@@ -1,0 +1,19 @@
+{
+  "name": "nexora-saas-platform",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SaaS platform for online storefronts. Phase 0 tooling only; no product code yet.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "conformance": "tsx tools/conformance/run.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,29 @@
+name: Conformance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Harness self-test (proves every rule still detects its fixture)
+        run: npm test
+      - name: Conformance scan of real source tree
+        run: npm run conformance
+      - name: Upload exceptions report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-exceptions-report
+          path: conformance-exceptions-report.md
