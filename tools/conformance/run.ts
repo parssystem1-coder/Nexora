@@ -6,6 +6,7 @@ import { checkSingletons } from "./rules/singleton.js";
 import { checkSchema } from "./rules/schema.js";
 import { checkSecrets } from "./rules/secrets.js";
 import { checkSchemaLive } from "./rules/schema-live.js";
+import { checkDbAccess } from "./rules/db-access.js";
 import { loadExceptions, applyExceptions } from "./lib/exceptions.js";
 import { loadDbConfig } from "../../platform/config.js";
 import { discoverModuleMigrations } from "../../platform/db/discover-migrations.js";
@@ -23,6 +24,7 @@ async function run() {
     ...checkSingletons(ROOT),
     ...checkSchema(ROOT),
     ...checkSecrets(ROOT),
+    ...checkDbAccess(ROOT),
     ...(await checkSchemaLiveAgainstRealTree()),
   ];
 

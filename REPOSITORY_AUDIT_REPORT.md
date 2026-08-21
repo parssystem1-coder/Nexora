@@ -53,14 +53,14 @@ This session's output turns the repository from "docs only" into "docs + a worki
 | Area | Status | Notes |
 |---|---|---|
 | Node/npm availability | MATCH | Node v24.18.0, npm 11.16.0, registry reachable. |
-| `package.json` | MISSING → now scaffolded | Created this session. Runtime dependency: `pg` only. Dev toolchain: `typescript`, `tsx`, `vitest`, `@types/node`, `@types/pg`. No NestJS, Next.js, Redis/BullMQ, or query builder yet — those belong to Task 1 (golden path), not Task 0. Query builder (Drizzle vs. Kysely, ADR-021) deliberately deferred; see `DECISION_LOG.md`. |
+| `package.json` | MISSING → now scaffolded | Created this session. Runtime dependencies: `pg`, `kysely`. Dev toolchain: `typescript`, `tsx`, `vitest`, `@types/node`, `@types/pg`. No NestJS, Next.js or Redis/BullMQ yet — those belong to Task 1 (golden path), not Task 0. Query builder (ADR-021) is now decided: **Kysely**, confirmed by the user; see `DECISION_LOG.md`. |
 | `tsconfig.json` | MISSING → now scaffolded | Strict mode on. Covers `tools/`, `modules/`, `platform/`. Excludes `tools/conformance/fixtures` from type-checking since those files contain deliberately-invalid imports by design. |
 | Dependency audit | PARTIAL | `npm install` reports 5 vulnerabilities (3 moderate, 1 high, 1 critical), all transitive, all inside `esbuild`/`vite`'s dev-server CORS advisory (GHSA-67mh-4wv8-2f99), pulled in by `vitest`. This class of finding only affects a running `vite` dev server, which this project does not start. `pg` itself has no reported advisories at the installed version. Re-run `npm audit` once the real app dependencies (Task 1: NestJS/Next.js) are added. |
-| Database setup | MATCH | `docker-compose.yml` provides PostgreSQL 16 on host port 5433 (chosen to avoid colliding with a developer's pre-existing local Postgres — see `DECISION_LOG.md`). `platform/config.ts` loads `DATABASE_URL` from the environment with a dev-friendly default matching docker-compose. Query builder still deliberately not chosen (see above). |
-| Migration runner + RLS/transaction helper | MATCH | `platform/db/migrate.ts` (forward-only, tracked in `schema_migrations`) + `platform/db/discover-migrations.ts` (discovers `modules/<module>/migrations/*.sql`) + `platform/db/tenant-context.ts` (the one `@singleton-role: tenant-context` helper — opens a transaction, sets `app.tenant_id` via `set_config`, commits/rolls back). Proven against a real, running PostgreSQL this session — see section 4.5. |
+| Database setup | MATCH | `docker-compose.yml` provides PostgreSQL 16 on host port 5433 (chosen to avoid colliding with a developer's pre-existing local Postgres — see `DECISION_LOG.md`). `platform/config.ts` loads `DATABASE_URL` from the environment with a dev-friendly default matching docker-compose. `platform/db/kysely.ts`'s `createDb()` is the one place a Kysely instance is constructed, wrapping `platform/db/pool.ts`'s `pg.Pool`. |
+| Migration runner + RLS/transaction helper | MATCH | `platform/db/migrate.ts` (forward-only, raw SQL, tracked in `schema_migrations`) + `platform/db/discover-migrations.ts` (discovers `modules/<module>/migrations/*.sql`) + `platform/db/tenant-context.ts` (the one `@singleton-role: tenant-context` helper, rebuilt on Kysely this session — opens a `db.transaction()`, sets `app.tenant_id` via `set_config(..., true)` as the first statement, commits/rolls back). Proven against a real, running PostgreSQL both structurally (section 4.5) and behaviorally (`platform/db/tenant-context.spec.ts`: tenant isolation, fail-closed, no cross-call leakage, rollback-on-error — 4/4 passing). A new conformance rule (`tools/conformance/rules/db-access.ts`) mechanically forbids any other file from importing `pg` directly or calling `.transaction(` — see `DECISION_LOG.md`. |
 | Config/secret loading | MATCH | `platform/config.ts` — `DATABASE_URL` / `CONFORMANCE_TEST_DATABASE_URL` from environment only, `.env.example` documents them, `.env` is gitignored. Nothing else needs a secret yet in Phase 0. |
 | Migrations (product) | MISSING | Zero actual migrations exist under `modules/*/migrations/` (no modules exist yet). Per-module placement corrected this session from an earlier root-level `migrations/` folder — see `DECISION_LOG.md`. Building real migrations is Task 1/2 work, gated on this report being reviewed. |
-| Tests | MISSING (product) / MATCH (harness) | No product tests exist (no product code exists). The conformance harness has two self-test files: `tools/conformance/harness.selftest.spec.ts` (16 cases, static rules) and `tools/conformance/harness.selftest.live-db.spec.ts` (5 cases, against a real migrated PostgreSQL) — 21/21 passing. |
+| Tests | MISSING (product) / MATCH (harness + DB helper) | No product tests exist (no product code exists). Three self-test files, 28/28 passing: `tools/conformance/harness.selftest.spec.ts` (19 cases, static rules incl. `db-access.ts`), `tools/conformance/harness.selftest.live-db.spec.ts` (5 cases, schema rules against a real migrated PostgreSQL), `platform/db/tenant-context.spec.ts` (4 cases, the RLS helper's behavior against real PostgreSQL). |
 | CI/CD | MISSING → now scaffolded | `.github/workflows/conformance.yml`: starts `docker compose up -d --wait` (Postgres), then runs typecheck, the harness self-test (incl. the live-DB cases), and the real-tree conformance scan, on every PR and on push to `main`. Not yet exercised by an actual GitHub remote/PR since there is no git remote configured in this environment (explicit user instruction: local-only, no remote, no push). |
 | Git repository | MISSING → now initialized | `git init` run this session (see section 5). No remote configured, per explicit user instruction. |
 
@@ -87,12 +87,14 @@ Built this session under `tools/conformance/`. See section 4 for detail. Status:
 - `tools/conformance/rules/schema.ts` — static SQL-text check: parses `**/migrations/*.sql`: every non-exempt table must have `tenant_id`; every non-exempt table must have both `ENABLE ROW LEVEL SECURITY` and a `CREATE POLICY`; no `FLOAT`/`DOUBLE`/`REAL` column on a money-shaped column name; no more than one `*idempotency*`-named table across all migrations.
 - `tools/conformance/rules/schema-live.ts` — the same rules, proven against a real, migrated PostgreSQL database via `information_schema`/`pg_catalog` introspection, per ADR-030 §3 ("a schema conformance test executed against a real migrated database"). See section 4.5.
 - `tools/conformance/rules/secrets.ts` — flags AWS-shaped access key IDs, PEM private key blocks, generic `key/secret/password/token = "..."` literal assignments, and — added this session's second pass — the same keywords embedded inside a larger string (`SECRET-IN-LOG-OR-SNAPSHOT`, e.g. a captured log line or a `.snap` file), which the standalone-literal pattern alone would miss. Placeholder values like `changeme` are allow-listed.
+- `tools/conformance/rules/db-access.ts` — added with the Kysely decision: only `platform/db/pool.ts`/`migrate.ts`/`migrate-cli.ts` may import `pg` directly, and only `platform/db/tenant-context.ts` may open a transaction. Makes "exactly one tenant-context helper" an enforced boundary, not just a convention.
 - `tools/conformance/lib/exceptions.ts` + root `exceptions.json` — implements ADR-030 item 5: a suppression is only honored if it references a real ADR (`ADR-###`); anything else fails CI outright. `npm run conformance` regenerates `conformance-exceptions-report.md` on every run.
 - `tools/conformance/run.ts` — the CI entry point. Scans the real tree (everything except `node_modules`, `.git`, `dist`, `coverage`, and `tools` itself — the harness's own code and fixtures are not "product code" and are reviewed by hand instead, logged in `DECISION_LOG.md`), plus a best-effort live-DB schema check against the real `modules/*/migrations` tree (skipped with a clear log line, not a failure, if no database is reachable — see 4.5).
-- `tools/conformance/fixtures/**` — one deliberately-violating fixture per rule (12 fixtures) plus one `clean/` control tree that must produce zero violations across every rule.
-- `tools/conformance/harness.selftest.spec.ts` — 16 Vitest cases: one asserting detection per fixture, plus one asserting the clean tree is silent across all four static rule families.
+- `tools/conformance/fixtures/**` — one deliberately-violating fixture per rule (15 fixtures) plus one `clean/` control tree that must produce zero violations across every rule.
+- `tools/conformance/harness.selftest.spec.ts` — 19 Vitest cases: one asserting detection per fixture, plus one asserting the clean tree is silent across all rule families.
 - `tools/conformance/harness.selftest.live-db.spec.ts` — 5 Vitest cases proving the schema rules against a real PostgreSQL connection (4 violation fixtures + the clean control), isolated in a dedicated schema that's reset between fixtures.
-- `.github/workflows/conformance.yml` — starts Postgres via `docker compose up -d --wait`, then runs `npm run typecheck`, `npm test` (both self-test files above), and `npm run conformance` (the real scan), on every PR and on push to `main`.
+- `platform/db/tenant-context.spec.ts` — 4 Vitest cases proving the RLS helper itself (not just the schema rules) against real PostgreSQL: tenant isolation, fail-closed with no context, no leakage across pooled-connection reuse, rollback-on-error. Uncovered a real finding — see `DECISION_LOG.md` "RLS: FORCE ROW LEVEL SECURITY or a non-owner app role".
+- `.github/workflows/conformance.yml` — starts Postgres via `docker compose up -d --wait`, then runs `npm run typecheck`, `npm test` (all self-test files above), and `npm run conformance` (the real scan), on every PR and on push to `main`.
 
 ### 4.2 Why not `dependency-cruiser`
 
@@ -106,7 +108,7 @@ Import resolution is regex-based (source-text scanning of `import`/`require` spe
 
 ```
 npx tsc --noEmit                    -> 0 errors
-npx vitest run                      -> 21/21 self-test cases pass (16 static + 5 live-DB)
+npx vitest run                      -> 28/28 self-test cases pass (19 static + 5 live-DB schema + 4 tenant-context)
 npx tsx tools/conformance/run.ts    -> PASS (0 violations) on the current (empty) real tree
 ```
 
@@ -158,15 +160,16 @@ Per `AGENTS.md` section 6 and `08_PHASE_1_BRIEF.md`, none of the following start
 
 - The `store.read` golden path.
 - Any of the ~12 Phase 1 tables or their migrations.
-- NestJS/Next.js app scaffolding, the query builder choice (Drizzle vs. Kysely — deliberately deferred, see `DECISION_LOG.md`), Redis/BullMQ wiring (also deferred, see `DECISION_LOG.md`), or auth (ADR-029).
+- NestJS/Next.js app scaffolding, Redis/BullMQ wiring (deferred, see `DECISION_LOG.md`), or auth (ADR-029). (The query builder is no longer deferred — Kysely, see below.)
 - Any module folder under `modules/` beyond the documented-but-empty placeholder.
 
 ## 7. Open items needing human confirmation
 
-Full detail and options are in `DECISION_LOG.md`; listed here so they aren't missed:
+Full detail and options are in `DECISION_LOG.md`; listed here so they aren't missed. Two of the original five were resolved by the user 2026-08-22 and are struck through; what's left:
 
-1. **Contradiction between `06_IMPLEMENTATION_PLAN.md` (7-item Phase 0) and `08_PHASE_1_BRIEF.md` (3-item Task 0)** — proceeded under the broader `06`/`03` scope per the user's explicit instruction this session, but a human should confirm that's the right call before Phase 0 is signed off as complete.
+1. ~~Contradiction between `06_IMPLEMENTATION_PLAN.md` (7-item Phase 0) and `08_PHASE_1_BRIEF.md` (3-item Task 0)~~ — **RESOLVED**: `06`'s full 7-item list governs; `08` is a summary of Task 0, not its ceiling.
 2. Whether `platform/` is the right long-term name for cross-cutting DB plumbing (vs. `shared/`, `infra/`, or a `modules/platform/` pseudo-module) — low cost to rename now, higher later.
-3. The query builder choice (Drizzle vs. Kysely) — must land before Task 1's repository layer.
+3. ~~The query builder choice~~ — **RESOLVED**: Kysely. See `DECISION_LOG.md` for why and for the new `DB-ACCESS-*` conformance rules enforcing that all pool access and transaction-opening goes through it.
 4. Whether/when to add a `redis` service to `docker-compose.yml` — currently omitted as out of scope for this session's minimal-scaffold instruction.
-5. **Verify the Docker path itself** (`docker compose up -d && npm test`) on a machine with Docker — this session only exercised the equivalent native-Postgres path (section 4.5).
+5. **Verify the Docker path itself** (`docker compose up -d && npm test`) — moved to `RISK_REGISTER.md` (R-001) since it's a standing risk, not a one-time todo; the user is verifying this locally.
+6. **New, from building the tenant-context helper's own tests:** `FORCE ROW LEVEL SECURITY` vs. a non-owner application role — see `DECISION_LOG.md` "RLS: FORCE ROW LEVEL SECURITY or a non-owner app role". Must be decided before Task 1's real migrations create tenant-owned tables, since this Phase 0 scaffold's single `nexora` role would otherwise silently bypass RLS as the tables' owner.

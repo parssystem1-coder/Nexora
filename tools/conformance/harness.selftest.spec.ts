@@ -5,6 +5,7 @@ import { checkImports } from "./rules/imports.js";
 import { checkSingletons } from "./rules/singleton.js";
 import { checkSchema } from "./rules/schema.js";
 import { checkSecrets } from "./rules/secrets.js";
+import { checkDbAccess } from "./rules/db-access.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) => join(HERE, "fixtures", name);
@@ -103,6 +104,22 @@ describe("secret rules", () => {
   });
 });
 
+describe("db access rules", () => {
+  it("flags module code importing 'pg' directly", () => {
+    const violations = checkDbAccess(fixture("db-access-raw-pg-import"));
+    expect(violations.map((v) => v.rule)).toContain("DB-ACCESS-RAW-PG-IMPORT");
+  });
+
+  it("flags code opening a transaction outside the tenant-context helper", () => {
+    const violations = checkDbAccess(fixture("db-access-transaction-bypass"));
+    expect(violations.map((v) => v.rule)).toContain("DB-ACCESS-TRANSACTION-BYPASSES-HELPER");
+  });
+
+  it("does not flag the allow-listed platform/db/* files that legitimately need pg/transaction access", () => {
+    expect(checkDbAccess(fixture("db-access-allowed-platform-files"))).toEqual([]);
+  });
+});
+
 describe("clean control tree", () => {
   it("produces zero violations across every rule set", () => {
     const root = fixture("clean");
@@ -110,5 +127,6 @@ describe("clean control tree", () => {
     expect(checkSingletons(root)).toEqual([]);
     expect(checkSchema(root)).toEqual([]);
     expect(checkSecrets(root)).toEqual([]);
+    expect(checkDbAccess(root)).toEqual([]);
   });
 });
