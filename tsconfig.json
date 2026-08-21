@@ -13,6 +13,6 @@
     "noEmit": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["tools", "modules", "vitest.config.ts"],
+  "include": ["tools", "modules", "platform", "vitest.config.ts"],
   "exclude": ["node_modules", "dist", "tools/conformance/fixtures"]
 }

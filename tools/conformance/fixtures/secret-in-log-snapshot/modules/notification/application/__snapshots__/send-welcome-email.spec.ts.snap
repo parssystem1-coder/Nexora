@@ -1,0 +1,5 @@
+// Vitest Snapshot v1
+
+exports[`send welcome email > logs the outbound request 1`] = `
+"POST https://provider.example/v1/send?api_key=FAKEFAKEFAKEFAKE1234 200 OK"
+`;

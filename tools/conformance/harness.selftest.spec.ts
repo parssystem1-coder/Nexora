@@ -96,6 +96,11 @@ describe("secret rules", () => {
     const violations = checkSecrets(fixture("secret-credential-literal"));
     expect(violations.map((v) => v.rule)).toContain("SECRET-CREDENTIAL-LITERAL");
   });
+
+  it("flags a credential embedded in a snapshot/log line, not just a standalone literal", () => {
+    const violations = checkSecrets(fixture("secret-in-log-snapshot"));
+    expect(violations.map((v) => v.rule)).toContain("SECRET-IN-LOG-OR-SNAPSHOT");
+  });
 });
 
 describe("clean control tree", () => {

@@ -1,22 +1,29 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { Client } from "pg";
 import { checkImports } from "./rules/imports.js";
 import { checkSingletons } from "./rules/singleton.js";
 import { checkSchema } from "./rules/schema.js";
 import { checkSecrets } from "./rules/secrets.js";
+import { checkSchemaLive } from "./rules/schema-live.js";
 import { loadExceptions, applyExceptions } from "./lib/exceptions.js";
+import { loadDbConfig } from "../../platform/config.js";
+import { discoverModuleMigrations } from "../../platform/db/discover-migrations.js";
+import { migrate } from "../../platform/db/migrate.js";
+import { describeDbError } from "../../platform/db/describe-error.js";
 import type { Violation } from "./lib/types.js";
 
 const ROOT = process.cwd();
 const EXCEPTIONS_PATH = join(ROOT, "exceptions.json");
 const REPORT_PATH = join(ROOT, "conformance-exceptions-report.md");
 
-function run() {
+async function run() {
   const violations: Violation[] = [
     ...checkImports(ROOT),
     ...checkSingletons(ROOT),
     ...checkSchema(ROOT),
     ...checkSecrets(ROOT),
+    ...(await checkSchemaLiveAgainstRealTree()),
   ];
 
   const exceptions = loadExceptions(EXCEPTIONS_PATH);
@@ -47,6 +54,35 @@ function run() {
   process.exit(1);
 }
 
+/**
+ * Live-DB companion to checkSchema() (static SQL parsing): applies the real
+ * per-module migrations tree (modules/<module>/migrations) to the configured
+ * database and introspects it. Best-effort — if no database is reachable this
+ * is logged and skipped rather
+ * than failing CI, because Phase 0's real modules/ tree has zero migrations
+ * and not every environment running `npm run conformance` has Postgres up
+ * (the self-test suite's live-DB spec is what makes the mechanism a hard
+ * requirement — see tools/conformance/harness.selftest.live-db.spec.ts).
+ */
+async function checkSchemaLiveAgainstRealTree(): Promise<Violation[]> {
+  const config = loadDbConfig();
+  const client = new Client({ connectionString: config.connectionString });
+  try {
+    await client.connect();
+  } catch (err) {
+    console.log(`(live-DB schema check skipped: could not reach ${config.connectionString} — ${describeDbError(err)})`);
+    return [];
+  }
+
+  try {
+    const files = discoverModuleMigrations(join(ROOT, "modules"));
+    await migrate(client, "public", files);
+    return await checkSchemaLive(client, "public");
+  } finally {
+    await client.end();
+  }
+}
+
 function writeReport(suppressed: Array<Violation & { reason: string; adr: string }>) {
   const lines = [
     "# Conformance Exceptions Report",
@@ -65,4 +101,7 @@ function writeReport(suppressed: Array<Violation & { reason: string; adr: string
   writeFileSync(REPORT_PATH, lines.join("\n") + "\n", "utf8");
 }
 
-run();
+run().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
