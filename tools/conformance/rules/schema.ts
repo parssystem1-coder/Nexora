@@ -3,22 +3,13 @@ import { join } from "node:path";
 import { listFiles } from "../lib/walk.js";
 import type { Violation } from "../lib/types.js";
 
-// Tables that are legitimately not tenant-owned (Phase 1 scope, 08_PHASE_1_BRIEF.md section 4).
-// The identity cluster (sessions/credentials/identity_providers) is exempt for the same
-// structural reason `users` is: none of them are owned by a single tenant, and RLS on
-// `sessions` would be circular (validating a session is how tenant trust gets established
-// in the first place). See DECISION_LOG.md "RLS exemption list is incomplete...".
-const TENANT_EXEMPT = new Set([
-  "users",
-  "currencies",
-  "reserved_subdomains",
-  "sessions",
-  "credentials",
-  "identity_providers",
-  "roles",
-  "permissions",
-  "role_permissions",
-]);
+// Exactly the three tables 08_PHASE_1_BRIEF.md §5 exempts, no more.
+// Widening this list is a documentation change, not an implementer's call:
+// two proposals to widen it (the identity cluster; the role/permission
+// catalog) are OPEN in DECISION_LOG.md awaiting a decision, and are
+// deliberately NOT applied here — so the harness reports the current schema's
+// deviation instead of silently sanctioning it.
+const TENANT_EXEMPT = new Set(["users", "currencies", "reserved_subdomains"]);
 
 const CREATE_TABLE_RE = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([a-zA-Z_][\w]*)"?\s*\(([\s\S]*?)\n\)\s*;/gi;
 const COLUMN_LINE_RE = /^\s*"?([a-zA-Z_][\w]*)"?\s+([A-Z][A-Z0-9 ]*?)(?:\s|,|$)/i;

@@ -2,21 +2,11 @@ import type { Client } from "pg";
 import { qualifiedIdent } from "../../../platform/db/ident.js";
 import type { Violation } from "../lib/types.js";
 
-// Tables that are legitimately not tenant-owned (Phase 1 scope, 08_PHASE_1_BRIEF.md section 4).
-// See tools/conformance/rules/schema.ts for why the identity cluster is included, and
-// DECISION_LOG.md "RLS exemption list is incomplete...".
-const TENANT_EXEMPT = new Set([
-  "users",
-  "currencies",
-  "reserved_subdomains",
-  "sessions",
-  "credentials",
-  "identity_providers",
-  "roles",
-  "permissions",
-  "role_permissions",
-  "schema_migrations",
-]);
+// Exactly the three tables 08_PHASE_1_BRIEF.md §5 exempts — see the matching
+// note in ./schema.ts. `schema_migrations` is the migration runner's own
+// bookkeeping table (platform/db/migrate.ts), not a §4 product table, so it is
+// excluded here as tooling rather than as a tenancy exemption.
+const TENANT_EXEMPT = new Set(["users", "currencies", "reserved_subdomains", "schema_migrations"]);
 
 const MONEY_NAME_RE = /amount|price|cost|total|balance|fee|money|charge/i;
 const FLOATING_TYPES = new Set(["real", "double precision"]);

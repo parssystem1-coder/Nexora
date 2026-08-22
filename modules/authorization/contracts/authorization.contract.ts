@@ -1,2 +1,3 @@
-export { PermissionGuard } from "../interfaces/permission.guard.js";
-export { RequirePermission } from "../interfaces/require-permission.decorator.js";
+export { CheckPermissionService } from "../application/check-permission.service.js";
+export { PermissionCheckRepositoryPg } from "../infrastructure/permission-check.repository.pg.js";
+export type { PermissionCheckRepository } from "../domain/permission-check.repository.js";

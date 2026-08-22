@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Test } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
-import cookieParser from "cookie-parser";
 import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
-import { AppModule } from "./app.module.js";
+import { createTestApp } from "./create-app.js";
 import { createDb } from "../../platform/db/kysely.js";
 import { loadDbConfig } from "../../platform/config.js";
 import { describeDbError } from "../../platform/db/describe-error.js";
@@ -54,10 +52,7 @@ beforeAll(async () => {
     );
   }
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = moduleRef.createNestApplication();
-  app.use(cookieParser());
-  await app.init();
+  app = await createTestApp();
 });
 
 afterAll(async () => {
@@ -179,6 +174,108 @@ describe("GET /api/v1/stores/:storeId — golden path", () => {
           .execute(),
     );
     expect(events).toContainEqual({ capability: "store.read", outcome: "SUCCESS" });
+  });
+
+  it("writes no audit event when authorization fails — step 6 runs before steps 7-8 in the same transaction", async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const userId = await seedUser(db, `noperm-audit-${suffix}@example.test`);
+    const orgId = await seedOrganization(db, "NoPermAudit Org", `noperm-audit-org-${suffix}`);
+    await seedMembership(db, orgId, userId, "ACTIVE");
+    const storeId = await seedStore(db, orgId, "NoPermAudit Store", `noperm-audit-store-${suffix}`);
+    await seedStoreMembership(db, orgId, storeId, userId);
+    const token = await seedSession(db, userId, { activeOrganizationId: orgId });
+
+    const res = await request(app.getHttpServer()).get(`/api/v1/stores/${storeId}`).set("Cookie", `sid=${token}`);
+    expect(res.status).toBe(403);
+
+    const events = await withTenantContext(db, { tenantId: orgId, userId, storeId }, (trx) =>
+      trx.selectFrom("audit_events").select("id").where("resource_id", "=", storeId).execute(),
+    );
+    expect(events).toEqual([]);
+  });
+});
+
+/** 08_PHASE_1_BRIEF.md §2 steps 9-10 — the stable error envelope and structured logging. */
+describe("stable error contract and observability", () => {
+  it("returns the documented envelope shape with a requestId on every failure path", async () => {
+    const tenantA = await createTenantFixture("envA");
+    const tenantB = await createTenantFixture("envB");
+
+    const cases = [
+      { path: `/api/v1/stores/${tenantA.storeId}`, cookie: undefined, code: "AUTHENTICATION_REQUIRED" },
+      { path: `/api/v1/stores/not-a-uuid`, cookie: tenantA.token, code: "VALIDATION_ERROR" },
+      { path: `/api/v1/stores/${tenantB.storeId}`, cookie: tenantA.token, code: "STORE_ACCESS_DENIED" },
+    ];
+
+    for (const testCase of cases) {
+      const req = request(app.getHttpServer()).get(testCase.path);
+      if (testCase.cookie) req.set("Cookie", `sid=${testCase.cookie}`);
+      const res = await req;
+
+      expect(res.body.code).toBe(testCase.code);
+      expect(typeof res.body.message).toBe("string");
+      expect(res.body.requestId).toMatch(/^[0-9a-f-]{36}$/);
+    }
+  });
+
+  it("propagates a real requestId and correlationId into the audit event, not an empty string", async () => {
+    const tenant = await createTenantFixture("reqid");
+    const correlationId = randomUUID();
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/stores/${tenant.storeId}`)
+      .set("Cookie", `sid=${tenant.token}`)
+      .set("x-correlation-id", correlationId);
+
+    const events = await withTenantContext(
+      db,
+      { tenantId: tenant.orgId, userId: tenant.userId, storeId: tenant.storeId },
+      (trx) =>
+        trx
+          .selectFrom("audit_events")
+          .select(["request_id", "correlation_id"])
+          .where("resource_id", "=", tenant.storeId)
+          .execute(),
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]!.request_id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(events[0]!.correlation_id).toBe(correlationId);
+  });
+
+  it("emits one structured log line per request carrying requestId, correlationId and tenantId", async () => {
+    const tenant = await createTenantFixture("logline");
+    const captured: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => {
+      captured.push(String(args[0]));
+    };
+
+    try {
+      await request(app.getHttpServer()).get(`/api/v1/stores/${tenant.storeId}`).set("Cookie", `sid=${tenant.token}`);
+    } finally {
+      console.log = originalLog;
+    }
+
+    const entries = captured
+      .map((line) => {
+        try {
+          return JSON.parse(line) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      })
+      .filter((entry): entry is Record<string, unknown> => entry !== null && "requestId" in entry);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      tenantId: tenant.orgId,
+      status: 200,
+      method: "GET",
+      path: `/api/v1/stores/${tenant.storeId}`,
+    });
+    expect(entries[0]!["requestId"]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(entries[0]!["correlationId"]).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
 
