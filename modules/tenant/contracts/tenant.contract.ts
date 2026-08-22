@@ -28,3 +28,12 @@ export interface MembershipDto {
   status: "ACTIVE" | "REVOKED";
   createdAt: string;
 }
+
+/** One role grant on one membership — membership.role.assign adds a role, it does not replace the membership's whole role set. */
+export interface MembershipRoleDto {
+  id: string;
+  organizationId: string;
+  membershipId: string;
+  roleKey: string;
+  createdAt: string;
+}

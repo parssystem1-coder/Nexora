@@ -39,4 +39,21 @@ export interface MembershipRepository {
    * Throws {@link MembershipAlreadyExistsError} on a duplicate (tenant, user).
    */
   create(membership: Membership): Promise<void>;
+
+  /**
+   * Added for membership.role.assign, to resolve the TARGET membership (not
+   * the caller's own — that is findByUserAndTenant's job). Scoped by id only,
+   * relying on RLS to hide rows outside the caller's reach.
+   *
+   * **Not safe to trust alone**: `memberships`' RLS policy has a self-access
+   * OR clause (RISK_REGISTER.md R-003) so a row is visible if EITHER its
+   * tenant_id matches the current context OR its user_id matches the
+   * caller's own id — the second branch means a caller's own membership row
+   * IN A DIFFERENT ORGANIZATION can come back from this method even though
+   * the current tenant context is a third organization entirely. Every
+   * caller of this method MUST explicitly compare the returned row's
+   * `tenantId` against the tenant it actually intended, rather than assuming
+   * "this returned a row" already proves it belongs to the current tenant.
+   */
+  findById(id: string): Promise<Membership | null>;
 }

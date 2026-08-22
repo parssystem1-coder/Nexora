@@ -31,6 +31,11 @@ function fakes(options: { user?: User | null; onCreate?: () => never } = {}) {
   };
   const memberships: MembershipRepository = {
     findByUserAndTenant: async () => null,
+    // Never exercised here: InviteMemberService only writes. Present because
+    // membership.role.assign added findById to the port.
+    findById: async () => {
+      throw new Error("InviteMemberService must not look up memberships by id.");
+    },
     create: async (membership) => {
       if (options.onCreate) options.onCreate();
       created.push(membership);

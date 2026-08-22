@@ -67,7 +67,13 @@ export class CreateOrganizationService {
 
     const membership = new Membership(randomUUID(), organization.id, command.creatorUserId, "ACTIVE", createdAt);
     await this.memberships.create(membership);
-    await this.roleGrants.grantRoleByKey(organization.id, membership.id, OWNER_ROLE_KEY);
+    await this.roleGrants.grantRoleByKey({
+      id: randomUUID(),
+      tenantId: organization.id,
+      membershipId: membership.id,
+      roleKey: OWNER_ROLE_KEY,
+      createdAt,
+    });
 
     return {
       id: organization.id,

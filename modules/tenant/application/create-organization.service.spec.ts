@@ -35,13 +35,19 @@ function fakes(options: { onCreate?: () => never } = {}) {
   };
   const memberships: MembershipRepository = {
     findByUserAndTenant: async () => null,
+    // Never exercised here: CreateOrganizationService only writes. Present
+    // because membership.role.assign added findById to the port.
+    findById: async () => {
+      throw new Error("CreateOrganizationService must not look up memberships by id.");
+    },
     create: async (membership) => {
       recorded.memberships.push(membership);
     },
   };
   const roleGrants: RoleGrantRepository = {
-    grantRoleByKey: async (tenantId, membershipId, roleKey) => {
-      recorded.grants.push({ tenantId, membershipId, roleKey });
+    grantRoleByKey: async (grant) => {
+      recorded.grants.push({ tenantId: grant.tenantId, membershipId: grant.membershipId, roleKey: grant.roleKey });
+      return { id: grant.id, tenantId: grant.tenantId, membershipId: grant.membershipId, roleKey: grant.roleKey, createdAt: grant.createdAt };
     },
   };
 

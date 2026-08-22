@@ -3,6 +3,7 @@ import {
   storeReadCapability,
   organizationCreateCapability,
   membershipInviteCapability,
+  membershipRoleAssignCapability,
 } from "../../modules/tenant/contracts/index.js";
 
 /**
@@ -21,6 +22,7 @@ import {
  */
 export const CAPABILITIES: readonly CapabilityDefinition[] = [
   membershipInviteCapability,
+  membershipRoleAssignCapability,
   organizationCreateCapability,
   storeReadCapability,
 ];

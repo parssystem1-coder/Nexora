@@ -17,10 +17,14 @@ function fakeRepos(options: { storeMembership: StoreMembership | null; membershi
   };
   const memberships: MembershipRepository = {
     findByUserAndTenant: async () => options.membership,
-    // Never exercised here: ResolveStoreAccessService only reads. Present
-    // because organization.create added create() to the port.
+    // Never exercised here: ResolveStoreAccessService only reads by
+    // (user, tenant). Present because organization.create added create() and
+    // membership.role.assign added findById() to the port.
     create: async () => {
       throw new Error("ResolveStoreAccessService must not create memberships.");
+    },
+    findById: async () => {
+      throw new Error("ResolveStoreAccessService must not look up memberships by id.");
     },
   };
   return { storeMemberships, memberships };

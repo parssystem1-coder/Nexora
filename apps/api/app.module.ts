@@ -3,6 +3,7 @@ import { APP_FILTER } from "@nestjs/core";
 import { StoreController } from "../../modules/tenant/interfaces/store.controller.js";
 import { OrganizationController } from "../../modules/tenant/interfaces/organization.controller.js";
 import { MembershipController } from "../../modules/tenant/interfaces/membership.controller.js";
+import { MembershipRoleController } from "../../modules/tenant/interfaces/membership-role.controller.js";
 import { StoreAccessGuard } from "../../modules/tenant/interfaces/store-access.guard.js";
 import { OrganizationAccessGuard } from "../../modules/tenant/interfaces/organization-access.guard.js";
 import { SessionGuard } from "../../modules/identity/interfaces/session.guard.js";
@@ -17,7 +18,7 @@ import { DatabaseLifecycle } from "./database-lifecycle.provider.js";
  * connections are created (db-providers.ts).
  */
 @Module({
-  controllers: [StoreController, OrganizationController, MembershipController],
+  controllers: [StoreController, OrganizationController, MembershipController, MembershipRoleController],
   providers: [
     { provide: APP_DB, useFactory: createAppDb },
     { provide: AUDIT_DB, useFactory: createAuditDb },

@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "ee8872a",
+    "commit": "53d0850",
     "dirty": true
   },
   "modules": [
@@ -28,7 +28,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 12,
+      "files": 14,
       "dependsOn": [
         "capability"
       ],
@@ -55,7 +55,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 17,
+      "files": 19,
       "dependsOn": [
         "capability"
       ],
@@ -83,7 +83,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 43,
+      "files": 48,
       "dependsOn": [
         "audit",
         "authorization",
@@ -227,6 +227,18 @@
       "audit": true,
       "storeScoped": false,
       "route": "POST /api/v1/organizations/:organizationId/memberships"
+    },
+    {
+      "id": "membership.role.assign",
+      "module": "tenant",
+      "file": "modules/tenant/interfaces/membership-role-assign.capability.ts",
+      "permissions": [
+        "membership.role.assign"
+      ],
+      "risk": "HIGH_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/organizations/:organizationId/memberships/:membershipId/roles"
     },
     {
       "id": "organization.create",
@@ -517,6 +529,11 @@
       "cases": 7
     },
     {
+      "file": "modules/tenant/application/assign-membership-role.service.spec.ts",
+      "layer": "application",
+      "cases": 9
+    },
+    {
       "file": "modules/tenant/application/create-organization.service.spec.ts",
       "layer": "application",
       "cases": 6
@@ -557,6 +574,11 @@
       "cases": 22
     },
     {
+      "file": "apps/api/membership-role-assign.integration.spec.ts",
+      "layer": "integration",
+      "cases": 27
+    },
+    {
       "file": "apps/api/organization-create.integration.spec.ts",
       "layer": "integration",
       "cases": 13
@@ -594,6 +616,11 @@
       "file": "modules/tenant/interfaces/membership.controller.ts"
     },
     {
+      "method": "POST",
+      "path": "/api/v1/organizations/:organizationId/memberships/:membershipId/roles",
+      "file": "modules/tenant/interfaces/membership-role.controller.ts"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/stores/:storeId",
       "file": "modules/tenant/interfaces/store.controller.ts"
@@ -603,10 +630,10 @@
     "modules": 6,
     "tables": 12,
     "tablesWithRls": 6,
-    "capabilities": 3,
-    "routes": 3,
-    "testFiles": 19,
-    "testCases": 153,
+    "capabilities": 4,
+    "routes": 4,
+    "testFiles": 21,
+    "testCases": 189,
     "adrs": 37,
     "adrsAccepted": 29
   }

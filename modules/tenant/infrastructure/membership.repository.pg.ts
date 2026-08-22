@@ -23,6 +23,17 @@ export class MembershipRepositoryPg implements MembershipRepository {
     return new Membership(row.id, row.tenant_id, row.user_id, row.status as "ACTIVE" | "REVOKED", row.created_at);
   }
 
+  /** See MembershipRepository.findById's R-003 warning: callers must check tenantId themselves. */
+  async findById(id: string): Promise<Membership | null> {
+    const row = await this.conn
+      .selectFrom("memberships")
+      .select(["id", "tenant_id", "user_id", "status", "created_at"])
+      .where("id", "=", id)
+      .executeTakeFirst();
+    if (!row) return null;
+    return new Membership(row.id, row.tenant_id, row.user_id, row.status as "ACTIVE" | "REVOKED", row.created_at);
+  }
+
   /** See MembershipRepository.create: id supplied by the caller, no RETURNING. */
   async create(membership: Membership): Promise<void> {
     try {

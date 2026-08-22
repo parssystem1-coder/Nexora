@@ -16,3 +16,12 @@ export { UserRepositoryPg } from "../infrastructure/user.repository.pg.js";
 export { normalizeEmail } from "../domain/email.vo.js";
 export type { User } from "../domain/user.entity.js";
 export type { UserRepository } from "../domain/user.repository.js";
+
+/**
+ * Write access limited to "revoke everything for this user" — see
+ * session-revocation.repository.ts. modules/tenant calls this from
+ * membership.role.assign; no module may write modules/identity's tables
+ * directly (ADR-030 dependency direction).
+ */
+export { SessionRevocationRepositoryPg } from "../infrastructure/session-revocation.repository.pg.js";
+export type { SessionRevocationRepository } from "../domain/session-revocation.repository.js";
