@@ -97,7 +97,7 @@ modules/<module>/
     <resource>.controller.ts      thin, no business logic
     <capability>.capability.ts    capability definition metadata
   migrations/
-    <timestamp>__<description>.sql
+    <timestamp>_<module>__<description>.sql
 ```
 
 Rules: one use case per file; a controller may contain no conditional business logic; a repository implementation may not be imported outside its own module; `contracts/index.ts` is the only cross-module import path.

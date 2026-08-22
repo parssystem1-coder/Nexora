@@ -49,7 +49,7 @@ It must demonstrate, in this order:
 5. transaction open plus RLS session context via the single helper (ADR-021)
 6. permission authorization through the capability policy pipeline
 7. application service execution with domain mapping
-8. audit event
+8. audit event, written before commit but on a separate connection that commits independently of the domain transaction, so the record survives whether that transaction commits or rolls back (option B; see `DECISION_LOG.md`, "Conflict: is the audit event inside the transaction (08 §2) or after commit (03 §3.1)?"). An audit event therefore attests to an authorized attempt, with `outcome` distinguishing success from failure — not to a committed effect.
 9. stable error contract for every failure mode
 10. structured logging with `requestId`, `correlationId`, `tenantId`
 11. tests at every layer, including an RLS test proving a query without context returns zero rows
@@ -94,7 +94,7 @@ About twelve tables. Not sixty. Do not create billing, commerce, domain, plugin,
 
 ## 5. Non-negotiable rules for this phase
 
-- every table above except `users`, `currencies` and `reserved_subdomains` carries `tenant_id` and an RLS policy in the same migration that creates it
+- every table above except `users`, `currencies`, `reserved_subdomains` and `sessions` carries `tenant_id` and an RLS policy in the same migration that creates it. `roles`, `permissions` and `role_permissions` are platform-wide reference data and are likewise exempt. `sessions` is exempt because one user holds memberships in several organizations while having a single live session, so a session row has no single correct `tenant_id`; the role catalog is exempt because capability keys are platform-defined, not per-tenant. `membership_roles` is **not** exempt — it is tenant-scoped and carries `tenant_id` + RLS like any other tenant-owned table.
 - RLS fails closed: no tenant context means zero rows plus an application error
 - the application database role cannot bypass RLS
 - `store_memberships` is checked for every store-scoped read; organization membership alone is not sufficient
