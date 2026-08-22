@@ -2,22 +2,35 @@
   "name": "nexora-saas-platform",
   "version": "0.0.0",
   "private": true,
-  "description": "SaaS platform for online storefronts. Phase 0 tooling only; no product code yet.",
+  "description": "SaaS platform for online storefronts.",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "conformance": "tsx tools/conformance/run.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate": "tsx platform/db/migrate-cli.ts"
+    "db:migrate": "tsx platform/db/migrate-cli.ts",
+    "start:dev": "tsx watch apps/api/main.ts"
   },
   "dependencies": {
+    "@nestjs/common": "^11.2.1",
+    "@nestjs/core": "^11.2.1",
+    "@nestjs/platform-express": "^11.2.1",
+    "cookie-parser": "^1.4.6",
     "kysely": "^0.29.5",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@nestjs/testing": "^11.2.1",
+    "@types/cookie-parser": "^1.4.7",
+    "@types/express": "^4.17.0",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.11.0",
+    "@types/supertest": "^6.0.0",
+    "supertest": "^7.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

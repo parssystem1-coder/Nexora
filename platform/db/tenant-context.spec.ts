@@ -30,6 +30,8 @@ const appDb = createDb(loadDbConfig());
 const TENANT_A = "11111111-1111-1111-1111-111111111111";
 const TENANT_B = "22222222-2222-2222-2222-222222222222";
 
+const asTenant = (tenantId: string | null) => ({ tenantId, userId: null, storeId: null });
+
 beforeAll(async () => {
   try {
     await sql`select 1`.execute(migrateDb);
@@ -61,10 +63,10 @@ beforeAll(async () => {
   // this file would be proving nothing.
   await assertRoleCannotBypassRls(appDb, TABLE);
 
-  await withTenantContext(appDb, TENANT_A, (trx) =>
+  await withTenantContext(appDb, asTenant(TENANT_A), (trx) =>
     sql`INSERT INTO ${sql.raw(TABLE)} (tenant_id, label) VALUES (${TENANT_A}::uuid, 'a-row')`.execute(trx),
   );
-  await withTenantContext(appDb, TENANT_B, (trx) =>
+  await withTenantContext(appDb, asTenant(TENANT_B), (trx) =>
     sql`INSERT INTO ${sql.raw(TABLE)} (tenant_id, label) VALUES (${TENANT_B}::uuid, 'b-row')`.execute(trx),
   );
 });
@@ -83,14 +85,14 @@ describe("the app role cannot bypass RLS (precondition for every test below)", (
 
 describe("withTenantContext (the one transaction/RLS helper)", () => {
   it("scopes reads to the given tenant", async () => {
-    const result = await withTenantContext(appDb, TENANT_A, (trx) =>
+    const result = await withTenantContext(appDb, asTenant(TENANT_A), (trx) =>
       sql<{ label: string }>`SELECT label FROM ${sql.raw(TABLE)}`.execute(trx),
     );
     expect(result.rows.map((r) => r.label)).toEqual(["a-row"]);
   });
 
   it("fails closed: no tenant context returns zero rows, not another tenant's data", async () => {
-    const result = await withTenantContext(appDb, null, (trx) =>
+    const result = await withTenantContext(appDb, asTenant(null), (trx) =>
       sql<{ label: string }>`SELECT label FROM ${sql.raw(TABLE)}`.execute(trx),
     );
     expect(result.rows).toEqual([]);
@@ -98,7 +100,7 @@ describe("withTenantContext (the one transaction/RLS helper)", () => {
 
   it("does not leak tenant context across pooled-connection reuse between calls", async () => {
     for (let i = 0; i < 5; i++) {
-      const result = await withTenantContext(appDb, TENANT_B, (trx) =>
+      const result = await withTenantContext(appDb, asTenant(TENANT_B), (trx) =>
         sql<{ label: string }>`SELECT label FROM ${sql.raw(TABLE)}`.execute(trx),
       );
       expect(result.rows.map((r) => r.label)).toEqual(["b-row"]);
@@ -107,7 +109,7 @@ describe("withTenantContext (the one transaction/RLS helper)", () => {
 
   it("rolls back the transaction (and therefore the tenant context) if fn throws", async () => {
     await expect(
-      withTenantContext(appDb, TENANT_A, async (trx) => {
+      withTenantContext(appDb, asTenant(TENANT_A), async (trx) => {
         await sql`INSERT INTO ${sql.raw(TABLE)} (tenant_id, label) VALUES (${TENANT_A}::uuid, 'should-not-persist')`.execute(
           trx,
         );
@@ -115,7 +117,7 @@ describe("withTenantContext (the one transaction/RLS helper)", () => {
       }),
     ).rejects.toThrow("boom");
 
-    const result = await withTenantContext(appDb, TENANT_A, (trx) =>
+    const result = await withTenantContext(appDb, asTenant(TENANT_A), (trx) =>
       sql<{ label: string }>`SELECT label FROM ${sql.raw(TABLE)}`.execute(trx),
     );
     expect(result.rows.map((r) => r.label)).toEqual(["a-row"]);
