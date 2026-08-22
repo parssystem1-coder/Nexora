@@ -1,0 +1,556 @@
+{
+  "generatedFrom": {
+    "commit": "aa1f749",
+    "dirty": true
+  },
+  "modules": [
+    {
+      "name": "audit",
+      "layers": [
+        "application",
+        "contracts",
+        "domain",
+        "infrastructure",
+        "interfaces",
+        "migrations"
+      ],
+      "files": 9,
+      "dependsOn": [],
+      "dependsOnPlatform": true
+    },
+    {
+      "name": "authorization",
+      "layers": [
+        "application",
+        "contracts",
+        "domain",
+        "infrastructure",
+        "interfaces",
+        "migrations"
+      ],
+      "files": 9,
+      "dependsOn": [
+        "capability"
+      ],
+      "dependsOnPlatform": true
+    },
+    {
+      "name": "capability",
+      "layers": [
+        "contracts",
+        "domain",
+        "interfaces"
+      ],
+      "files": 5,
+      "dependsOn": [],
+      "dependsOnPlatform": false
+    },
+    {
+      "name": "identity",
+      "layers": [
+        "application",
+        "contracts",
+        "domain",
+        "infrastructure",
+        "interfaces",
+        "migrations"
+      ],
+      "files": 16,
+      "dependsOn": [
+        "capability"
+      ],
+      "dependsOnPlatform": true
+    },
+    {
+      "name": "money",
+      "layers": [
+        "contracts",
+        "domain",
+        "infrastructure",
+        "migrations"
+      ],
+      "files": 11,
+      "dependsOn": [],
+      "dependsOnPlatform": true
+    },
+    {
+      "name": "tenant",
+      "layers": [
+        "application",
+        "contracts",
+        "domain",
+        "infrastructure",
+        "interfaces",
+        "migrations"
+      ],
+      "files": 26,
+      "dependsOn": [
+        "audit",
+        "authorization",
+        "capability",
+        "identity"
+      ],
+      "dependsOnPlatform": true
+    }
+  ],
+  "tables": [
+    {
+      "name": "audit_events",
+      "module": "audit",
+      "migration": "20260822090800_audit__create_audit_events.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "audit_events_tenant_isolation"
+      ]
+    },
+    {
+      "name": "currencies",
+      "module": "money",
+      "migration": "20260822110000_money__create_currencies.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "membership_roles",
+      "module": "authorization",
+      "migration": "20260822090700_authorization__create_membership_roles.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "membership_roles_tenant_isolation"
+      ]
+    },
+    {
+      "name": "memberships",
+      "module": "tenant",
+      "migration": "20260822090300_tenant__create_memberships.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "memberships_self_or_tenant_access"
+      ]
+    },
+    {
+      "name": "organizations",
+      "module": "tenant",
+      "migration": "20260822090200_tenant__create_organizations.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "organizations_tenant_isolation"
+      ]
+    },
+    {
+      "name": "permissions",
+      "module": "authorization",
+      "migration": "20260822090600_authorization__create_permission_catalog.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "role_permissions",
+      "module": "authorization",
+      "migration": "20260822090600_authorization__create_permission_catalog.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "roles",
+      "module": "authorization",
+      "migration": "20260822090600_authorization__create_permission_catalog.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "sessions",
+      "module": "identity",
+      "migration": "20260822090100_identity__create_sessions.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "store_memberships",
+      "module": "tenant",
+      "migration": "20260822090500_tenant__create_store_memberships.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "store_memberships_self_or_tenant_access"
+      ]
+    },
+    {
+      "name": "stores",
+      "module": "tenant",
+      "migration": "20260822090400_tenant__create_stores.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "stores_tenant_isolation"
+      ]
+    },
+    {
+      "name": "users",
+      "module": "identity",
+      "migration": "20260822090000_identity__create_users.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "store.read",
+      "module": "tenant",
+      "file": "modules/tenant/interfaces/store-read.capability.ts",
+      "permissions": [
+        "store.read"
+      ],
+      "risk": "READ",
+      "audit": true,
+      "storeScoped": true,
+      "route": "GET /api/v1/stores/:storeId"
+    }
+  ],
+  "singletons": [
+    {
+      "role": "money-allocator",
+      "file": "modules/money/domain/money.vo.ts"
+    },
+    {
+      "role": "tenant-context",
+      "file": "platform/db/tenant-context.ts"
+    }
+  ],
+  "adrs": [
+    {
+      "id": "ADR-001",
+      "title": "MCP Sensitive Write Confirmation",
+      "status": "ACCEPTED",
+      "blocks": "Phase 9"
+    },
+    {
+      "id": "ADR-001b",
+      "title": "Mobile UX for HIGH_WRITE Platform Approval",
+      "status": "ACCEPTED",
+      "blocks": "Phase 9"
+    },
+    {
+      "id": "ADR-002",
+      "title": "OAuth Identity, Tenant and Store Resolution",
+      "status": "ACCEPTED",
+      "blocks": "Phase 1, Phase 9"
+    },
+    {
+      "id": "ADR-003",
+      "title": "MCP Write Idempotency",
+      "status": "ACCEPTED",
+      "blocks": "Phase 9"
+    },
+    {
+      "id": "ADR-004",
+      "title": "Python AI Plane to NestJS Capability Boundary",
+      "status": "ACCEPTED",
+      "blocks": "Phase 8"
+    },
+    {
+      "id": "ADR-004b",
+      "title": "Service Authentication Between AI Plane and NestJS",
+      "status": "ACCEPTED",
+      "blocks": "Phase 8"
+    },
+    {
+      "id": "ADR-005",
+      "title": "In-Process Plugin Security Boundary",
+      "status": "ACCEPTED",
+      "blocks": "Phase 6"
+    },
+    {
+      "id": "ADR-005b",
+      "title": "Malicious/Buggy Plugin Tenant Isolation Testing",
+      "status": "ACCEPTED",
+      "blocks": "Phase 6 release"
+    },
+    {
+      "id": "ADR-006",
+      "title": "Concurrent Usage and AI Credit Accounting",
+      "status": "ACCEPTED",
+      "blocks": "Phase 2"
+    },
+    {
+      "id": "ADR-007",
+      "title": "External MCP Trust Boundary",
+      "status": "ACCEPTED",
+      "blocks": "Phase 9"
+    },
+    {
+      "id": "ADR-008",
+      "title": "Entitlement Precedence and Conflict Resolution",
+      "status": "ACCEPTED",
+      "blocks": "Phase 2"
+    },
+    {
+      "id": "ADR-009",
+      "title": "Shared Idempotency Store",
+      "status": "ACCEPTED",
+      "blocks": "Phase 2, Phase 9"
+    },
+    {
+      "id": "ADR-010",
+      "title": "Non-Functional Requirements and Scale Assumptions",
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "nothing; revisit triggers defined"
+    },
+    {
+      "id": "ADR-019",
+      "title": "Storefront Delivery, Caching and Domain Routing",
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "Phase 1 exit, Phase 4"
+    },
+    {
+      "id": "ADR-020",
+      "title": "Data Retention, Deletion and Tenant Offboarding",
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "Phase 2"
+    },
+    {
+      "id": "ADR-021",
+      "title": "Database Access, ORM and RLS Session Handling",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 1"
+    },
+    {
+      "id": "ADR-022",
+      "title": "Money, Currency and Rounding",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 2, Phase 3"
+    },
+    {
+      "id": "ADR-023",
+      "title": "Payment Provider Port and Iranian PSP Profile",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 2, Phase 3"
+    },
+    {
+      "id": "ADR-024",
+      "title": "Subscription Term, Renewal, Expiry and Grace",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 2"
+    },
+    {
+      "id": "ADR-025",
+      "title": "Plan Change, Upgrade, Downgrade and Proration",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 2"
+    },
+    {
+      "id": "ADR-026",
+      "title": "Over-Limit Policy and Data Preservation on Downgrade",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 2"
+    },
+    {
+      "id": "ADR-027",
+      "title": "Domain Verification, TLS Lifecycle and DNS/CDN Port",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 4"
+    },
+    {
+      "id": "ADR-028",
+      "title": "Host Resolution Security and Domain Ownership",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 4"
+    },
+    {
+      "id": "ADR-029",
+      "title": "Authentication Provider and Session Strategy",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 1"
+    },
+    {
+      "id": "ADR-030",
+      "title": "Architecture Conformance Enforcement",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 1 start"
+    },
+    {
+      "id": "ADR-031",
+      "title": "Time, Timezone and Calendar",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 2"
+    },
+    {
+      "id": "ADR-032",
+      "title": "Storefront Read Path Separation",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 4"
+    },
+    {
+      "id": "ADR-033",
+      "title": "API Schema Artifact Generation",
+      "status": "ACCEPTED (new)",
+      "blocks": "Task 2 (Phase 1)"
+    },
+    {
+      "id": "ADR-034",
+      "title": "Audit Event Placement and Durability",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 1 (in effect), Task 2"
+    },
+    {
+      "id": "ADR-011",
+      "title": "Co-Pilot Cadence vs AI Credit Cost",
+      "status": "DEFERRED",
+      "blocks": "Phase 12"
+    },
+    {
+      "id": "ADR-012",
+      "title": "Autonomous AI Execution Opt-In",
+      "status": "DEFERRED",
+      "blocks": "Phase 13"
+    },
+    {
+      "id": "ADR-013",
+      "title": "Voice Input Retention",
+      "status": "DEFERRED",
+      "blocks": "Phase 14"
+    },
+    {
+      "id": "ADR-014",
+      "title": "Channel Sync Conflict Resolution",
+      "status": "DEFERRED",
+      "blocks": "Phase 15"
+    },
+    {
+      "id": "ADR-015",
+      "title": "Dynamic Pricing Auto-Apply Policy",
+      "status": "DEFERRED",
+      "blocks": "Phase 16"
+    },
+    {
+      "id": "ADR-016",
+      "title": "Multi-Approver Quorum Rules",
+      "status": "DEFERRED",
+      "blocks": "Phase 17"
+    },
+    {
+      "id": "ADR-017",
+      "title": "Marketplace Plugin Review and Payout",
+      "status": "DEFERRED",
+      "blocks": "Phase 18"
+    },
+    {
+      "id": "ADR-018",
+      "title": "Financial Services Compliance and Deployment Isolation",
+      "status": "DEFERRED",
+      "blocks": "Phase 19"
+    }
+  ],
+  "tests": [
+    {
+      "file": "modules/audit/infrastructure/audit-events-append-only.spec.ts",
+      "layer": "infrastructure",
+      "cases": 3
+    },
+    {
+      "file": "modules/authorization/application/check-permission.service.spec.ts",
+      "layer": "application",
+      "cases": 2
+    },
+    {
+      "file": "modules/identity/application/validate-session.service.spec.ts",
+      "layer": "application",
+      "cases": 4
+    },
+    {
+      "file": "modules/identity/domain/session.entity.spec.ts",
+      "layer": "domain",
+      "cases": 4
+    },
+    {
+      "file": "modules/money/domain/money.vo.spec.ts",
+      "layer": "domain",
+      "cases": 17
+    },
+    {
+      "file": "modules/money/infrastructure/currency-registry.spec.ts",
+      "layer": "infrastructure",
+      "cases": 7
+    },
+    {
+      "file": "modules/tenant/application/read-store.service.spec.ts",
+      "layer": "application",
+      "cases": 4
+    },
+    {
+      "file": "modules/tenant/application/resolve-store-access.service.spec.ts",
+      "layer": "application",
+      "cases": 4
+    },
+    {
+      "file": "modules/tenant/infrastructure/organizations-rls.spec.ts",
+      "layer": "infrastructure",
+      "cases": 4
+    },
+    {
+      "file": "platform/db/tenant-context.spec.ts",
+      "layer": "platform",
+      "cases": 5
+    },
+    {
+      "file": "apps/api/error-contract.integration.spec.ts",
+      "layer": "integration",
+      "cases": 3
+    },
+    {
+      "file": "apps/api/store-read.integration.spec.ts",
+      "layer": "integration",
+      "cases": 15
+    },
+    {
+      "file": "tools/conformance/harness.selftest.live-db.spec.ts",
+      "layer": "conformance",
+      "cases": 6
+    },
+    {
+      "file": "tools/conformance/harness.selftest.spec.ts",
+      "layer": "conformance",
+      "cases": 20
+    }
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/v1/stores/:storeId",
+      "file": "modules/tenant/interfaces/store.controller.ts"
+    }
+  ],
+  "counts": {
+    "modules": 6,
+    "tables": 12,
+    "tablesWithRls": 6,
+    "capabilities": 1,
+    "routes": 1,
+    "testFiles": 14,
+    "testCases": 98,
+    "adrs": 37,
+    "adrsAccepted": 29
+  }
+}
