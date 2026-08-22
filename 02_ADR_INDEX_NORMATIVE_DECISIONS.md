@@ -67,6 +67,7 @@ For each ADR, completion requires:
 | ADR-031 | Time, Timezone and Calendar | Platform | **ACCEPTED (new)** | Phase 2 |
 | ADR-032 | Storefront Read Path Separation | Storefront / Performance | **ACCEPTED (new)** | Phase 4 |
 | ADR-033 | API Schema Artifact Generation | Platform / Contracts | **ACCEPTED (new)** | Task 2 (Phase 1) |
+| ADR-034 | Audit Event Placement and Durability | Platform / Audit | **ACCEPTED (new)** | Phase 1 (in effect), Task 2 |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -1513,6 +1514,52 @@ Generation keys off the capability definition and its Zod schemas, never the con
 - [ ] no `@ApiProperty` decorator and no hand-written schema exists in the repository
 - [ ] the generator runs with no database reachable
 - [ ] every error code a capability can raise appears in its documented responses
+
+---
+
+## ADR-034 - Audit Event Placement and Durability
+
+**ACCEPTED**, new, in effect since Task 1 (Phase 1)
+
+### Problem
+
+Two normative documents described the golden path's step 8 differently, and **both descriptions were wrong about what actually ships.**
+
+`03_TECHNICAL_BLUEPRINT.md` §3.1 ordered the pipeline `... Execute Application Service -> Commit Domain Data + Outbox -> Audit -> Return Stable Result`, which places the audit write strictly after a successful commit and says nothing about a failure path — implying that a request which never commits is never audited.
+
+`08_PHASE_1_BRIEF.md` §2 step 8, amended during the golden-path repair, said the event is "written before commit but on a separate connection." That is not achievable as written: `withTenantContext()` is `db.transaction().execute(...)`, whose promise settles only once the transaction has committed or rolled back, so any audit write issued from outside that callback is necessarily issued *after* the domain transaction has resolved.
+
+The only accurate description of the shipped design lived in `DECISION_LOG.md`'s "Correction to the above during implementation" — a working log the precedence chain in `README_START_HERE.md` explicitly excludes. `PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §116 flagged exactly this gap and left it open: "`DECISION_LOG.md` is a working log and is **not** part of the precedence chain in `README_START_HERE.md`. If this rule should be normatively citable it needs its own ADR; flagged rather than assumed."
+
+### Constraint that makes an ADR the only durable fix
+
+Amending one document to match the other would not settle which document governs. The precedence chain (`README_START_HERE.md`, `CLAUDE.md`) ranks `03` third and **does not rank `08` at all**; the read orders in `AGENTS.md` §1 and `README_START_HERE.md` both place `08` *above* `03`; and `DECISION_LOG.md` concluded the two are "peers." Three documents, three incompatible answers to the same precedence question.
+
+`AGENTS.md` §1 states the one unambiguous rule in the pack: **"ADRs override every other document."** Only an ADR moots the precedence question instead of depending on its answer.
+
+This is not documentation hygiene. `AGENTS.md` §2 makes the golden path the literal template every later slice mirrors, and Task 2's first slice reuses this mechanism while — unlike `store.read` — actually exercising the failure path.
+
+### Decision
+
+1. **Exactly one audit event per capability attempt**, not one per pipeline step. If authorization (step 6) fails, execution (step 7) never runs, so there is one outcome to record, not two.
+2. **The event is written on a connection independent of the domain transaction** — in practice a pool distinct from the one the domain transaction holds — in its own transaction that commits on its own.
+3. **The write is issued after the domain transaction has resolved and before the handler returns or re-throws.** The caller never observes an outcome that has not been audited.
+4. **The write is unconditional on both paths**, with `outcome` (`SUCCESS` | `FAILURE`) recording which occurred. A rolled-back domain transaction still leaves its audit row.
+5. **An audit event attests to an authorized attempt, not to a committed effect.** `outcome` is what distinguishes them. This semantic shift is accepted deliberately.
+6. **Audit writing does not live in an application service.** A single use case cannot observe both step 6 and step 7, so the audit call belongs at the composition root that wraps them.
+
+Rejected: writing the event *inside* the domain transaction, where the failure it records rolls it back, losing every failure audit; and writing it only after a successful commit, which leaves failure paths unaudited entirely.
+
+**Accepted residual cost:** the audit row and the domain effect are not atomic. A crash between the domain transaction resolving and the audit write completing can leave a committed effect with no audit record. Closing that window entirely requires putting the audit row in the domain transaction, which loses every failure audit — a strictly worse trade for an audit trail.
+
+### Verification
+
+- [ ] a capability whose permission check fails writes exactly one audit row with `outcome = FAILURE`, proven against real PostgreSQL
+- [ ] a capability whose domain transaction rolls back still has its audit row present after that rollback
+- [ ] a successful capability attempt writes exactly one audit row with `outcome = SUCCESS`
+- [ ] the audit write executes on a connection distinct from the one holding the domain transaction
+- [ ] no application service writes an audit event directly
+- [ ] the request handler does not resolve until the audit write has completed
 
 ---
 

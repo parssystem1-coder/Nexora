@@ -49,7 +49,7 @@ It must demonstrate, in this order:
 5. transaction open plus RLS session context via the single helper (ADR-021)
 6. permission authorization through the capability policy pipeline
 7. application service execution with domain mapping
-8. audit event, written before commit but on a separate connection that commits independently of the domain transaction, so the record survives whether that transaction commits or rolls back (option B; see `DECISION_LOG.md`, "Conflict: is the audit event inside the transaction (08 §2) or after commit (03 §3.1)?"). An audit event therefore attests to an authorized attempt, with `outcome` distinguishing success from failure — not to a committed effect.
+8. audit event, written on a connection independent of the domain transaction, in its own transaction that commits on its own — issued once that domain transaction has resolved and before the handler returns or re-throws, unconditionally on both the success and the failure path, so the record survives whether the domain transaction committed or rolled back (ADR-034). Exactly one event per capability attempt, not one per pipeline step. An audit event therefore attests to an authorized attempt, with `outcome` distinguishing success from failure — not to a committed effect.
 9. stable error contract for every failure mode
 10. structured logging with `requestId`, `correlationId`, `tenantId`
 11. tests at every layer, including an RLS test proving a query without context returns zero rows

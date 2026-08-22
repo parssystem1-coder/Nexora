@@ -15,6 +15,31 @@ Template for a new entry:
 
 ---
 
+## 2026-08-22 — Audit placement promoted to ADR-034; `03` and `08` both corrected
+
+**Context:** a gate review found `03_TECHNICAL_BLUEPRINT.md` §3.1 still describing audit as `Commit Domain Data + Outbox -> Audit` — the rejected after-commit-only design — while `08_PHASE_1_BRIEF.md` §2 step 8 had been amended to describe option B. The instruction to fix this assumed `03` outranks `08` and that `08` correctly described the implementation. Verification found **neither assumption holds**, which is what turned a documentation sync into an ADR.
+
+**What verification actually found:**
+
+1. **The precedence chain does not rank `08` at all.** `CLAUDE.md` and `README_START_HERE.md` both state `ADR Index > Architecture RFC > Technical/Database/Contract docs > Platform Overview > Source Master Spec`. `08` is none of those categories. Meanwhile both read orders (`AGENTS.md` §1, `README_START_HERE.md`) place `08` *above* `03`, and the audit-placement entry below concluded the two are "peers." Three documents, three incompatible answers to "which wins."
+2. **`08` was also wrong about the implementation.** Its amended text said the event is "written before commit." `platform/db/tenant-context.ts` is `db.transaction().execute(...)`, whose promise settles only after the transaction commits or rolls back — so the audit write in `store.controller.ts`, issued outside that callback, is necessarily issued *after* the domain transaction has resolved. The accurate description existed only in the "Correction to the above during implementation" paragraph in the entry below.
+3. **`03`'s ordering was actually closer to the code than `08`'s.** Its real defects were implying the success path only, and saying nothing about the independent connection.
+
+**Decision: write the ADR (ADR-034), rather than amend `03` to match `08` and leave the citation here.**
+
+Reasoning, in the order it mattered:
+
+- **Amending one document to match the other would not settle which governs.** The rule would still rest on a `03`-vs-`08` precedence relationship that three documents describe differently. `AGENTS.md` §1 states the one unambiguous rule in the pack — "ADRs override every other document" — so an ADR moots the precedence question instead of depending on its answer.
+- **The accurate description lived only in the excluded document.** This log is explicitly outside the precedence chain, which is precisely the gap `PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §116 flagged and left open ("if this rule should be normatively citable it needs its own ADR; flagged rather than assumed").
+- **It is about to be copied.** `AGENTS.md` §2 makes the golden path the literal template, and Task 2's first slice reuses this mechanism while — unlike `store.read` — actually exercising the failure path.
+- **Cost is low.** One entry in a pack that already carries 33, for a genuine cross-cutting normative decision rather than an implementation detail.
+
+**Implemented:** ADR-034 "Audit Event Placement and Durability" + its index row in `02_ADR_INDEX_NORMATIVE_DECISIONS.md`; `03` §3.1's diagram corrected to `Commit or Roll Back Domain Data + Outbox -> Audit, durable, independent connection, either outcome (ADR-034)` plus a paragraph stating the semantics; `08` §2 step 8 rewritten to drop "before commit" and cite ADR-034. Both now describe the identical design, and both cite the ADR rather than this log. No code changed — the implementation was already correct.
+
+**Deliberately not changed:** the dated point-in-time reports (`PHASE_1_REVIEW_AUDIT.md`, `PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md`, `PHASE_1_GATE_REVIEW_2026-08-22.md`) still describe the conflict as open, because that is what was true when each was written. The gap each flagged is closed by ADR-034's existence, not by rewriting the record of it having been flagged.
+
+**Status:** RESOLVED.
+
 ## 2026-08-22 — Pipeline step 6 must share the transaction with steps 7–8 (fixed); NestJS guards were the wrong home for it
 
 **Context:** raised in review. `08_PHASE_1_BRIEF.md` §2 orders the golden path: …4. build TenantContext → **5. transaction open + RLS context** → 6. permission authorization → 7. application service execution → 8. audit event. `03_TECHNICAL_BLUEPRINT.md` §3.1 states the same chain linearly (`Open Transaction + set RLS session context → Validate Input → Authorize Permission → … → Execute Application Service → Commit Domain Data + Outbox → Audit`). Both put authorization *after* the transaction opens, therefore inside it, together with execution.
@@ -56,6 +81,8 @@ This is not academic. `ReadStoreService` writes a `FAILURE` audit row and then t
 
 The conflicting sentence in `08_PHASE_1_BRIEF.md` §2 step 8 should be amended to match `03` §3.1's ordering when (B) lands.
 **Status:** RESOLVED (direction agreed); implementation deferred to Task 2 by decision, tracked as the first item of Task 2's scope.
+
+**Superseded 2026-08-22 by the ADR-034 entry at the top of this log.** The amendment was not deferred to Task 2 after all, and it did not resolve the way this paragraph anticipated: `08` was *not* amended to match `03` §3.1's ordering, because verification found `03` §3.1 described the rejected design and `08`'s own amended text ("written before commit") was unachievable against `platform/db/tenant-context.ts`. Both documents were corrected to match the implementation instead, and the rule now lives in ADR-034 rather than in this log.
 
 ## 2026-08-22 — How repositories participate in a `withTenantContext` transaction without domain seeing Kysely
 

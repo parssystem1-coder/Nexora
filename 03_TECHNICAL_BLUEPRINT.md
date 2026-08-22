@@ -121,10 +121,12 @@ Authenticate
  -> Check Quota and Rate Limit
  -> Claim Idempotency when required
  -> Execute Application Service
- -> Commit Domain Data + Outbox
- -> Audit
+ -> Commit or Roll Back Domain Data + Outbox
+ -> Audit, durable, independent connection, either outcome (ADR-034)
  -> Return Stable Result
 ```
+
+The audit step is **not** part of the domain transaction and is not conditional on it committing. It is written on a connection independent of that transaction, in its own transaction that commits on its own, unconditionally on both the success and the failure path, with `outcome` recording which occurred — and the handler does not resolve until that write completes. An audit event therefore attests to an authorized *attempt*, not to a committed effect. See ADR-034 for the full decision, including the rejected alternatives and the accepted non-atomicity cost.
 
 ### 3.2 Storefront read path (ADR-032)
 
