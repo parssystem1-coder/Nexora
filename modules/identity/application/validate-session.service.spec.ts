@@ -11,7 +11,12 @@ const fixedClock: Clock = { now: () => NOW };
 
 function service(session: Session | null, user: User | null): ValidateSessionService {
   const sessions: SessionRepository = { findByTokenHash: async () => session };
-  const users: UserRepository = { findById: async () => user };
+  const users: UserRepository = {
+    findById: async () => user,
+    // Never exercised here: ValidateSessionService resolves a user by id.
+    // Present because membership.invite added findByEmail to the port.
+    findByEmail: async () => null,
+  };
   return new ValidateSessionService(sessions, users, fixedClock);
 }
 
@@ -33,6 +38,7 @@ describe("ValidateSessionService", () => {
     let userLookedUp = false;
     const sessions: SessionRepository = { findByTokenHash: async () => session };
     const users: UserRepository = {
+      findByEmail: async () => null,
       findById: async () => {
         userLookedUp = true;
         return new User("u1", "ACTIVE");

@@ -27,7 +27,7 @@ export const organizationCreateCapability: CapabilityDefinition = {
   idempotent: false,
   audit: true,
   storeScoped: false,
-  route: { method: "post", path: "/api/v1/organizations", inputIn: "body", successStatus: 201 },
+  route: { method: "post", path: "/api/v1/organizations", pathParams: [], successStatus: 201 },
   inputSchema: createOrganizationInputSchema,
   outputSchema: organizationOutputSchema,
   errorCodes: ["AUTHENTICATION_REQUIRED", "VALIDATION_ERROR", "CONFLICT", "INTERNAL_ERROR"],

@@ -1,19 +1,23 @@
 import type { ZodTypeAny } from "zod";
 import type { CapabilityErrorCode } from "./capability.errors.js";
 
-/**
- * Where a capability's input arrives on its REST binding. Needed by the
- * OpenAPI generator (ADR-033) because a path-parameter schema and a request
- * body schema are different places in the document, and the generator is
- * forbidden from reading the controller to find out which one applies.
- */
-export type CapabilityInputLocation = "path" | "body";
-
 export interface CapabilityRoute {
   method: "get" | "post" | "patch" | "put" | "delete";
   /** OpenAPI path template, e.g. `/api/v1/stores/{storeId}`. */
   path: string;
-  inputIn: CapabilityInputLocation;
+  /**
+   * Which keys of `inputSchema` arrive as path parameters rather than in the
+   * request body. Everything else is the body; an empty remainder means the
+   * operation has none.
+   *
+   * The OpenAPI generator (ADR-033) needs this because path parameters and a
+   * request body are different places in the document, and it is forbidden
+   * from reading the controller to work out which is which. Declaring the
+   * split as a list of keys - rather than one location for the whole input -
+   * is what lets a capability have both, as membership.invite does
+   * (organizationId in the path, email in the body).
+   */
+  pathParams: readonly string[];
   successStatus: number;
 }
 

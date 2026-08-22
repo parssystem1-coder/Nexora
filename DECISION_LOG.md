@@ -15,6 +15,40 @@ Template for a new entry:
 
 ---
 
+## 2026-08-23 — `membership.invite`: what "invite" can mean in Phase 1
+
+**Context:** implementing Task 2 slice 2 (`08_PHASE_1_BRIEF.md` §3). This capability is documented more thinly than any so far: one row in `05_API_CAPABILITY_CONTRACTS.md` §4.1 (`membership.invite | tenant | MEDIUM_WRITE | yes`), one step in `03_TECHNICAL_BLUEPRINT.md` §167's flow ("create organization → **invite member** → assign role → create store → read store"), one bullet in `00_PLATFORM_OVERVIEW.md` §58 ("invite team members"), and one mention in `01_ARCHITECTURE_BASELINE_RFC.md` §483 listing *invitation* among the required V1 notification flows. There is no request/response contract, no state machine, and no `invitations` table anywhere in `04_DATABASE_BLUEPRINT.md` §2.1.
+
+**1. Is this a real invitation (offer → accept) or an immediate add?** The distinction decides the whole slice.
+  - Options: (A) a genuine invitation — needs an `invitations` table, which `08` §4's scope list does not contain and §4 forbids creating ("Only these. Creating anything else is out of scope"); (B) a pending membership — needs a `PENDING` value in `memberships.status`, whose CHECK constraint is `('ACTIVE','REVOKED')`. Technically a forward-only ALTER, but it would create a state with **no exit**: no accept capability is in Phase 1's six slices, and `ResolveStoreAccessService`/`ResolveOrganizationAccessService` both require `isActive`, so every PENDING member would be permanently denied. A dead state that nothing can leave is worse than an honest limitation; (C) add an existing platform user directly as an ACTIVE member holding no roles.
+  - **Decision: C.** It is the only reading the Phase 1 schema can express without creating a table the brief forbids or a state nothing can leave. `03` §167's ordering independently confirms the role split: invite creates the membership, `membership.role.assign` (slice 3) grants the roles, so a freshly invited member can do nothing until slice 3 runs. A test pins that (`membership_roles` is empty after an invite).
+  - **Known consequence, deliberately accepted:** "invite" is a slight misnomer for what ships — nobody is asked, they are added. When the notification module lands (`01` §483 makes invitation a V1 flow) this capability likely needs the pending state and an accept flow after all, and that will be a **contract change**, not an additive one. Flagged here so it is a decision then rather than a surprise.
+
+**2. The invitee is identified by email, which reveals whether an address has an account.** A caller with `membership.invite` gets `RESOURCE_NOT_FOUND` for an unknown address and `CONFLICT`/`201` for a known one.
+  - Options: (A) take a `userId` instead — no enumeration, but unusable: an admin does not know a stranger's UUID; (B) always return success and silently do nothing for an unknown address — the usual mitigation, but it depends on a pending state to be honest, and (1) established there isn't one, so it would be a lie rather than a deferral; (C) accept email and return the real outcome.
+  - **Decision: C**, with the exposure noted rather than hidden. It is narrow: the caller must already hold an active membership *and* a role granting `membership.invite` (owner or admin) in a specific organization, so this is not an unauthenticated oracle. Revisit together with (1) when the accept flow exists — a pending state makes (B) truthful and is the right time to adopt it.
+
+**3. Re-inviting a REVOKED member returns CONFLICT rather than reactivating.** `UNIQUE (tenant_id, user_id)` makes the row collide regardless of status.
+  - **Decision:** leave it as `CONFLICT`. No capability can currently produce a REVOKED membership — `membership.revoke` is not one of the six slices; it is the outstanding Phase 1 exit criterion — so the state is unreachable in practice today. Reactivation semantics belong with `membership.revoke`, which is where the question actually arises, and deciding them now would be inventing a rule for a state nothing can create.
+
+**Also settled, minor:** the invitee's account status is not checked. A SUSPENDED user cannot authenticate (`ValidateSessionService` rejects them), so the membership row grants nothing; refusing here would duplicate that rule in a second place and need an error code §7 does not define for it. — Duplicate detection uses the unique index rather than a `SELECT` pre-check: unlike `organization.create` a pre-check *would* be visible under RLS here, but it would still be wrong under concurrency. — The audit event carries the invitee's address in `metadata`, because `resource_id` is a membership id that, on the failure path, names a row that was never written; without the address a FAILURE row cannot say who the attempt concerned.
+
+**Status:** RESOLVED for Phase 1. Items 1 and 2 are **OPEN for V1** and must be revisited together when the notification module and an accept flow exist.
+
+---
+
+## 2026-08-23 — `CapabilityRoute.inputIn` replaced by `pathParams`
+
+**Context:** ADR-033's generator needed to know which part of a capability's input is a path parameter and which is a request body. `organization.create` (all body) and `store.read` (all path) were both expressible with a single `inputIn: "path" | "body"` field. `membership.invite` is the first capability with **both** — `organizationId` in the path, `email` in the body — and a one-location field cannot describe it.
+**Options considered:**
+  A. Add a second optional `pathSchema` alongside `inputSchema` — two schemas for one logical input, which is exactly the duplication ADR-033 item 1 forbids.
+  B. Keep `inputIn` and special-case the mixed shape in the generator — the split becomes generator-internal knowledge rather than declared data.
+  C. Replace `inputIn` with `pathParams: readonly string[]`, naming which keys of the one `inputSchema` arrive in the path; the generator picks those into the parameters object and the remainder into the body, either of which may be empty.
+**Decision:** C. One schema stays the source of truth, all three shapes fall out of the same rule, and the generator validates that every declared path parameter actually exists in the schema — a typo fails generation instead of silently producing an operation with a missing parameter. `inputIn` and `CapabilityInputLocation` are removed; they were introduced in the previous slice, so no shipped contract depended on them.
+**Status:** RESOLVED.
+
+---
+
 ## 2026-08-23 — `organization.create`: five decisions the docs pack leaves open
 
 **Context:** implementing Task 2 slice 1 (`08_PHASE_1_BRIEF.md` §3). The capability is one row in `05_API_CAPABILITY_CONTRACTS.md` §4.1 (`organization.create | user | MEDIUM_WRITE | yes`) plus one constraint in `04_DATABASE_BLUEPRINT.md` §5 ("organization slug unique within its namespace"). Nothing else in the pack describes its behaviour, and it is the first capability that does not fit the golden path's shape exactly, because it *creates* the tenant rather than acting inside one.

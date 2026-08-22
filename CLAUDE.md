@@ -22,9 +22,11 @@ Audit placement is now ADR-034 (`03` §3.1 and `08` §2 step 8 previously contra
 
 **ADR-033 now in force:** `openapi.json` is generated from each capability's Zod schemas and `CapabilityDefinition` (`npm run openapi`, `-- --check` in CI). `CapabilityDefinition` carries `route`, `inputSchema`, `outputSchema` and `errorCodes`. Never hand-edit the artifact.
 
-**Task 2 slices 2–6 not started.** Exit criteria still **eight of nine** (`PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §4); the remaining row is "revoking a membership invalidates active sessions," which needs `membership.revoke`.
+**Task 2 slice 2 done:** `membership.invite` (`POST /api/v1/organizations/{organizationId}/memberships`). Adds an existing platform user, found by email, as an ACTIVE member holding **no roles** — role assignment is slice 3, per `03` §167's flow. First slice with a real permission behind it (`membership.invite`, granted to `owner`+`admin` only, added by migration) and the first with an `OrganizationAccessGuard` doing steps 2–4 at organization level. No structural divergence from the golden path. `DECISION_LOG.md` (2026-08-23) records what "invite" can mean given no `invitations` table and no `PENDING` status — items 1 and 2 there are **OPEN for V1**, to revisit when the notification module and an accept flow exist.
 
-129 tests passing (17 files), conformance 0 violations, 12 migrations apply cleanly.
+**Task 2 slices 3–6 not started.** Exit criteria still **eight of nine** (`PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §4); the remaining row is "revoking a membership invalidates active sessions," which needs `membership.revoke`.
+
+160 tests passing (19 files), conformance 0 violations, 13 migrations apply cleanly from empty.
 
 **Local database note:** `docker compose` is not available on this machine; a native PostgreSQL 17 on **port 5432** carries the `nexora` database and both roles. Export `DATABASE_URL=postgresql://nexora_app:nexora_app_dev_only@localhost:5432/nexora` and `MIGRATE_DATABASE_URL=postgresql://nexora_migrate:nexora_migrate_dev_only@localhost:5432/nexora` before running tests, conformance or migrations — the defaults in `platform/config.ts` point at compose's 5433. `nexora_migrate` has no `CREATEDB`, so a from-empty migration run needs a database created by a superuser first.
 

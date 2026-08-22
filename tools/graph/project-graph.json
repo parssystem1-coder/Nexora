@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "35fb1b6",
+    "commit": "ee8872a",
     "dirty": true
   },
   "modules": [
@@ -28,7 +28,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 11,
+      "files": 12,
       "dependsOn": [
         "capability"
       ],
@@ -55,7 +55,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 16,
+      "files": 17,
       "dependsOn": [
         "capability"
       ],
@@ -83,7 +83,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 35,
+      "files": 43,
       "dependsOn": [
         "audit",
         "authorization",
@@ -216,6 +216,18 @@
     }
   ],
   "capabilities": [
+    {
+      "id": "membership.invite",
+      "module": "tenant",
+      "file": "modules/tenant/interfaces/membership-invite.capability.ts",
+      "permissions": [
+        "membership.invite"
+      ],
+      "risk": "MEDIUM_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/organizations/:organizationId/memberships"
+    },
     {
       "id": "organization.create",
       "module": "tenant",
@@ -510,6 +522,11 @@
       "cases": 6
     },
     {
+      "file": "modules/tenant/application/invite-member.service.spec.ts",
+      "layer": "application",
+      "cases": 7
+    },
+    {
       "file": "modules/tenant/application/read-store.service.spec.ts",
       "layer": "application",
       "cases": 4
@@ -533,6 +550,11 @@
       "file": "apps/api/error-contract.integration.spec.ts",
       "layer": "integration",
       "cases": 3
+    },
+    {
+      "file": "apps/api/membership-invite.integration.spec.ts",
+      "layer": "integration",
+      "cases": 22
     },
     {
       "file": "apps/api/organization-create.integration.spec.ts",
@@ -567,6 +589,11 @@
       "file": "modules/tenant/interfaces/organization.controller.ts"
     },
     {
+      "method": "POST",
+      "path": "/api/v1/organizations/:organizationId/memberships",
+      "file": "modules/tenant/interfaces/membership.controller.ts"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/stores/:storeId",
       "file": "modules/tenant/interfaces/store.controller.ts"
@@ -576,10 +603,10 @@
     "modules": 6,
     "tables": 12,
     "tablesWithRls": 6,
-    "capabilities": 2,
-    "routes": 2,
-    "testFiles": 17,
-    "testCases": 124,
+    "capabilities": 3,
+    "routes": 3,
+    "testFiles": 19,
+    "testCases": 153,
     "adrs": 37,
     "adrsAccepted": 29
   }

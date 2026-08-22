@@ -9,6 +9,7 @@ import { CapabilityError } from "../../capability/contracts/index.js";
 const TENANT = "tenant-1";
 const STORE = "store-1";
 const USER = "user-1";
+const MEMBER_SINCE = new Date("2026-08-22T10:00:00.000Z");
 
 function fakeRepos(options: { storeMembership: StoreMembership | null; membership: Membership | null }) {
   const storeMemberships: StoreMembershipRepository = {
@@ -35,7 +36,7 @@ function fakeRepos(options: { storeMembership: StoreMembership | null; membershi
 describe("ResolveStoreAccessService", () => {
   it("grants access and returns the membershipId when both checks pass", async () => {
     const storeMembership = new StoreMembership("sm1", TENANT, STORE, USER);
-    const membership = new Membership("m1", TENANT, USER, "ACTIVE");
+    const membership = new Membership("m1", TENANT, USER, "ACTIVE", MEMBER_SINCE);
     const { storeMemberships, memberships } = fakeRepos({ storeMembership, membership });
     const service = new ResolveStoreAccessService(storeMemberships, memberships);
     const result = await service.execute(USER, STORE);
@@ -43,7 +44,7 @@ describe("ResolveStoreAccessService", () => {
   });
 
   it("denies access when there is no store_membership at all, regardless of organization membership", async () => {
-    const membership = new Membership("m1", TENANT, USER, "ACTIVE");
+    const membership = new Membership("m1", TENANT, USER, "ACTIVE", MEMBER_SINCE);
     const { storeMemberships, memberships } = fakeRepos({ storeMembership: null, membership });
     const service = new ResolveStoreAccessService(storeMemberships, memberships);
     await expect(service.execute(USER, STORE)).rejects.toMatchObject({ code: "STORE_ACCESS_DENIED" });
@@ -58,7 +59,7 @@ describe("ResolveStoreAccessService", () => {
 
   it("denies access when store_membership exists but organization membership is REVOKED — checked independently", async () => {
     const storeMembership = new StoreMembership("sm1", TENANT, STORE, USER);
-    const membership = new Membership("m1", TENANT, USER, "REVOKED");
+    const membership = new Membership("m1", TENANT, USER, "REVOKED", MEMBER_SINCE);
     const { storeMemberships, memberships } = fakeRepos({ storeMembership, membership });
     const service = new ResolveStoreAccessService(storeMemberships, memberships);
     await expect(service.execute(USER, STORE)).rejects.toMatchObject({ code: "STORE_ACCESS_DENIED" });

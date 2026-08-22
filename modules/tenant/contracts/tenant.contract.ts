@@ -19,3 +19,12 @@ export interface OrganizationDto {
   status: "ACTIVE" | "SUSPENDED";
   createdAt: string;
 }
+
+/** A person's membership of an organization. Roles are granted separately (membership.role.assign). */
+export interface MembershipDto {
+  id: string;
+  organizationId: string;
+  userId: string;
+  status: "ACTIVE" | "REVOKED";
+  createdAt: string;
+}

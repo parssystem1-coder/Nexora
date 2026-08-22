@@ -18,7 +18,7 @@ export const storeReadCapability: CapabilityDefinition = {
   idempotent: false,
   audit: true,
   storeScoped: true,
-  route: { method: "get", path: "/api/v1/stores/{storeId}", inputIn: "path", successStatus: 200 },
+  route: { method: "get", path: "/api/v1/stores/{storeId}", pathParams: ["storeId"], successStatus: 200 },
   inputSchema: readStoreInputSchema,
   outputSchema: storeOutputSchema,
   errorCodes: [

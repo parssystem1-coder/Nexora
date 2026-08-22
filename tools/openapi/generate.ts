@@ -36,12 +36,33 @@ const errorEnvelopeSchema = z
   })
   .openapi("ErrorEnvelope");
 
-function pathParameterSchema(capability: CapabilityDefinition): z.AnyZodObject {
+/**
+ * Splits a capability's one input schema into the path parameters its route
+ * declares and the request body that is everything else. Either half may be
+ * empty: `store.read` is all path and no body, `organization.create` all body
+ * and no path, `membership.invite` both.
+ */
+function splitInput(capability: CapabilityDefinition): { params?: z.AnyZodObject; body?: z.AnyZodObject } {
   const schema = capability.inputSchema;
   if (!(schema instanceof z.ZodObject)) {
-    throw new Error(`Capability ${capability.id} declares inputIn "path" but its inputSchema is not a Zod object.`);
+    throw new Error(`Capability ${capability.id} has a non-object inputSchema, which cannot be split into path and body.`);
   }
-  return schema;
+
+  const keys = Object.keys(schema.shape as Record<string, unknown>);
+  const pathKeys = capability.route.pathParams;
+  for (const key of pathKeys) {
+    if (!keys.includes(key)) {
+      throw new Error(`Capability ${capability.id} declares path parameter "${key}", which its inputSchema does not define.`);
+    }
+  }
+
+  const bodyKeys = keys.filter((key) => !pathKeys.includes(key));
+  const mask = (selected: readonly string[]) => Object.fromEntries(selected.map((key) => [key, true as const]));
+
+  return {
+    params: pathKeys.length > 0 ? schema.pick(mask(pathKeys) as never) : undefined,
+    body: bodyKeys.length > 0 ? schema.pick(mask(bodyKeys) as never) : undefined,
+  };
 }
 
 /** Error codes sharing an HTTP status collapse into one documented response for that status. */
@@ -68,6 +89,7 @@ export function buildDocument(capabilities: readonly CapabilityDefinition[] = CA
   registry.register("ErrorEnvelope", errorEnvelopeSchema);
 
   for (const capability of capabilities) {
+    const { params, body } = splitInput(capability);
     const responses: Record<string, unknown> = {
       [String(capability.route.successStatus)]: {
         description: `${capability.id} succeeded.`,
@@ -96,10 +118,10 @@ export function buildDocument(capabilities: readonly CapabilityDefinition[] = CA
           : "Required permissions: none.",
       ].join(" "),
       security: [{ sessionCookie: [] }],
-      request:
-        capability.route.inputIn === "path"
-          ? { params: pathParameterSchema(capability) }
-          : { body: { required: true, content: { "application/json": { schema: capability.inputSchema } } } },
+      request: {
+        ...(params ? { params } : {}),
+        ...(body ? { body: { required: true, content: { "application/json": { schema: body } } } } : {}),
+      },
       responses: responses as never,
     });
   }

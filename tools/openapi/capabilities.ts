@@ -1,5 +1,9 @@
 import type { CapabilityDefinition } from "../../modules/capability/contracts/index.js";
-import { storeReadCapability, organizationCreateCapability } from "../../modules/tenant/contracts/index.js";
+import {
+  storeReadCapability,
+  organizationCreateCapability,
+  membershipInviteCapability,
+} from "../../modules/tenant/contracts/index.js";
 
 /**
  * Every implemented capability, in a stable order.
@@ -15,4 +19,8 @@ import { storeReadCapability, organizationCreateCapability } from "../../modules
  * tools/openapi/openapi.spec.ts, which asserts the registry covers every
  * `*.capability.ts` file in the tree.
  */
-export const CAPABILITIES: readonly CapabilityDefinition[] = [organizationCreateCapability, storeReadCapability];
+export const CAPABILITIES: readonly CapabilityDefinition[] = [
+  membershipInviteCapability,
+  organizationCreateCapability,
+  storeReadCapability,
+];
