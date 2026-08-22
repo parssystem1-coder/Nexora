@@ -15,6 +15,29 @@ Template for a new entry:
 
 ---
 
+## 2026-08-22 — `modules/money`: four decisions ADR-022 leaves to the implementer
+
+**Context:** implementing Phase 1 step 4 (`06_IMPLEMENTATION_PLAN.md`: currency registry + `Money` + allocator). `03_TECHNICAL_BLUEPRINT.md` §2 already assigns this to a `money/` module ("Money value object, currency registry, allocator"), so module ownership was not in question. ADR-022 is precise about representation, float prohibition, per-currency minor units, allocation and cross-currency arithmetic, but silent on four points that had to be settled to write the code.
+
+**1. Which currencies to seed.** ADR-022 requires a currency table but names no rows.
+  - Options: (A) seed nothing, let each deployment populate it — leaves the ADR-022 verification item "a currency with zero minor units round-trips" with no data to run against; (B) seed a broad ISO 4217 set (~180 rows) — bulk reference data nothing yet consumes; (C) seed a small set chosen to span the minor-unit exponents that actually break assumptions.
+  - **Decision: C.** Seeded `IRR` (0), `USD` (2), `EUR` (2), `JPY` (0), `KWD` (3). The spread is the point: 0 and 3 both exist, so no caller can pass its tests while assuming 2. `IRR` additionally carries the presentation pair (`IRT`, divisor 10) because rial-stored/toman-displayed is the platform's home-market case per ADR-023, and that factor of 10 must never appear as a literal in code. Widening to the full ISO list is a data task, not a design change, whenever a deployment needs it.
+
+**2. Where the presentation unit lives.** ADR-022 item 4 says the presentation unit, divisor and symbol are configuration and that "Domain and Application never see a presentation unit," but does not say how that is enforced.
+  - **Decision:** the columns exist on `currencies` (configuration has exactly one home), and the domain `Currency` entity deliberately does **not** carry them — `CurrencyRepositoryPg` selects only `code`, `name`, `minor_units`. The rule is structural rather than a convention: domain code cannot reach a presentation unit because the object it holds has no such field. A test pins the entity's key set so a future field addition fails loudly. Applying the divisor is interface-layer work and is deferred until something actually renders money; nothing does yet.
+
+**3. What `Money` carries.** ADR-022 item 1's type is `{ amountMinor: bigint; currency: string }`, but the DTO in item 7 also needs `minorUnits`, which suggests carrying the `Currency` entity instead of a bare code.
+  - **Decision:** follow item 1 literally — `Money` holds `amountMinor: bigint` + `currency: string`. Allocation and all arithmetic operate purely on integer minor units and never need the exponent, so carrying it would add a registry dependency to a value object that does not use it. The exponent is supplied at the boundary instead: `toMoneyDto(money, currency)` takes the `Currency` explicitly and throws if it does not match. This keeps the registry lookup at the edge, where it belongs, and makes "which currency's exponent is this?" an explicit argument rather than an assumption.
+
+**4. Rounding modes and decimal multiplication.** ADR-022 item 5 requires every fraction-producing operation to declare a rounding mode, default half-up.
+  - **Decision:** implement no fraction-producing operation at all in Phase 1. `multiply` takes a `bigint` and is exact; splitting by a ratio goes through `allocate`, which distributes the remainder rather than rounding each part independently — which is what item 5 mandates for allocation anyway. So there is currently no operation that needs to declare a mode, and no `RoundingMode` enum has been invented ahead of a caller. The first capability that genuinely needs a decimal factor (ADR-025 proration is the likely one) adds it then, with its mode declared at that call site.
+
+**Also settled, minor:** `modules/money`'s domain errors (`CurrencyMismatchError`, `InvalidCurrencyCodeError`, `InvalidAllocationError`) are plain `Error` subclasses, not `CapabilityError`. `CapabilityError` carries an `httpStatus`, which is an interface concern, and `Money` has no HTTP surface; a caller maps these at its own boundary like any other domain failure.
+
+**Module shape:** `contracts/`, `domain/`, `infrastructure/` and `migrations/` are populated. `application/` and `interfaces/` are **not** — there is no use case and no HTTP surface in this slice, and creating an empty service or controller to fill the template would be exactly the premature abstraction `AGENTS.md` §4 warns against. `03_TECHNICAL_BLUEPRINT.md` §2's "each module owns interfaces/, application/, domain/, infrastructure/, and contracts/ where other modules must consume it" is read as naming the permitted layers, not as requiring every one to be occupied before it has content. The first Phase 2 slice that resolves a currency through a use case adds `application/`.
+
+**Status:** RESOLVED.
+
 ## 2026-08-22 — Audit placement promoted to ADR-034; `03` and `08` both corrected
 
 **Context:** a gate review found `03_TECHNICAL_BLUEPRINT.md` §3.1 still describing audit as `Commit Domain Data + Outbox -> Audit` — the rejected after-commit-only design — while `08_PHASE_1_BRIEF.md` §2 step 8 had been amended to describe option B. The instruction to fix this assumed `03` outranks `08` and that `08` correctly described the implementation. Verification found **neither assumption holds**, which is what turned a documentation sync into an ADR.

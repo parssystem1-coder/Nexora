@@ -12,9 +12,15 @@ When documents disagree: **ADR Index > Architecture RFC > Technical/Database/Con
 
 ## Current state
 
-Phase 0 complete. Phase 1 Task 0 and Task 1 (golden path `store.read`) complete and **repaired** — an independent audit found six defects (audit events not surviving their own transaction, a 404 returning `VALIDATION_ERROR`, three connection pools created at import time, `organizations`' RLS `WITH CHECK` covering UPDATE with no real predicate, `audit_events` not actually append-only) and all six are fixed as of commit `979bf3d`; see `PHASE_1_REPAIR_REPORT.md` for the defect-by-defect record and `PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §4 for the current exit-criteria state. **Task 2 not started.** Phase 2 is not open — `06_IMPLEMENTATION_PLAN.md` gates it on Phase 1's exit criteria, and `Money`/`currencies` (Phase 1 step 4) do not exist yet.
+Phase 0 complete. Phase 1 Task 0 and Task 1 (golden path `store.read`) complete and **repaired** — an independent audit found six defects (audit events not surviving their own transaction, a 404 returning `VALIDATION_ERROR`, three connection pools created at import time, `organizations`' RLS `WITH CHECK` covering UPDATE with no real predicate, `audit_events` not actually append-only) and all six are fixed as of commit `979bf3d`; see `PHASE_1_REPAIR_REPORT.md` for the defect-by-defect record.
 
-74 tests passing (12 files), conformance 0 violations, 11 migrations apply cleanly from empty.
+Audit placement is now ADR-034 (`03` §3.1 and `08` §2 step 8 previously contradicted each other and both misdescribed the shipped design).
+
+**Phase 1 step 4 done:** `modules/money` — `Money` value object (bigint minor units + explicit currency), the `currencies` registry, and the remainder-distributing allocator carrying the ADR-030 `money-allocator` singleton role. Per-currency minor units are read from the table, never hard-coded to 2.
+
+**Task 2 not started.** Exit criteria now **eight of nine** (`PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §4); the remaining row is "revoking a membership invalidates active sessions," which needs `membership.revoke` from Task 2. Phase 2 is no longer *structurally* blocked — `Money` exists for it to be typed against — but `06_IMPLEMENTATION_PLAN.md` still gates it on the full exit criteria.
+
+98 tests passing (14 files), conformance 0 violations, 12 migrations apply cleanly from empty.
 
 Update this section when that changes.
 

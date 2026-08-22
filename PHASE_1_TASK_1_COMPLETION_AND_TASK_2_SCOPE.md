@@ -129,7 +129,7 @@ Open risks in `RISK_REGISTER.md`: **R-001** (the Docker compose path itself is s
 
 ## 4. Phase 1 exit criteria — current results
 
-Against `08_PHASE_1_BRIEF.md` §6, **as of the repair in `PHASE_1_REPAIR_REPORT.md`** (commits `e613bff`..`979bf3d`). **Seven of nine met, two not met** — the outstanding two are Task 2 and later work, not defects in the golden path.
+Against `08_PHASE_1_BRIEF.md` §6, as of the repair in `PHASE_1_REPAIR_REPORT.md` (commits `e613bff`..`979bf3d`) **and the `modules/money` slice that followed it** (Phase 1 step 4, ADR-022). **Eight of nine met, one not met** — the outstanding row is `membership.revoke`, a Task 2 slice, not a defect in the golden path.
 
 | Criterion | Result |
 |---|---|
@@ -142,7 +142,7 @@ Against `08_PHASE_1_BRIEF.md` §6, **as of the repair in `PHASE_1_REPAIR_REPORT.
 | Integration tests run against real PostgreSQL | ✅ no mocks |
 | Every capability emits an audit event | ✅ **was partial, now met** — the previous state audited only `store.read`'s success path; a `FORBIDDEN` outcome (permission denial) was invisible to the only code that wrote audit events at all, not merely "latent" as this document previously read. Repair item 1 moves the durable write (option B) to the controller and proves both `SUCCESS` and `FAILURE` rows against real PostgreSQL. |
 | Revoking a membership invalidates active sessions within one request | ❌ **not met** — needs `membership.revoke` (Task 2) |
-| `Money` allocator test over randomized inputs | ❌ **not met** — `Money`/`currencies` deferred to the slice that first needs them |
+| `Money` allocator test over randomized inputs | ✅ **now met** — `modules/money` implements Phase 1 step 4 (ADR-022). Proven by `modules/money/domain/money.vo.spec.ts` → "Money.allocate — randomized property" → *"always produces parts that sum to exactly the original whole, fairly distributed"*: 5000 seeded-random iterations over mixed currencies, magnitudes past 2^53, negative totals and zero-weight lines, asserting `sum(parts) === original` exactly. It also asserts fairness (no part more than one minor unit from its exact share), because sum-equality alone would pass an allocator that dumped everything into part 0. |
 
 **Two rows above were previously marked ✅ or partial on a check that an independent audit found incomplete** ("every error path returns a documented code" and "every capability emits an audit event") — both are corrected now, not merely re-asserted. See `PHASE_1_REPAIR_REPORT.md` for the full defect list, including two items (connection-pool composition, `audit_events` append-only enforcement) that this exit-criteria table never claimed but that the repair also fixed.
 
