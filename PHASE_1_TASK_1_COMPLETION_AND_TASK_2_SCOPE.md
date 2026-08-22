@@ -1,10 +1,10 @@
-# Phase 0 and Phase 1 — Completion Summary
+# Phase 1 Task 1 — Completion, and Task 2 Scope
 
 **Date:** 2026-08-22
-**Last commit:** `9c53166` — 2026-08-22 06:04 (8 commits total)
-**State:** Phase 0 complete. Phase 1 **Task 1 (golden path) complete and approved**; Task 2 not started.
+**Last commit:** `9c53166` — 2026-08-22 06:04
+**State:** Phase 0 complete. Phase 1 **Task 1 (golden path) complete and approved**; Task 2 scoped, not started.
 
-> **Scope note on the title.** Phase 1 is not finished — Task 1 is. `08_PHASE_1_BRIEF.md` §3 lists seven further slices in Task 2, and two of Phase 1's nine exit criteria are not yet met (§4 below). This document summarises what is done and is explicit about what is not.
+> **Scope.** Phase 1 is not finished — Task 1 is. `08_PHASE_1_BRIEF.md` §3 lists six further slices in Task 2, and two of Phase 1's nine exit criteria are not yet met (§4). §1 covers Phase 0 as background; §5 defines what Task 2 may touch.
 
 ---
 
@@ -81,7 +81,7 @@ All eleven ordered steps of `08_PHASE_1_BRIEF.md` §2 are present and tested:
 |---|---|
 | **Pipeline transaction boundary** — permission authorization ran in its own transaction that committed before execution and audit began, making it a check against released state | **Fixed.** One transaction now spans steps 6–8; `PermissionGuard` deleted, guards reduced to steps 1–4 |
 | **RLS exemptions** — six tables had been exempted on implementer authority | **Finalized by decision.** Reverted, surfaced as 16 harness violations, then re-applied as a recorded decision (§3) |
-| **Audit placement** — `08` §2 and `03` §3.1 disagreed; inside one transaction a `FAILURE` audit is rolled back by the failure it records | **Option B agreed**, `08` §2 amended. Implementation deferred to Task 2 (§5) |
+| **Audit event placement** — `08` §2 and `03` §3.1 disagreed; inside one transaction a `FAILURE` audit is rolled back by the failure it records | **Option B agreed** (`DECISION_LOG.md`), `08` §2 amended. Latent for Task 1, active in Task 2 (§5) |
 | **Test/production drift** — the integration test applied only `cookieParser()`, so `requestId` was undefined throughout and step 10 had no coverage at all | **Fixed at the root.** `apps/api/create-app.ts` is now the single composition used by both `main.ts` and the tests |
 | **A table's owner bypasses RLS** by default, and `INSERT … RETURNING` re-checks the `USING` policy | Both confirmed empirically; drove role separation, mandatory `FORCE`, and client-generated ids for organization creation |
 | **NestJS type-based DI fails silently under esbuild** (`emitDecoratorMetadata` is not emitted) | Explicit construction everywhere; also decisive for ADR-033 |
@@ -97,7 +97,7 @@ All eleven ordered steps of `08_PHASE_1_BRIEF.md` §2 are present and tested:
 | 1 | `sessions` tenancy | **Platform-global** — one user, many organizations, one live session |
 | 2 | `roles`/`permissions`/`role_permissions` | **Platform-global** — Phase 1 core; capability keys are platform-defined |
 | 3 | Self-access RLS clause | **Kept** on `memberships`/`store_memberships` only; removing it disables the system |
-| 4 | Audit placement | **Option B** — separate connection, committed independently, written before the domain transaction resolves |
+| 4 | Audit event placement | **Option B**, per `DECISION_LOG.md` (not an ADR — see the citation note below): written **before** the domain transaction commits, on a **separate connection that commits independently** of it, so the record survives either outcome. **Latent for Task 1, active in Task 2.** |
 | 5 | OpenAPI artifacts | **ADR-033**, accepted; generate from Zod, CI drift check; Task 2 scope |
 | 6 | Migration naming | `<timestamp>_<module>__<description>.sql`; all 9 renamed, convention enforced |
 
@@ -144,33 +144,51 @@ Against `08_PHASE_1_BRIEF.md` §6. **Six of nine met, one partial, two not met**
 
 ---
 
-## 5. Readiness for Task 2
-
-**Schema ready:** 11 tables with RLS + `FORCE` where tenant-owned, role separation enforced, migration runner rejecting non-conforming filenames.
-
-**Remaining `08_PHASE_1_BRIEF.md` §4 tables — 5 of 16:**
-
-```text
-credentials            → auth.login
-identity_providers     → contract-ready extension point (ADR-029 item 7)
-reserved_subdomains    → store.create slug validation (§5)
-currencies             → the Money value object (§4, deliberately in Phase 1)
-outbox_events          → when eventing starts
-```
-
-> **Correction — this matters.** The brief for this summary listed the pending tables as "credentials, identity_providers, plan, plan_version, price, subscription, invoice, payment_intent (per 08 §4)". **`plan`, `plan_version`, `price`, `subscription`, `invoice` and `payment_intent` are not in §4.** They are Phase 2 billing tables from `04_DATABASE_BLUEPRINT.md` §2.3/§2.5, and §4 says in terms: *"Do not create billing, commerce, domain, plugin, AI or MCP tables."* Writing them into a hand-off document would have authorized exactly what §4 forbids, so the correct five are listed above. Phase 2 opens after Phase 1's exit criteria are met (`06_IMPLEMENTATION_PLAN.md`).
+## 5. Task 2 Scope — the first six slices
 
 **Golden path approved** ✅ — the pattern every Task 2 slice mirrors is fixed, hand-reviewed, and enforced by the harness.
 
-**Task 2 order** (`08_PHASE_1_BRIEF.md` §3): `organization.create` → `membership.invite` → `membership.role.assign` → `store.create` → `auth.login`/`logout`/`logout_all` → `organization.switch`.
+**Schema ready:** 11 tables with RLS + `FORCE` where tenant-owned, role separation enforced, migration runner rejecting non-conforming filenames.
 
-> *Correction:* the brief called `organization.create` "Task 2 step 2"; §3 lists it **first**.
+### 5.1 The six slices, in order
 
-**Carried into the first Task 2 slice:**
-- audit placement option B becomes mandatory (`organization.create` and `store.create` audit reachable failures);
-- `organization.create` must generate the organization id itself rather than relying on the column default with `RETURNING` (the `USING`-policy finding);
-- ADR-033's generator and CI drift check;
-- the `credentials`/`identity_providers` tenancy decision, when `auth.login` creates them.
+Per `08_PHASE_1_BRIEF.md` §3, each mirroring the golden path:
+
+| # | Slice | New tables it needs |
+|---|---|---|
+| 1 | `organization.create` | — (`organizations` exists) |
+| 2 | `membership.invite` | — (`memberships` exists) |
+| 3 | `membership.role.assign` | — (`membership_roles` exists) |
+| 4 | `store.create` | `reserved_subdomains` (slug rejection, §5) |
+| 5 | `auth.login`, `auth.logout`, `auth.logout_all` | `credentials` |
+| 6 | `organization.switch` | — (`sessions` exists) |
+
+Slice 5 is three capabilities in one numbered item, `auth.logout_all` included.
+
+### 5.2 Tables Task 2 may create
+
+Only the five `08_PHASE_1_BRIEF.md` §4 tables not yet built — 11 of 16 exist:
+
+```text
+credentials            → required by slice 5 (auth.login)
+reserved_subdomains    → required by slice 4 (store.create slug validation)
+identity_providers     → contract-ready extension point (ADR-029 item 7); no slice requires it
+currencies             → the Money value object; §4 places it in Phase 1 deliberately,
+                         and the Money allocator test is an unmet exit criterion (§4)
+outbox_events          → when eventing starts
+```
+
+Only `credentials` and `reserved_subdomains` are strictly driven by the six slices; the other three are remaining Phase 1 tables that may land in Task 2 or with the slice that first needs them.
+
+> **Commerce and billing tables are Phase 2, not Task 2.** `plan`, `plan_version`, `price`, `subscription`, `invoice`, `payment_intent` and every commerce table come from `04_DATABASE_BLUEPRINT.md` §2.3/§2.5 and belong to Phase 2. `08_PHASE_1_BRIEF.md` §4 states the boundary directly: *"Do not create billing, commerce, domain, plugin, AI or MCP tables."* Phase 2 opens only after Phase 1's exit criteria are met (`06_IMPLEMENTATION_PLAN.md`).
+
+### 5.3 Carried into the first Task 2 slice
+
+- **Audit event placement option B becomes active** — `organization.create` and `store.create` audit reachable failures (duplicate slug, reserved slug), so the failure audit must survive the rollback it records;
+- `organization.create` must **generate the organization id itself** rather than relying on the column default with `RETURNING` — Postgres re-checks the `USING` policy on returned rows, and a brand-new organization's own `tenant_id` cannot satisfy it;
+- **ADR-033's** generator and CI drift check;
+- the **`credentials`/`identity_providers` tenancy decision**, when `auth.login` creates them — same structural case as `sessions`, deliberately not pre-decided;
+- **R-003** — re-evaluate the `user_id`-keyed RLS clause against a clause-free alternative.
 
 ---
 
