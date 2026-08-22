@@ -1,8 +1,10 @@
 # Phase 1 Task 1 — Completion, and Task 2 Scope
 
-**Date:** 2026-08-22
-**Last commit:** `9c53166` — 2026-08-22 06:04
-**State:** Phase 0 complete. Phase 1 **Task 1 (golden path) complete and approved**; Task 2 scoped, not started.
+**Date:** 2026-08-22 (repaired 2026-08-22 — see note below)
+**Last commit:** `979bf3d` — 2026-08-22 15:41
+**State:** Phase 0 complete. Phase 1 **Task 1 (golden path) complete, repaired, and re-frozen**; Task 2 scoped, not started.
+
+> **Repair note.** This document was written at commit `9c53166`. An independent audit of that commit found six defects in the golden path itself, all fixed in commits `e613bff`..`979bf3d` — see **`PHASE_1_REPAIR_REPORT.md`** for the full list. Test/table/migration counts below are updated to the repaired state; anything not explicitly touched by that report is unchanged from this document's original writing.
 
 > **Scope.** Phase 1 is not finished — Task 1 is. `08_PHASE_1_BRIEF.md` §3 lists six further slices in Task 2, and two of Phase 1's nine exit criteria are not yet met (§4). §1 covers Phase 0 as background; §5 defines what Task 2 may touch.
 
@@ -69,9 +71,9 @@ All eleven ordered steps of `08_PHASE_1_BRIEF.md` §2 are present and tested:
 
 **Modules:** `identity`, `tenant`, `authorization`, `audit`, `capability` — each following `03_TECHNICAL_BLUEPRINT.md` §2.1 (`contracts/`, `domain/`, `application/`, `infrastructure/`, `interfaces/`, `migrations/`).
 
-**Tables: 11 of the 16 named in `08_PHASE_1_BRIEF.md` §4**, across **9 migrations** under `<timestamp>_<module>__` naming — `users`, `sessions`, `organizations`, `memberships`, `stores`, `store_memberships`, `roles`, `permissions`, `role_permissions`, `membership_roles`, `audit_events`. Nothing outside §4 was created.
+**Tables: 11 of the 16 named in `08_PHASE_1_BRIEF.md` §4**, across **11 migrations** (9 original + 2 from the repair, splitting `organizations`' RLS policy and enforcing `audit_events` append-only) under `<timestamp>_<module>__` naming — `users`, `sessions`, `organizations`, `memberships`, `stores`, `store_memberships`, `roles`, `permissions`, `role_permissions`, `membership_roles`, `audit_events`. Nothing outside §4 was created.
 
-**Tests: 64**, all passing — domain unit tests, application tests with fakes, capability policy tests, and 15 integration tests driving real HTTP against real PostgreSQL with RLS active. No mocked database anywhere.
+**Tests: 74**, all passing — domain unit tests, application tests with fakes, capability policy tests, and integration tests driving real HTTP against real PostgreSQL with RLS active. No mocked database anywhere. (64 before the repair; +10 across the six repair items — see `PHASE_1_REPAIR_REPORT.md`.)
 
 **Harness: 26 conformance tests, zero violations, empty exceptions report.**
 
@@ -81,7 +83,7 @@ All eleven ordered steps of `08_PHASE_1_BRIEF.md` §2 are present and tested:
 |---|---|
 | **Pipeline transaction boundary** — permission authorization ran in its own transaction that committed before execution and audit began, making it a check against released state | **Fixed.** One transaction now spans steps 6–8; `PermissionGuard` deleted, guards reduced to steps 1–4 |
 | **RLS exemptions** — six tables had been exempted on implementer authority | **Finalized by decision.** Reverted, surfaced as 16 harness violations, then re-applied as a recorded decision (§3) |
-| **Audit event placement** — `08` §2 and `03` §3.1 disagreed; inside one transaction a `FAILURE` audit is rolled back by the failure it records | **Option B agreed** (`DECISION_LOG.md`), `08` §2 amended. Latent for Task 1, active in Task 2 (§5) |
+| **Audit event placement** — `08` §2 and `03` §3.1 disagreed; inside one transaction a `FAILURE` audit is rolled back by the failure it records | **Option B agreed** (`DECISION_LOG.md`), `08` §2 amended. **Implemented** — see `PHASE_1_REPAIR_REPORT.md` item 1: an independent audit found this had been decided but not built, and `store.read`'s permission-denial path had no audit coverage at all, not merely a latent gap |
 | **Test/production drift** — the integration test applied only `cookieParser()`, so `requestId` was undefined throughout and step 10 had no coverage at all | **Fixed at the root.** `apps/api/create-app.ts` is now the single composition used by both `main.ts` and the tests |
 | **A table's owner bypasses RLS** by default, and `INSERT … RETURNING` re-checks the `USING` policy | Both confirmed empirically; drove role separation, mandatory `FORCE`, and client-generated ids for organization creation |
 | **NestJS type-based DI fails silently under esbuild** (`emitDecoratorMetadata` is not emitted) | Explicit construction everywhere; also decisive for ADR-033 |
@@ -97,7 +99,7 @@ All eleven ordered steps of `08_PHASE_1_BRIEF.md` §2 are present and tested:
 | 1 | `sessions` tenancy | **Platform-global** — one user, many organizations, one live session |
 | 2 | `roles`/`permissions`/`role_permissions` | **Platform-global** — Phase 1 core; capability keys are platform-defined |
 | 3 | Self-access RLS clause | **Kept** on `memberships`/`store_memberships` only; removing it disables the system |
-| 4 | Audit event placement | **Option B**, per `DECISION_LOG.md` (not an ADR — see the citation note below): written **before** the domain transaction commits, on a **separate connection that commits independently** of it, so the record survives either outcome. **Latent for Task 1, active in Task 2.** |
+| 4 | Audit event placement | **Option B**, per `DECISION_LOG.md` (not an ADR — see the citation note below): written **before** the domain transaction commits, on a **separate connection that commits independently** of it, so the record survives either outcome. **Implemented** in the repair — see `PHASE_1_REPAIR_REPORT.md` item 1. |
 | 5 | OpenAPI artifacts | **ADR-033**, accepted; generate from Zod, CI drift check; Task 2 scope |
 | 6 | Migration naming | `<timestamp>_<module>__<description>.sql`; all 9 renamed, convention enforced |
 
@@ -127,20 +129,22 @@ Open risks in `RISK_REGISTER.md`: **R-001** (the Docker compose path itself is s
 
 ## 4. Phase 1 exit criteria — current results
 
-Against `08_PHASE_1_BRIEF.md` §6. **Six of nine met, one partial, two not met** — the outstanding ones are Task 2 and later work, not defects in the golden path.
+Against `08_PHASE_1_BRIEF.md` §6, **as of the repair in `PHASE_1_REPAIR_REPORT.md`** (commits `e613bff`..`979bf3d`). **Seven of nine met, two not met** — the outstanding two are Task 2 and later work, not defects in the golden path.
 
 | Criterion | Result |
 |---|---|
-| Tenant A cannot read/write/delete/execute against Tenant B data | ✅ RLS fail-closed, proven at the database level and through HTTP |
+| Tenant A cannot read/write/delete/execute against Tenant B data | ✅ RLS fail-closed, proven at the database level and through HTTP; `organizations` UPDATE now carries a real `WITH CHECK`, not `true` for every command (repair item 5) |
 | A valid session with another tenant's `storeId` is denied | ✅ tested; `storeId` is a path parameter only, never derived from the token (ADR-002) |
 | A query without tenant context returns zero rows **and** raises an application error | ✅ both halves tested separately |
 | `store_memberships` checked independently of organization membership | ✅ both failure directions tested — a revoked org membership with a live store membership is denied, and vice versa |
 | Sessions are server-side and revocable | ✅ opaque hashed token in an `httpOnly` cookie (ADR-029) |
-| Every error path returns a documented `05` code | ✅ stable `{code, message, details, requestId}` envelope, asserted across failure paths |
+| Every error path returns a documented `05` code | ✅ **corrected** — an independent audit found every framework-level `HttpException` was mapped to `VALIDATION_ERROR` regardless of its real status (e.g. a 404 returned `{code: "VALIDATION_ERROR"}`), so this row was previously ✅ on an incomplete check. Fixed in repair item 3; now status-mapped and tested against the real router. |
 | Integration tests run against real PostgreSQL | ✅ no mocks |
-| Every capability emits an audit event | ⚠️ **partial** — true for `store.read` success; failure-path durability arrives with option B in Task 2 |
+| Every capability emits an audit event | ✅ **was partial, now met** — the previous state audited only `store.read`'s success path; a `FORBIDDEN` outcome (permission denial) was invisible to the only code that wrote audit events at all, not merely "latent" as this document previously read. Repair item 1 moves the durable write (option B) to the controller and proves both `SUCCESS` and `FAILURE` rows against real PostgreSQL. |
 | Revoking a membership invalidates active sessions within one request | ❌ **not met** — needs `membership.revoke` (Task 2) |
 | `Money` allocator test over randomized inputs | ❌ **not met** — `Money`/`currencies` deferred to the slice that first needs them |
+
+**Two rows above were previously marked ✅ or partial on a check that an independent audit found incomplete** ("every error path returns a documented code" and "every capability emits an audit event") — both are corrected now, not merely re-asserted. See `PHASE_1_REPAIR_REPORT.md` for the full defect list, including two items (connection-pool composition, `audit_events` append-only enforcement) that this exit-criteria table never claimed but that the repair also fixed.
 
 ---
 
@@ -184,7 +188,7 @@ Only `credentials` and `reserved_subdomains` are strictly driven by the six slic
 
 ### 5.3 Carried into the first Task 2 slice
 
-- **Audit event placement option B becomes active** — `organization.create` and `store.create` audit reachable failures (duplicate slug, reserved slug), so the failure audit must survive the rollback it records;
+- **Audit event placement option B is already built** (`modules/audit/contracts/index.ts`'s `recordAuditEventDurable`, `platform/db/connections.ts`'s `AUDIT_DB` pool) — `organization.create` and `store.create` reuse it rather than rebuilding it, and now actually exercise its failure path (duplicate slug, reserved slug), which `store.read` structurally cannot;
 - `organization.create` must **generate the organization id itself** rather than relying on the column default with `RETURNING` — Postgres re-checks the `USING` policy on returned rows, and a brand-new organization's own `tenant_id` cannot satisfy it;
 - **ADR-033's** generator and CI drift check;
 - the **`credentials`/`identity_providers` tenancy decision**, when `auth.login` creates them — same structural case as `sessions`, deliberately not pre-decided;
@@ -197,22 +201,30 @@ Only `credentials` and `reserved_subdomains` are strictly driven by the six slic
 ```text
 apps/api/          NestJS bootstrap + composition root; no business logic
   create-app.ts      the one middleware stack, shared by main.ts and tests
+  database-lifecycle.provider.ts   drains both pools on shutdown
 platform/          cross-cutting infrastructure only
   config.ts, clock.ts, db/{pool,kysely,migrate,discover-migrations,
-                           tenant-context,assert-role-safety,ident}.ts
+                           tenant-context,assert-role-safety,ident,
+                           connections}.ts
 modules/           identity, tenant, authorization, audit, capability
   <module>/{contracts,domain,application,infrastructure,interfaces,migrations}
 tools/conformance/ harness: rules/, fixtures/, lib/, run.ts
 ```
 
+`platform/db/connections.ts` (added in the repair) is where both DI tokens
+(`APP_DB`, `AUDIT_DB`) and their pool factories live — deliberately in
+`platform/`, not `apps/api/`, because guards and controllers inside
+`modules/` need `@Inject(APP_DB)` and must not import from `apps/api`
+(that would invert the composition direction).
+
 | Check | Status |
 |---|---|
 | `npm run typecheck` | ✅ clean (strict, `noUncheckedIndexedAccess`) |
-| `npm test` | ✅ 64 passing across 9 files |
+| `npm test` | ✅ 74 passing across 12 files |
 | `npm run conformance` | ✅ 0 violations, empty exceptions report |
 | Full pipeline runtime | ~10s (ADR-030 requires under two minutes) |
 | CI workflow | committed; **not yet executed** — the repository is local-only with no remote by instruction (R-001) |
 
-**Last commit:** `9c53166`, 2026-08-22 06:04 — *"Normative amendments: RLS exemptions, audit placement, migration naming; accept ADR-033"*.
+**Last commit:** `979bf3d`, 2026-08-22 15:41 — *"Repair item 6: audit_events is append-only for the app role, not just by convention"*. Full repair history: `e613bff`..`979bf3d` (six commits, one per repair item — see `PHASE_1_REPAIR_REPORT.md`).
 
 **Code freeze point:** Phase 1 golden path approved and frozen as the reference pattern. Task 2 may begin from `organization.create`.
