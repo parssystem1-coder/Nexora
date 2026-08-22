@@ -1,8 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { CanActivate, ExecutionContext, Inject, Injectable } from "@nestjs/common";
 import type { Request } from "express";
-import { createDb } from "../../../platform/db/kysely.js";
-import { loadDbConfig } from "../../../platform/config.js";
+import type { Kysely } from "kysely";
+import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
+import { APP_DB } from "../../../platform/db/connections.js";
 import { CapabilityError } from "../../capability/contracts/index.js";
 import type { RequestWithIdentity } from "../../identity/contracts/index.js";
 import { StoreMembershipRepositoryPg } from "../infrastructure/store-membership.repository.pg.js";
@@ -22,17 +23,18 @@ export interface TenantContext {
 
 export type RequestWithTenantContext = RequestWithIdentity & { tenantContext?: TenantContext };
 
-const appDb = createDb(loadDbConfig());
-
 /**
  * 08_PHASE_1_BRIEF.md §2 steps 2-4: resolve organization membership, check
  * store access (ADR-002 — storeId is always an explicit path input, never
  * derived from the token), build the trusted TenantContext. Must run after
  * SessionGuard. Uses the bootstrap RLS phase — app.user_id set, app.tenant_id
- * still null — see DECISION_LOG.md "RLS bootstrap...".
+ * still null — see DECISION_LOG.md "RLS bootstrap...". `db` is injected via
+ * the explicit APP_DB token — see platform/db/connections.ts.
  */
 @Injectable()
 export class StoreAccessGuard implements CanActivate {
+  constructor(@Inject(APP_DB) private readonly db: Kysely<Database>) {}
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithTenantContext & Request & { requestId?: string; correlationId?: string }>();
     const identity = request.authenticatedIdentity;
@@ -48,7 +50,7 @@ export class StoreAccessGuard implements CanActivate {
     }
     const { storeId } = parsed.data;
 
-    const access = await withTenantContext(appDb, { tenantId: null, userId: identity.userId, storeId: null }, (trx) => {
+    const access = await withTenantContext(this.db, { tenantId: null, userId: identity.userId, storeId: null }, (trx) => {
       const service = new ResolveStoreAccessService(new StoreMembershipRepositoryPg(trx), new MembershipRepositoryPg(trx));
       return service.execute(identity.userId, storeId);
     });

@@ -1,7 +1,8 @@
-import { Controller, Get, Req, UseGuards } from "@nestjs/common";
-import { createDb } from "../../../platform/db/kysely.js";
-import { loadDbConfig } from "../../../platform/config.js";
+import { Controller, Get, Inject, Req, UseGuards } from "@nestjs/common";
+import type { Kysely } from "kysely";
+import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
+import { APP_DB } from "../../../platform/db/connections.js";
 import { SessionGuard } from "../../identity/contracts/index.js";
 import { CheckPermissionService, PermissionCheckRepositoryPg } from "../../authorization/contracts/index.js";
 import { createAuditEventRepository } from "../../audit/contracts/index.js";
@@ -11,8 +12,6 @@ import { storeReadCapability } from "./store-read.capability.js";
 import { StoreRepositoryPg } from "../infrastructure/store.repository.pg.js";
 import { ReadStoreService } from "../application/read-store.service.js";
 import type { StoreDto } from "../contracts/index.js";
-
-const appDb = createDb(loadDbConfig());
 
 /**
  * The golden path: GET /api/v1/stores/{storeId} (08_PHASE_1_BRIEF.md §2).
@@ -42,6 +41,8 @@ const appDb = createDb(loadDbConfig());
  */
 @Controller("api/v1/stores")
 export class StoreController {
+  constructor(@Inject(APP_DB) private readonly appDb: Kysely<Database>) {}
+
   @Get(":storeId")
   @UseGuards(SessionGuard, StoreAccessGuard)
   async read(@Req() request: RequestWithTenantContext): Promise<StoreDto> {
@@ -52,7 +53,7 @@ export class StoreController {
     }
 
     return withTenantContext(
-      appDb,
+      this.appDb,
       { tenantId: tenantContext.tenantId, userId: tenantContext.userId, storeId: tenantContext.storeId },
       async (trx) => {
         // step 6 — permission authorization, inside the transaction
