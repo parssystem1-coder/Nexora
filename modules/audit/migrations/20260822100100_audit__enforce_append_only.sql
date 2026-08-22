@@ -1,0 +1,20 @@
+-- Repair (see PHASE_1_REPAIR_REPORT.md item 6): 04_DATABASE_BLUEPRINT.md §1
+-- requires "audit and ledger records are append-only." The original
+-- migration (20260822090800_audit__create_audit_events.sql) said so only in
+-- a comment — nexora_app held UPDATE and DELETE on audit_events via the
+-- blanket ALTER DEFAULT PRIVILEGES in platform/db/init/001_roles.sql, same
+-- as every other table, with nothing in the database actually preventing
+-- either.
+--
+-- Scoped to this one table, not a change to the default-privileges pattern
+-- itself: revoking here does not touch what future tables get by default
+-- (each ledger-shaped table Phase 2 adds — usage, payment — needs this same
+-- treatment in its own creating migration, not a blanket policy change now
+-- for tables that do not exist yet).
+--
+-- Evaluated per the task's "if the grant pattern would re-grant it": it
+-- would not. ALTER DEFAULT PRIVILEGES only affects objects created AFTER it
+-- runs; it does not retroactively re-grant anything on an existing table,
+-- and audit_events is never dropped and recreated (migrations are
+-- forward-only, ADR-021 item 8). No change to 001_roles.sql is needed.
+REVOKE UPDATE, DELETE ON audit_events FROM nexora_app;
