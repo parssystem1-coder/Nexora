@@ -16,6 +16,11 @@ function fakeRepos(options: { storeMembership: StoreMembership | null; membershi
   };
   const memberships: MembershipRepository = {
     findByUserAndTenant: async () => options.membership,
+    // Never exercised here: ResolveStoreAccessService only reads. Present
+    // because organization.create added create() to the port.
+    create: async () => {
+      throw new Error("ResolveStoreAccessService must not create memberships.");
+    },
   };
   return { storeMemberships, memberships };
 }

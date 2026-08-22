@@ -15,6 +15,58 @@ Template for a new entry:
 
 ---
 
+## 2026-08-23 — `organization.create`: five decisions the docs pack leaves open
+
+**Context:** implementing Task 2 slice 1 (`08_PHASE_1_BRIEF.md` §3). The capability is one row in `05_API_CAPABILITY_CONTRACTS.md` §4.1 (`organization.create | user | MEDIUM_WRITE | yes`) plus one constraint in `04_DATABASE_BLUEPRINT.md` §5 ("organization slug unique within its namespace"). Nothing else in the pack describes its behaviour, and it is the first capability that does not fit the golden path's shape exactly, because it *creates* the tenant rather than acting inside one.
+
+**1. Does creating an organization also make the creator a member?** The pack never says. `membership.invite` is a separate slice (§3 item 2) and `organization.switch` is another (item 6).
+  - Options: (A) create only the organization — but every subsequent capability authorizes through `membership_roles` (pipeline step 6), so the organization would be permanently unreachable by anybody, including its creator, and slices 2 and 6 would have no reachable starting state; (B) create the organization, an ACTIVE membership for the creator, and grant them the platform `owner` role, all in one transaction.
+  - **Decision: B.** This resolves an ambiguity rather than inventing architecture: (A) makes the documented slice order impossible to execute, so it cannot be the intended reading. The role granted is `owner` from the existing platform catalog — no new role, no new permission. Cross-module write goes through a new `RoleGrantRepository` port exported from `modules/authorization/contracts/`, mirroring how `modules/audit` already exposes `createAuditEventRepository`; `modules/tenant` never touches `membership_roles` directly.
+
+**2. Pipeline steps 2–4 have nothing to resolve.** The golden path puts "resolve membership, check resource access, build `TenantContext`" in `StoreAccessGuard`, before any transaction. Here there is no pre-existing membership and no resource to check access to.
+  - Options: (A) add a guard anyway, whose only acts are validating the body and calling `randomUUID()`; (B) do that work in the controller and document the absence.
+  - **Decision: B.** A guard named for access resolution that resolves no access would imply a check that did not happen — worse than an honest gap. What genuinely survives of those steps is input validation and minting the organization id, which is also the tenant id and therefore has to exist *before* the transaction, because it is what the RLS context is set to. `AGENTS.md` §2 requires documenting a mismatch rather than inventing a second structure; this is that record. Everything else — step 1 in a guard, one `withTenantContext` transaction for step 7, one durable audit event for the whole attempt — is the golden path unchanged.
+
+**3. Pipeline step 6 has no permission to assert.** §4.1 scopes the capability to `user`, and the caller holds no membership until step 7 creates one, so `membership_roles` has nothing to read.
+  - **Decision:** `requiredPermissions: []`, and the controller *throws* if that list is ever non-empty, rather than looping over it and silently doing nothing. An unenforceable requirement that looks enforced is the failure mode ADR-030 exists to prevent.
+
+**4. Idempotency: §4.1 says yes, and there is no mechanism.** ADR-009's shared idempotency store is Phase 2, no idempotency table is in `08` §4's scope list, and `AGENTS.md` §4 forbids a module-local substitute.
+  - Options: (A) `idempotent: true` in the capability definition, matching §4.1 — but the ADR-033 generator turns that metadata into a published contract, so the OpenAPI document would advertise an `Idempotency-Key` guarantee nothing provides; (B) `idempotent: false`, recording what is actually enforced.
+  - **Decision: B**, with the divergence stated in the capability file. The globally-unique slug index means a naive retry returns `CONFLICT` rather than creating a second organization, so the failure mode is a wrong status code on retry, not duplicate data. **Flip to `true` in the slice that lands ADR-009.**
+
+**5. Duplicate-slug detection cannot be a pre-check.** Inside the transaction `app.tenant_id` is the *new* organization's id, so a `SELECT` for a colliding slug owned by another tenant returns zero rows — RLS hides exactly the row the check is looking for.
+  - **Decision:** no pre-check exists. `OrganizationRepositoryPg` catches the `organizations_slug_key` unique violation and raises the domain-level `OrganizationSlugTakenError`, which `CreateOrganizationService` maps to the documented `CONFLICT` code. The unique index is both the only authority that sees the whole namespace and the only race-free one. `platform/db/constraint-violation.ts` inspects the error structurally rather than importing `pg`, which ADR-030 confines to three platform files.
+
+**Also settled, minor:** `reserved_subdomains` is deliberately not consulted — `08` §5 and `04` §5 both scope that rejection to *store* slug creation, and the table belongs to the `store.create` slice. Organization slugs are still constrained to a DNS-label-safe character set (3–63 chars, lowercase alphanumeric segments separated by single hyphens) so nothing has to be re-validated under ADR-028 later.
+
+**Status:** RESOLVED, except item 4, which is **OPEN pending ADR-009** (Phase 2).
+
+---
+
+## 2026-08-23 — `TenantContext` split so a non-store capability can have one
+
+**Context:** `TenantContext` was declared inline in `store-access.guard.ts` with `storeId: string` and `membershipId: string` both required. `05_API_CAPABILITY_CONTRACTS.md` §2 declares `storeId` **optional** precisely because not every capability is store-scoped. `organization.create` is the first capability with neither a store nor a membership, and pipeline step 10 requires *every* request's structured log line to carry `tenantId` — which `loggingMiddleware` reads off `request.tenantContext`.
+**Options considered:**
+  A. Leave the type alone and attach an untyped partial object to `request.tenantContext` — two shapes under one property name, exactly the "second structure" `AGENTS.md` §2 forbids.
+  B. Widen the existing type in place — loses the golden path's compile-time guarantee that `storeId`/`membershipId` are present.
+  C. Move the 05 §2 shape into `modules/tenant/interfaces/tenant-context.ts` and derive `StoreTenantContext extends TenantContext` with both fields required; `StoreAccessGuard` still produces the narrower one and `StoreController` still consumes it.
+**Decision:** C. Type-only change, no behaviour change to the golden path, and it makes the repository *more* conformant to `05` §2 rather than less. Without it `POST /api/v1/organizations` logged `tenantId: null` on every request, which is a step-10 defect, not a cosmetic one; `apps/api/organization-create.integration.spec.ts` now pins the log line.
+**Status:** RESOLVED.
+
+---
+
+## 2026-08-23 — ADR-033 implemented with this slice, not deferred
+
+**Context:** ADR-033 is "ACCEPTED, applies from Task 2 (Phase 1)" and `PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §5.3 lists its generator and CI drift check as carried into the first Task 2 slice. `AGENTS.md` §7 makes "generated schema artifacts" part of the definition of done. This slice is that first slice.
+**Options considered:**
+  A. Defer to a separate task — but the ADR's own rationale is that "Task 2 adds seven more [capabilities], so the cost of deciding late rises with every slice," and every deferred slice would ship undone against §7.
+  B. Build it here, minimally.
+**Decision:** B. `@asteasolutions/zod-to-openapi@7.3.4` (the last line supporting Zod 3.x, which this repo is on), `tools/openapi/generate.ts`, committed `openapi.json`, `npm run openapi [-- --check]`, and a CI step. `CapabilityDefinition` gained `route`, `inputSchema`, `outputSchema` and `errorCodes` — the generator reads only those and never a controller, so it runs with no database reachable, which `tools/openapi/openapi.spec.ts` proves by running the real CLI as a subprocess with every connection string pointed at a closed port. The stale-artifact case is proven the ADR-030 way: the real check is run against a deliberately tampered copy and must exit 1.
+**Scope note:** this is platform tooling, not a second vertical slice. It touched two frozen golden-path files additively (`read-store.input.ts` gained an output schema, `store-read.capability.ts` gained route/schema/error metadata) because ADR-033's first verification item is that the artifact covers *every* implemented capability.
+**Status:** RESOLVED.
+
+---
+
 ## 2026-08-22 — `modules/money`: four decisions ADR-022 leaves to the implementer
 
 **Context:** implementing Phase 1 step 4 (`06_IMPLEMENTATION_PLAN.md`: currency registry + `Money` + allocator). `03_TECHNICAL_BLUEPRINT.md` §2 already assigns this to a `money/` module ("Money value object, currency registry, allocator"), so module ownership was not in question. ADR-022 is precise about representation, float prohibition, per-currency minor units, allocation and cross-currency arithmetic, but silent on four points that had to be settled to write the code.

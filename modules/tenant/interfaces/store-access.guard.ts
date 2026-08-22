@@ -5,23 +5,24 @@ import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import { APP_DB } from "../../../platform/db/connections.js";
 import { CapabilityError } from "../../capability/contracts/index.js";
-import type { RequestWithIdentity } from "../../identity/contracts/index.js";
+import type {
+  TenantContext,
+  StoreTenantContext,
+  RequestWithTenantContext,
+  RequestWithStoreTenantContext,
+} from "./tenant-context.js";
 import { StoreMembershipRepositoryPg } from "../infrastructure/store-membership.repository.pg.js";
 import { MembershipRepositoryPg } from "../infrastructure/membership.repository.pg.js";
 import { ResolveStoreAccessService } from "../application/resolve-store-access.service.js";
 import { readStoreInputSchema } from "../application/read-store.input.js";
 
-export interface TenantContext {
-  tenantId: string;
-  userId: string;
-  storeId: string;
-  membershipId: string;
-  requestId: string;
-  correlationId: string;
-  actorType: "user";
-}
-
-export type RequestWithTenantContext = RequestWithIdentity & { tenantContext?: TenantContext };
+/**
+ * Re-exported from tenant-context.ts, where the shape now lives so a
+ * capability with no store (organization.create) can build the same trusted
+ * context. Nothing about what this guard produces changed: it still emits a
+ * StoreTenantContext, in which storeId and membershipId are required.
+ */
+export type { TenantContext, StoreTenantContext, RequestWithTenantContext, RequestWithStoreTenantContext };
 
 /**
  * 08_PHASE_1_BRIEF.md §2 steps 2-4: resolve organization membership, check
@@ -36,7 +37,7 @@ export class StoreAccessGuard implements CanActivate {
   constructor(@Inject(APP_DB) private readonly db: Kysely<Database>) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<RequestWithTenantContext & Request & { requestId?: string; correlationId?: string }>();
+    const request = context.switchToHttp().getRequest<RequestWithStoreTenantContext & Request & { requestId?: string; correlationId?: string }>();
     const identity = request.authenticatedIdentity;
     if (!identity) {
       throw new CapabilityError("AUTHENTICATION_REQUIRED", "StoreAccessGuard ran before SessionGuard established an identity.");

@@ -8,12 +8,14 @@
     "typecheck": "tsc --noEmit",
     "conformance": "tsx tools/conformance/run.ts",
     "graph": "tsx tools/graph/extract.ts",
+    "openapi": "tsx tools/openapi/generate.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "tsx platform/db/migrate-cli.ts",
     "start:dev": "tsx watch apps/api/main.ts"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "7.3.4",
     "@nestjs/common": "^11.2.1",
     "@nestjs/core": "^11.2.1",
     "@nestjs/platform-express": "^11.2.1",

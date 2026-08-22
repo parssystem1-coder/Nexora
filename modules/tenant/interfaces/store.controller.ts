@@ -7,7 +7,7 @@ import { SessionGuard } from "../../identity/contracts/index.js";
 import { CheckPermissionService, PermissionCheckRepositoryPg } from "../../authorization/contracts/index.js";
 import { AuditEvent, recordAuditEventDurable, type AuditOutcome } from "../../audit/contracts/index.js";
 import { StoreAccessGuard } from "./store-access.guard.js";
-import type { RequestWithTenantContext } from "./store-access.guard.js";
+import type { RequestWithStoreTenantContext } from "./store-access.guard.js";
 import { storeReadCapability } from "./store-read.capability.js";
 import { StoreRepositoryPg } from "../infrastructure/store.repository.pg.js";
 import { ReadStoreService } from "../application/read-store.service.js";
@@ -57,7 +57,7 @@ export class StoreController {
 
   @Get(":storeId")
   @UseGuards(SessionGuard, StoreAccessGuard)
-  async read(@Req() request: RequestWithTenantContext): Promise<StoreDto> {
+  async read(@Req() request: RequestWithStoreTenantContext): Promise<StoreDto> {
     const tenantContext = request.tenantContext;
     if (!tenantContext) {
       // Guards run first and always populate this; a missing context here is a wiring bug, not a client error.

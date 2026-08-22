@@ -1,21 +1,21 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `aa1f749` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `35fb1b6` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 6 modules · 12 tables (6 with RLS) · 1 capabilities · 1 routes · 98 test cases in 14 files · 37 ADRs (29 accepted)
+**At a glance:** 6 modules · 12 tables (6 with RLS) · 2 capabilities · 2 routes · 124 test cases in 17 files · 37 ADRs (29 accepted)
 
 ## Modules
 
 | module | layers | files | depends on | platform |
 |---|---|---|---|---|
 | `audit` | application, contracts, domain, infrastructure, interfaces, migrations | 9 | — | yes |
-| `authorization` | application, contracts, domain, infrastructure, interfaces, migrations | 9 | `capability` | yes |
+| `authorization` | application, contracts, domain, infrastructure, interfaces, migrations | 11 | `capability` | yes |
 | `capability` | contracts, domain, interfaces | 5 | — | — |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 16 | `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
-| `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 26 | `audit`, `authorization`, `capability`, `identity` | yes |
+| `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 35 | `audit`, `authorization`, `capability`, `identity` | yes |
 
 ## Tables
 
@@ -40,6 +40,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 
 | capability | route | permissions | risk | audit | store-scoped |
 |---|---|---|---|---|---|
+| `organization.create` | `POST /api/v1/organizations` | — | MEDIUM_WRITE | yes | — |
 | `store.read` | `GET /api/v1/stores/:storeId` | `store.read` | READ | yes | yes |
 
 ## Platform singletons
@@ -55,11 +56,12 @@ Roles ADR-030 requires exactly one implementation of.
 
 | layer | files | cases |
 |---|---|---|
-| application | 4 | 14 |
+| application | 5 | 20 |
 | conformance | 2 | 26 |
 | domain | 2 | 21 |
 | infrastructure | 3 | 14 |
-| integration | 2 | 18 |
+| integration | 3 | 31 |
+| other | 1 | 7 |
 | platform | 1 | 5 |
 
 <details><summary>Per file</summary>
@@ -72,14 +74,17 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/identity/domain/session.entity.spec.ts` | domain | 4 |
 | `modules/money/domain/money.vo.spec.ts` | domain | 17 |
 | `modules/money/infrastructure/currency-registry.spec.ts` | infrastructure | 7 |
+| `modules/tenant/application/create-organization.service.spec.ts` | application | 6 |
 | `modules/tenant/application/read-store.service.spec.ts` | application | 4 |
 | `modules/tenant/application/resolve-store-access.service.spec.ts` | application | 4 |
 | `modules/tenant/infrastructure/organizations-rls.spec.ts` | infrastructure | 4 |
 | `platform/db/tenant-context.spec.ts` | platform | 5 |
 | `apps/api/error-contract.integration.spec.ts` | integration | 3 |
+| `apps/api/organization-create.integration.spec.ts` | integration | 13 |
 | `apps/api/store-read.integration.spec.ts` | integration | 15 |
 | `tools/conformance/harness.selftest.live-db.spec.ts` | conformance | 6 |
 | `tools/conformance/harness.selftest.spec.ts` | conformance | 20 |
+| `tools/openapi/openapi.spec.ts` | other | 7 |
 
 </details>
 

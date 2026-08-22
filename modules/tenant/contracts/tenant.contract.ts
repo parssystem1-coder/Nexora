@@ -7,3 +7,15 @@ export interface StoreDto {
   status: "ACTIVE" | "SUSPENDED";
   createdAt: string;
 }
+
+/**
+ * An organization is the tenant, so there is no separate `organizationId`
+ * field the way StoreDto has one - `id` is the tenant id.
+ */
+export interface OrganizationDto {
+  id: string;
+  name: string;
+  slug: string;
+  status: "ACTIVE" | "SUSPENDED";
+  createdAt: string;
+}

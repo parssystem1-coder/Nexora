@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "aa1f749",
+    "commit": "35fb1b6",
     "dirty": true
   },
   "modules": [
@@ -28,7 +28,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 9,
+      "files": 11,
       "dependsOn": [
         "capability"
       ],
@@ -83,7 +83,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 26,
+      "files": 35,
       "dependsOn": [
         "audit",
         "authorization",
@@ -216,6 +216,16 @@
     }
   ],
   "capabilities": [
+    {
+      "id": "organization.create",
+      "module": "tenant",
+      "file": "modules/tenant/interfaces/organization-create.capability.ts",
+      "permissions": [],
+      "risk": "MEDIUM_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/organizations"
+    },
     {
       "id": "store.read",
       "module": "tenant",
@@ -495,6 +505,11 @@
       "cases": 7
     },
     {
+      "file": "modules/tenant/application/create-organization.service.spec.ts",
+      "layer": "application",
+      "cases": 6
+    },
+    {
       "file": "modules/tenant/application/read-store.service.spec.ts",
       "layer": "application",
       "cases": 4
@@ -520,6 +535,11 @@
       "cases": 3
     },
     {
+      "file": "apps/api/organization-create.integration.spec.ts",
+      "layer": "integration",
+      "cases": 13
+    },
+    {
       "file": "apps/api/store-read.integration.spec.ts",
       "layer": "integration",
       "cases": 15
@@ -533,9 +553,19 @@
       "file": "tools/conformance/harness.selftest.spec.ts",
       "layer": "conformance",
       "cases": 20
+    },
+    {
+      "file": "tools/openapi/openapi.spec.ts",
+      "layer": "other",
+      "cases": 7
     }
   ],
   "routes": [
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations",
+      "file": "modules/tenant/interfaces/organization.controller.ts"
+    },
     {
       "method": "GET",
       "path": "/api/v1/stores/:storeId",
@@ -546,10 +576,10 @@
     "modules": 6,
     "tables": 12,
     "tablesWithRls": 6,
-    "capabilities": 1,
-    "routes": 1,
-    "testFiles": 14,
-    "testCases": 98,
+    "capabilities": 2,
+    "routes": 2,
+    "testFiles": 17,
+    "testCases": 124,
     "adrs": 37,
     "adrsAccepted": 29
   }

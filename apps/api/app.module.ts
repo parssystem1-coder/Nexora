@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
 import { StoreController } from "../../modules/tenant/interfaces/store.controller.js";
+import { OrganizationController } from "../../modules/tenant/interfaces/organization.controller.js";
 import { StoreAccessGuard } from "../../modules/tenant/interfaces/store-access.guard.js";
 import { SessionGuard } from "../../modules/identity/interfaces/session.guard.js";
 import { HttpExceptionFilter } from "../../modules/capability/interfaces/http-exception.filter.js";
@@ -14,7 +15,7 @@ import { DatabaseLifecycle } from "./database-lifecycle.provider.js";
  * connections are created (db-providers.ts).
  */
 @Module({
-  controllers: [StoreController],
+  controllers: [StoreController, OrganizationController],
   providers: [
     { provide: APP_DB, useFactory: createAppDb },
     { provide: AUDIT_DB, useFactory: createAuditDb },

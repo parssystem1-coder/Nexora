@@ -18,9 +18,15 @@ Audit placement is now ADR-034 (`03` §3.1 and `08` §2 step 8 previously contra
 
 **Phase 1 step 4 done:** `modules/money` — `Money` value object (bigint minor units + explicit currency), the `currencies` registry, and the remainder-distributing allocator carrying the ADR-030 `money-allocator` singleton role. Per-currency minor units are read from the table, never hard-coded to 2.
 
-**Task 2 not started.** Exit criteria now **eight of nine** (`PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §4); the remaining row is "revoking a membership invalidates active sessions," which needs `membership.revoke` from Task 2. Phase 2 is no longer *structurally* blocked — `Money` exists for it to be typed against — but `06_IMPLEMENTATION_PLAN.md` still gates it on the full exit criteria.
+**Task 2 slice 1 done:** `organization.create` (`POST /api/v1/organizations`). Creates the organization, an ACTIVE membership for its creator and an `owner` role grant in one transaction; no new tables. Two documented divergences from the golden path, both structural to a capability that creates its own tenant — no guard for steps 2–4, and no permission to assert at step 6. First slice whose domain transaction can actually fail, so it is where ADR-034's "the audit row survives a rolled-back transaction" is proven end to end. See `DECISION_LOG.md` (2026-08-23) for the five open questions it settled, one of which stays OPEN pending ADR-009.
 
-98 tests passing (14 files), conformance 0 violations, 12 migrations apply cleanly from empty.
+**ADR-033 now in force:** `openapi.json` is generated from each capability's Zod schemas and `CapabilityDefinition` (`npm run openapi`, `-- --check` in CI). `CapabilityDefinition` carries `route`, `inputSchema`, `outputSchema` and `errorCodes`. Never hand-edit the artifact.
+
+**Task 2 slices 2–6 not started.** Exit criteria still **eight of nine** (`PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §4); the remaining row is "revoking a membership invalidates active sessions," which needs `membership.revoke`.
+
+129 tests passing (17 files), conformance 0 violations, 12 migrations apply cleanly.
+
+**Local database note:** `docker compose` is not available on this machine; a native PostgreSQL 17 on **port 5432** carries the `nexora` database and both roles. Export `DATABASE_URL=postgresql://nexora_app:nexora_app_dev_only@localhost:5432/nexora` and `MIGRATE_DATABASE_URL=postgresql://nexora_migrate:nexora_migrate_dev_only@localhost:5432/nexora` before running tests, conformance or migrations — the defaults in `platform/config.ts` point at compose's 5433. `nexora_migrate` has no `CREATEDB`, so a from-empty migration run needs a database created by a superuser first.
 
 Update this section when that changes.
 

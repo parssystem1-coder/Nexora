@@ -35,6 +35,8 @@ jobs:
         run: npm run conformance
       - name: Project graph up to date
         run: npm run graph -- --check
+      - name: OpenAPI artifact up to date (ADR-033)
+        run: npm run openapi -- --check
       - name: Stop PostgreSQL
         if: always()
         run: docker compose down -v

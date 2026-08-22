@@ -27,6 +27,16 @@ const STATUS_BY_CODE: Record<CapabilityErrorCode, number> = {
 };
 
 /**
+ * The HTTP status a given code maps to. Exported so the ADR-033 OpenAPI
+ * generator documents each capability's error responses under the same
+ * status the HTTP boundary actually returns, instead of restating the
+ * mapping in a second place where it could drift.
+ */
+export function httpStatusForCode(code: CapabilityErrorCode): number {
+  return STATUS_BY_CODE[code];
+}
+
+/**
  * One error taxonomy for every capability, not a per-module reinvention —
  * mirrors the "exactly one" spirit of the ADR-030 singleton rules even
  * though the error contract itself isn't one of the five named roles.

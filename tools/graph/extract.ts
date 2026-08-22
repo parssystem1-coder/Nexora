@@ -275,8 +275,18 @@ function extractCapabilities(routes: { method: string; path: string; file: strin
       .filter((p): p is string => Boolean(p));
 
     const module = /^modules\/([^/]+)\//.exec(file)?.[1] ?? "?";
-    // A capability's route is the one declared by a controller in the same module.
-    const route = routes.find((r) => r.file.startsWith(`modules/${module}/`));
+    // The capability definition itself declares its route (added for ADR-033,
+    // which generates OpenAPI from these files). Prefer it: the older
+    // "first controller in the same module" heuristic silently gave every
+    // capability in a module the same route once a module had more than one.
+    // OpenAPI path templating ({storeId}) is rewritten to the Nest form
+    // (:storeId) so this column keeps reading like the route table.
+    const declaredMethod = /\broute:\s*\{[^{}]*\bmethod:\s*["']([^"']+)["']/.exec(src)?.[1];
+    const declaredPath = /\broute:\s*\{[^{}]*\bpath:\s*["']([^"']+)["']/.exec(src)?.[1];
+    const route =
+      declaredMethod && declaredPath
+        ? { method: declaredMethod.toUpperCase(), path: declaredPath.replace(/\{([^}]+)\}/g, ":$1") }
+        : routes.find((r) => r.file.startsWith(`modules/${module}/`));
 
     out.push({
       id,

@@ -17,4 +17,17 @@ export class MembershipRepositoryPg implements MembershipRepository {
     if (!row) return null;
     return new Membership(row.id, row.tenant_id, row.user_id, row.status as "ACTIVE" | "REVOKED");
   }
+
+  /** See MembershipRepository.create: id supplied by the caller, no RETURNING. */
+  async create(membership: Membership): Promise<void> {
+    await this.conn
+      .insertInto("memberships")
+      .values({
+        id: membership.id,
+        tenant_id: membership.tenantId,
+        user_id: membership.userId,
+        status: membership.status,
+      })
+      .execute();
+  }
 }
