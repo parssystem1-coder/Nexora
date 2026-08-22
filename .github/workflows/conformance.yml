@@ -33,6 +33,8 @@ jobs:
         run: npm test
       - name: Conformance scan of real source tree
         run: npm run conformance
+      - name: Project graph up to date
+        run: npm run graph -- --check
       - name: Stop PostgreSQL
         if: always()
         run: docker compose down -v

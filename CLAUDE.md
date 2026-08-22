@@ -28,6 +28,7 @@ Update this section when that changes.
 
 - `/new-slice` — implement one vertical capability slice mirroring the golden path. Use for every new capability.
 - `/phase-gate` — audit a phase against its exit criteria before the next one opens.
+- `/project-graph` — regenerate and read the mechanically-extracted map of what the repository contains: modules and their real dependency edges, tables and their RLS posture, capabilities, routes, singletons, ADRs, tests by layer. Run it at the start of a task, to avoid rediscovering the same facts by reading files, and after finishing a slice, to see what changed structurally.
 
 ## Always verify before reporting done
 
