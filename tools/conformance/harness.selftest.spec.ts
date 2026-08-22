@@ -71,6 +71,11 @@ describe("schema rules", () => {
     expect(violations.map((v) => v.rule)).toContain("SCHEMA-MISSING-RLS");
   });
 
+  it("flags a tenant-owned table with RLS enabled and a policy but no FORCE", () => {
+    const violations = checkSchema(fixture("schema-missing-force-rls"));
+    expect(violations.map((v) => v.rule)).toContain("SCHEMA-MISSING-FORCE-RLS");
+  });
+
   it("flags a FLOAT column on a monetary field", () => {
     const violations = checkSchema(fixture("schema-float-money"));
     expect(violations.map((v) => v.rule)).toContain("SCHEMA-FLOAT-MONEY-COLUMN");

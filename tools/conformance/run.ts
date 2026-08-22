@@ -8,7 +8,7 @@ import { checkSecrets } from "./rules/secrets.js";
 import { checkSchemaLive } from "./rules/schema-live.js";
 import { checkDbAccess } from "./rules/db-access.js";
 import { loadExceptions, applyExceptions } from "./lib/exceptions.js";
-import { loadDbConfig } from "../../platform/config.js";
+import { loadMigrateDbConfig } from "../../platform/config.js";
 import { discoverModuleMigrations } from "../../platform/db/discover-migrations.js";
 import { migrate } from "../../platform/db/migrate.js";
 import { describeDbError } from "../../platform/db/describe-error.js";
@@ -65,9 +65,15 @@ async function run() {
  * and not every environment running `npm run conformance` has Postgres up
  * (the self-test suite's live-DB spec is what makes the mechanism a hard
  * requirement — see tools/conformance/harness.selftest.live-db.spec.ts).
+ *
+ * Uses the migrate role (nexora_migrate), not the app role: it needs DDL
+ * rights to apply migrations, and this check is structural (does RLS/FORCE/
+ * tenant_id exist in the catalogs), not a proof of row-level isolation
+ * behavior — that distinction matters for which role is safe to use here.
+ * See DECISION_LOG.md "RLS: FORCE ROW LEVEL SECURITY or a non-owner app role".
  */
 async function checkSchemaLiveAgainstRealTree(): Promise<Violation[]> {
-  const config = loadDbConfig();
+  const config = loadMigrateDbConfig();
   const client = new Client({ connectionString: config.connectionString });
   try {
     await client.connect();

@@ -60,21 +60,33 @@ export async function checkSchemaLive(client: Client, schema = "public"): Promis
         });
       }
 
-      const rlsResult = await client.query<{ relrowsecurity: boolean }>(
-        `SELECT relrowsecurity FROM pg_class WHERE oid = $1::regclass`,
+      const rlsResult = await client.query<{ relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+        `SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = $1::regclass`,
         [qualifiedIdent(schema, table)],
       );
       const policyResult = await client.query(
         `SELECT 1 FROM pg_policies WHERE schemaname = $1 AND tablename = $2`,
         [schema, table],
       );
-      const hasRls = rlsResult.rows[0]?.relrowsecurity === true && (policyResult.rowCount ?? 0) > 0;
-      if (!hasRls) {
+      const relrowsecurity = rlsResult.rows[0]?.relrowsecurity === true;
+      const hasPolicy = (policyResult.rowCount ?? 0) > 0;
+
+      if (!relrowsecurity || !hasPolicy) {
         violations.push({
           rule: "SCHEMA-MISSING-RLS",
           file: `db:${schema}.${table}`,
           message: `table '${table}' has no ENABLE ROW LEVEL SECURITY + CREATE POLICY pair`,
           fix: "Add ALTER TABLE ... ENABLE ROW LEVEL SECURITY and a CREATE POLICY in the same migration that creates the table.",
+        });
+      } else if (rlsResult.rows[0]?.relforcerowsecurity !== true) {
+        // Without FORCE, the table's owning role bypasses RLS entirely — verified
+        // empirically (see DECISION_LOG.md "RLS: FORCE ROW LEVEL SECURITY or a
+        // non-owner app role"). Only checked once ENABLE+POLICY already exist.
+        violations.push({
+          rule: "SCHEMA-MISSING-FORCE-RLS",
+          file: `db:${schema}.${table}`,
+          message: `table '${table}' has RLS enabled and a policy, but no FORCE ROW LEVEL SECURITY`,
+          fix: "Add ALTER TABLE ... FORCE ROW LEVEL SECURITY in the same migration — without it, the table's owning role bypasses RLS entirely.",
         });
       }
     }

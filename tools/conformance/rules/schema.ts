@@ -9,6 +9,7 @@ const TENANT_EXEMPT = new Set(["users", "currencies", "reserved_subdomains"]);
 const CREATE_TABLE_RE = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([a-zA-Z_][\w]*)"?\s*\(([\s\S]*?)\n\)\s*;/gi;
 const COLUMN_LINE_RE = /^\s*"?([a-zA-Z_][\w]*)"?\s+([A-Z][A-Z0-9 ]*?)(?:\s|,|$)/i;
 const RLS_ENABLE_RE = /ALTER\s+TABLE\s+"?([a-zA-Z_][\w]*)"?\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi;
+const RLS_FORCE_RE = /ALTER\s+TABLE\s+"?([a-zA-Z_][\w]*)"?\s+FORCE\s+ROW\s+LEVEL\s+SECURITY/gi;
 const RLS_POLICY_RE = /CREATE\s+POLICY\s+\S+\s+ON\s+"?([a-zA-Z_][\w]*)"?/gi;
 
 const MONEY_NAME_RE = /amount|price|cost|total|balance|fee|money|charge/i;
@@ -20,10 +21,16 @@ interface TableDef {
   columns: Array<{ name: string; type: string }>;
 }
 
-function parseMigrations(root: string): { tables: TableDef[]; rlsEnabled: Set<string>; rlsPolicies: Set<string> } {
+function parseMigrations(root: string): {
+  tables: TableDef[];
+  rlsEnabled: Set<string>;
+  rlsForced: Set<string>;
+  rlsPolicies: Set<string>;
+} {
   const files = listFiles(root, [".sql"]).filter((f) => f.includes("migrations/"));
   const tables: TableDef[] = [];
   const rlsEnabled = new Set<string>();
+  const rlsForced = new Set<string>();
   const rlsPolicies = new Set<string>();
 
   for (const file of files) {
@@ -49,17 +56,20 @@ function parseMigrations(root: string): { tables: TableDef[]; rlsEnabled: Set<st
     for (const match of source.matchAll(RLS_ENABLE_RE)) {
       if (match[1]) rlsEnabled.add(match[1]);
     }
+    for (const match of source.matchAll(RLS_FORCE_RE)) {
+      if (match[1]) rlsForced.add(match[1]);
+    }
     for (const match of source.matchAll(RLS_POLICY_RE)) {
       if (match[1]) rlsPolicies.add(match[1]);
     }
   }
 
-  return { tables, rlsEnabled, rlsPolicies };
+  return { tables, rlsEnabled, rlsForced, rlsPolicies };
 }
 
 export function checkSchema(root: string): Violation[] {
   const violations: Violation[] = [];
-  const { tables, rlsEnabled, rlsPolicies } = parseMigrations(root);
+  const { tables, rlsEnabled, rlsForced, rlsPolicies } = parseMigrations(root);
 
   const idempotencyTables = tables.filter((t) => /idempotency/i.test(t.name));
   if (idempotencyTables.length > 1) {
@@ -94,6 +104,17 @@ export function checkSchema(root: string): Violation[] {
           file: table.file,
           message: `table '${table.name}' has no ENABLE ROW LEVEL SECURITY + CREATE POLICY pair`,
           fix: "Add ALTER TABLE ... ENABLE ROW LEVEL SECURITY and a CREATE POLICY in the same migration that creates the table.",
+        });
+      } else if (!rlsForced.has(table.name)) {
+        // Without FORCE, the table's owning role bypasses RLS entirely — verified
+        // empirically (see DECISION_LOG.md "RLS: FORCE ROW LEVEL SECURITY or a
+        // non-owner app role"). Only checked once ENABLE+POLICY already exist, so
+        // this doesn't pile onto SCHEMA-MISSING-RLS's message when RLS is absent outright.
+        violations.push({
+          rule: "SCHEMA-MISSING-FORCE-RLS",
+          file: table.file,
+          message: `table '${table.name}' has RLS enabled and a policy, but no FORCE ROW LEVEL SECURITY`,
+          fix: "Add ALTER TABLE ... FORCE ROW LEVEL SECURITY in the same migration — without it, the table's owning role bypasses RLS entirely.",
         });
       }
     }

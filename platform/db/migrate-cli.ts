@@ -1,11 +1,11 @@
 import { Client } from "pg";
 import { join } from "node:path";
-import { loadDbConfig } from "../config.js";
+import { loadMigrateDbConfig } from "../config.js";
 import { discoverModuleMigrations } from "./discover-migrations.js";
 import { migrate } from "./migrate.js";
 
 async function main() {
-  const config = loadDbConfig();
+  const config = loadMigrateDbConfig();
   const client = new Client({ connectionString: config.connectionString });
   await client.connect();
 

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { loadConformanceTestDbConfig } from "../../platform/config.js";
+import { loadMigrateDbConfig } from "../../platform/config.js";
 import { migrate } from "../../platform/db/migrate.js";
 import { describeDbError } from "../../platform/db/describe-error.js";
 import { readSqlDir } from "./lib/read-sql-dir.js";
@@ -17,15 +17,20 @@ const SCHEMA = "conformance_live_selftest";
 
 let client: Client;
 
+// Uses the migrate role (nexora_migrate): applying fixture migrations needs
+// DDL rights (CREATE SCHEMA/TABLE), and this file proves schema *structure*
+// (does RLS/FORCE/tenant_id exist), not row-level isolation behavior — see
+// platform/db/tenant-context.spec.ts for the latter, which uses the app role
+// and asserts it cannot bypass RLS. DECISION_LOG.md has the full reasoning.
 beforeAll(async () => {
-  const config = loadConformanceTestDbConfig();
+  const config = loadMigrateDbConfig();
   client = new Client({ connectionString: config.connectionString });
   try {
     await client.connect();
   } catch (err) {
     throw new Error(
       `Could not reach Postgres at ${config.connectionString}. ` +
-        `Run "docker compose up -d" (or point CONFORMANCE_TEST_DATABASE_URL at a running Postgres) ` +
+        `Run "docker compose up -d" (or point MIGRATE_DATABASE_URL at a running Postgres) ` +
         `before running the live-DB schema tests. Original error: ${describeDbError(err)}`,
     );
   }
@@ -58,6 +63,12 @@ describe("schema rules against a real, migrated PostgreSQL database", () => {
     await applyFixture("schema-missing-rls");
     const violations = await checkSchemaLive(client, SCHEMA);
     expect(violations.map((v) => v.rule)).toContain("SCHEMA-MISSING-RLS");
+  });
+
+  it("flags a tenant-owned table with RLS enabled and a policy but no FORCE", async () => {
+    await applyFixture("schema-missing-force-rls");
+    const violations = await checkSchemaLive(client, SCHEMA);
+    expect(violations.map((v) => v.rule)).toContain("SCHEMA-MISSING-FORCE-RLS");
   });
 
   it("flags a FLOAT column on a monetary field", async () => {
