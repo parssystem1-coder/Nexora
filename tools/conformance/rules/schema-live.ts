@@ -2,11 +2,20 @@ import type { Client } from "pg";
 import { qualifiedIdent } from "../../../platform/db/ident.js";
 import type { Violation } from "../lib/types.js";
 
-// Exactly the three tables 08_PHASE_1_BRIEF.md §5 exempts — see the matching
-// note in ./schema.ts. `schema_migrations` is the migration runner's own
-// bookkeeping table (platform/db/migrate.ts), not a §4 product table, so it is
-// excluded here as tooling rather than as a tenancy exemption.
-const TENANT_EXEMPT = new Set(["users", "currencies", "reserved_subdomains", "schema_migrations"]);
+// Must stay in step with ./schema.ts — see the note there for why each table is
+// exempt. `schema_migrations` is additionally excluded here as the migration
+// runner's own bookkeeping table (platform/db/migrate.ts), not a §4 product
+// table, so it is tooling rather than a tenancy exemption.
+const TENANT_EXEMPT = new Set([
+  "users",
+  "currencies",
+  "reserved_subdomains",
+  "sessions",
+  "roles",
+  "permissions",
+  "role_permissions",
+  "schema_migrations",
+]);
 
 const MONEY_NAME_RE = /amount|price|cost|total|balance|fee|money|charge/i;
 const FLOATING_TYPES = new Set(["real", "double precision"]);

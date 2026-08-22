@@ -170,13 +170,36 @@ One deviation worth naming: `modules/audit/contracts/audit.contract.ts` imports 
 
 ---
 
-## 4. Open decisions — yours, not mine
+## 4. Open decisions — all six decided 2026-08-22
 
-1. **`sessions` tenancy** (`DECISION_LOG.md`) — literal §5, amend §5, or split. Harness red until decided.
-2. **Role catalog tenancy** (`DECISION_LOG.md`) — tenant-owned, amend §5, or split `permissions` from `roles`. Harness red until decided.
-3. **Self-access RLS clause** — keep, `SECURITY DEFINER`, or give sessions an authoritative tenant. Couples to (1).
-4. **Audit inside transaction vs after commit** — `08` §2 and `03` §3.1 disagree; latent for `store.read`, live in Task 2.
-5. **Generated OpenAPI artifacts** — required by `05` §1/§8; approach undecided; cheapest to settle before Task 2.
-6. **Migration filename convention** — `0001__` vs `<timestamp>__`; cheap to change now.
+| # | Decision | Outcome | State |
+|---|---|---|---|
+| 1 | `sessions` tenancy | **GLOBAL** — one user, many organizations, one live session | Applied; harness green |
+| 2 | Role catalog tenancy | **GLOBAL** — Phase 1 core, capability keys are platform-defined | Applied; harness green |
+| 3 | Self-access RLS clause | **Keep** — removing it disables the system | Kept; tracked as `RISK_REGISTER.md` R-003 |
+| 4 | Audit placement | **(B)** separate connection, committed independently, written before the domain transaction resolves | Direction agreed; (A) stands for Task 1 (failure branch unreachable), (B) mandatory at Task 2 |
+| 5 | OpenAPI artifacts | Task 2 scope, tooling ADR first | `ADR-033-API-SCHEMA-ARTIFACT-GENERATION.md` written, status PROPOSED |
+| 6 | Migration filenames | `<timestamp>_<module>__<description>.sql` | All 9 renamed; convention now enforced by the runner |
+
+Neither `tenant_id` nor an RLS policy had to be removed for (1) or (2) — those columns were never added, so the change was confined to the harness's exemption list.
+
+### Notes carried forward from these decisions
+
+- **(1)** covers `sessions` only. `credentials` and `identity_providers` do not exist yet; they are the same structural case but are deliberately not pre-decided — the call is made in the Task 2 slice that creates them.
+- **(4)** implementation is deliberately deferred rather than retrofitted: building the second-connection machinery now, with no reachable failure path to exercise it, would ship untested infrastructure. It is the first item of Task 2's scope.
+- **(5)** ADR-033 is PROPOSED, not ACCEPTED — accepting it and folding it into `02_ADR_INDEX_NORMATIVE_DECISIONS.md` is your call. It documents a constraint that eliminates the obvious tool: `@nestjs/swagger`'s type inference reads `emitDecoratorMetadata`, which esbuild does not emit, so it fails *silently* here — the worst failure mode for a drift-detection artifact.
+- **(6)** the rename was safe now because only the local development database had applied the old names; it was reset and re-migrated. The filename is the `schema_migrations` tracking key, so this becomes expensive the moment any shared environment applies a migration. The runner now rejects a non-conforming filename with an explicit error rather than applying it.
+
+### Amendments these decisions imply for the normative documents
+
+Three sentences now disagree with agreed behaviour and should be amended so this is not rediscovered:
+
+1. `08_PHASE_1_BRIEF.md` §5 — the exemption list should name `sessions` and platform-global reference data alongside `users`/`currencies`/`reserved_subdomains`.
+2. `08_PHASE_1_BRIEF.md` §2 step 8 — audit ordering should match `03_TECHNICAL_BLUEPRINT.md` §3.1 once decision (4) lands.
+3. `03_TECHNICAL_BLUEPRINT.md` §2.1 — the migration filename example is `<timestamp>__<description>.sql`; the agreed convention is `<timestamp>_<module>__<description>.sql`.
+
+I have not edited those documents: they are normative, and amending them is your call, not an implementation detail.
+
+---
 
 No Task 2 slice was started. No table outside `08_PHASE_1_BRIEF.md` §4 was created. No unrelated refactor was bundled into this work.
