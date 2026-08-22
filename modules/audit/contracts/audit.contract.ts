@@ -1,5 +1,7 @@
 import type { Kysely, Transaction } from "kysely";
 import type { Database } from "../../../platform/db/kysely.js";
+import { withTenantContext } from "../../../platform/db/tenant-context.js";
+import type { RlsContext } from "../../../platform/db/tenant-context.js";
 import { AuditEvent } from "../domain/audit-event.entity.js";
 import type { AuditEventRepository } from "../domain/audit-event.repository.js";
 import { AuditEventRepositoryPg } from "../infrastructure/audit-event.repository.pg.js";
@@ -17,4 +19,18 @@ export type { ActorType, AuditOutcome } from "../domain/audit-event.entity.js";
  */
 export function createAuditEventRepository(conn: Kysely<Database> | Transaction<Database>): AuditEventRepository {
   return new AuditEventRepositoryPg(conn);
+}
+
+/**
+ * 08_PHASE_1_BRIEF.md §2 step 8 (option B, DECISION_LOG.md "Conflict: is the
+ * audit event inside the transaction..."): writes one audit event on its own
+ * transaction against `db`, which must be a connection independent of
+ * whatever domain transaction the caller has open elsewhere (in practice,
+ * platform/db/connections.ts's AUDIT_DB, a separate pool from APP_DB). This
+ * commits and releases as soon as it resolves, so the record survives
+ * whether the caller's own transaction subsequently commits or rolls back —
+ * call it *before* that transaction's callback returns, not after.
+ */
+export async function recordAuditEventDurable(db: Kysely<Database>, context: RlsContext, event: AuditEvent): Promise<void> {
+  await withTenantContext(db, context, (trx) => createAuditEventRepository(trx).record(event));
 }

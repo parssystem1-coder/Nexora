@@ -158,7 +158,7 @@ describe("GET /api/v1/stores/:storeId — golden path", () => {
     expect(res.body.code).toBe("VALIDATION_ERROR");
   });
 
-  it("emits an audit event for a successful read", async () => {
+  it("durably records a SUCCESS audit event for a successful read (08_PHASE_1_BRIEF.md §2 step 8, option B)", async () => {
     const tenant = await createTenantFixture("audit");
 
     await request(app.getHttpServer()).get(`/api/v1/stores/${tenant.storeId}`).set("Cookie", `sid=${tenant.token}`);
@@ -176,7 +176,7 @@ describe("GET /api/v1/stores/:storeId — golden path", () => {
     expect(events).toContainEqual({ capability: "store.read", outcome: "SUCCESS" });
   });
 
-  it("writes no audit event when authorization fails — step 6 runs before steps 7-8 in the same transaction", async () => {
+  it("durably records a FAILURE audit event when authorization fails — the record survives even though the request fails, because it is written on a connection independent of the domain transaction (option B, DECISION_LOG.md)", async () => {
     const suffix = randomUUID().slice(0, 8);
     const userId = await seedUser(db, `noperm-audit-${suffix}@example.test`);
     const orgId = await seedOrganization(db, "NoPermAudit Org", `noperm-audit-org-${suffix}`);
@@ -187,12 +187,25 @@ describe("GET /api/v1/stores/:storeId — golden path", () => {
 
     const res = await request(app.getHttpServer()).get(`/api/v1/stores/${storeId}`).set("Cookie", `sid=${token}`);
     expect(res.status).toBe(403);
+    expect(res.body.code).toBe("FORBIDDEN");
 
     const events = await withTenantContext(db, { tenantId: orgId, userId, storeId }, (trx) =>
-      trx.selectFrom("audit_events").select("id").where("resource_id", "=", storeId).execute(),
+      trx.selectFrom("audit_events").select(["capability", "outcome"]).where("resource_id", "=", storeId).execute(),
     );
-    expect(events).toEqual([]);
+    expect(events).toContainEqual({ capability: "store.read", outcome: "FAILURE" });
   });
+
+  // A RESOURCE_NOT_FOUND case is not exercised here: store_memberships.store_id
+  // is a foreign key to stores(id) (modules/tenant/migrations), so no fixture
+  // can seed access to a store that does not exist — the FK makes the
+  // not-found branch genuinely unreachable, not just unlikely (confirmed by
+  // attempting exactly this seed, which fails on the constraint rather than
+  // on any assertion). modules/tenant/application/read-store.service.spec.ts
+  // covers that ReadStoreService itself throws RESOURCE_NOT_FOUND when its
+  // repository returns null; the controller's audit-wrapping around that
+  // throw is structurally identical to the FORBIDDEN case proven above (same
+  // try/catch, same recordAuditEventDurable call), so it is not a distinct
+  // code path this suite needs to separately exercise against real Postgres.
 });
 
 /** 08_PHASE_1_BRIEF.md §2 steps 9-10 — the stable error envelope and structured logging. */
