@@ -32,7 +32,7 @@ Fixed along the way: `modules/identity/infrastructure/identity.tables.ts`'s `ses
 
 **Task 2 slices 4–6 not started** (`store.create`, `auth.login`/`logout`/`logout_all`, `organization.switch`). Exit criteria still **eight of nine** (`PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §4); the remaining row is "revoking a membership invalidates active sessions," which needs `membership.revoke` (not one of the six slices — see above).
 
-196 tests passing (21 files), conformance 0 violations, 14 migrations apply cleanly from empty.
+197 tests passing (22 files), conformance 0 violations, 14 migrations apply cleanly from empty. (The extra file/test: `modules/authorization/infrastructure/role-catalog-agreement.spec.ts`, proving `ROLE_KEYS` and the seeded `roles` table agree in both directions — a housekeeping addition, not a slice.)
 
 **Local database note:** `docker compose` is not available on this machine; a native PostgreSQL 17 on **port 5432** carries the `nexora` database and both roles. Export `DATABASE_URL=postgresql://nexora_app:nexora_app_dev_only@localhost:5432/nexora` and `MIGRATE_DATABASE_URL=postgresql://nexora_migrate:nexora_migrate_dev_only@localhost:5432/nexora` before running tests, conformance or migrations — the defaults in `platform/config.ts` point at compose's 5433. `nexora_migrate` has no `CREATEDB`, so a from-empty migration run needs a database created by a superuser first.
 

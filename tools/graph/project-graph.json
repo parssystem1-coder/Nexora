@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "53d0850",
+    "commit": "3cd2c6d",
     "dirty": true
   },
   "modules": [
@@ -28,7 +28,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 14,
+      "files": 15,
       "dependsOn": [
         "capability"
       ],
@@ -509,6 +509,11 @@
       "cases": 2
     },
     {
+      "file": "modules/authorization/infrastructure/role-catalog-agreement.spec.ts",
+      "layer": "infrastructure",
+      "cases": 1
+    },
+    {
       "file": "modules/identity/application/validate-session.service.spec.ts",
       "layer": "application",
       "cases": 4
@@ -632,8 +637,8 @@
     "tablesWithRls": 6,
     "capabilities": 4,
     "routes": 4,
-    "testFiles": 21,
-    "testCases": 189,
+    "testFiles": 22,
+    "testCases": 190,
     "adrs": 37,
     "adrsAccepted": 29
   }

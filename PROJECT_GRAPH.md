@@ -1,17 +1,17 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `53d0850` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `3cd2c6d` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 6 modules · 12 tables (6 with RLS) · 4 capabilities · 4 routes · 189 test cases in 21 files · 37 ADRs (29 accepted)
+**At a glance:** 6 modules · 12 tables (6 with RLS) · 4 capabilities · 4 routes · 190 test cases in 22 files · 37 ADRs (29 accepted)
 
 ## Modules
 
 | module | layers | files | depends on | platform |
 |---|---|---|---|---|
 | `audit` | application, contracts, domain, infrastructure, interfaces, migrations | 9 | — | yes |
-| `authorization` | application, contracts, domain, infrastructure, interfaces, migrations | 14 | `capability` | yes |
+| `authorization` | application, contracts, domain, infrastructure, interfaces, migrations | 15 | `capability` | yes |
 | `capability` | contracts, domain, interfaces | 5 | — | — |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 19 | `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
@@ -61,7 +61,7 @@ Roles ADR-030 requires exactly one implementation of.
 | application | 7 | 36 |
 | conformance | 2 | 26 |
 | domain | 2 | 21 |
-| infrastructure | 3 | 14 |
+| infrastructure | 4 | 15 |
 | integration | 5 | 80 |
 | other | 1 | 7 |
 | platform | 1 | 5 |
@@ -72,6 +72,7 @@ Roles ADR-030 requires exactly one implementation of.
 |---|---|---|
 | `modules/audit/infrastructure/audit-events-append-only.spec.ts` | infrastructure | 3 |
 | `modules/authorization/application/check-permission.service.spec.ts` | application | 2 |
+| `modules/authorization/infrastructure/role-catalog-agreement.spec.ts` | infrastructure | 1 |
 | `modules/identity/application/validate-session.service.spec.ts` | application | 4 |
 | `modules/identity/domain/session.entity.spec.ts` | domain | 4 |
 | `modules/money/domain/money.vo.spec.ts` | domain | 17 |
