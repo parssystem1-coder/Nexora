@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "94e4bc5",
+    "commit": "9f012e6",
     "dirty": true
   },
   "modules": [
@@ -81,7 +81,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 57,
+      "files": 62,
       "dependsOn": [
         "audit",
         "authorization",
@@ -295,6 +295,16 @@
       "audit": true,
       "storeScoped": false,
       "route": "POST /api/v1/organizations"
+    },
+    {
+      "id": "organization.switch",
+      "module": "tenant",
+      "file": "modules/tenant/interfaces/organization-switch.capability.ts",
+      "permissions": [],
+      "risk": "LOW_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/organizations/:organizationId/switch"
     },
     {
       "id": "store.create",
@@ -643,6 +653,11 @@
       "cases": 4
     },
     {
+      "file": "modules/tenant/application/switch-organization.service.spec.ts",
+      "layer": "application",
+      "cases": 2
+    },
+    {
       "file": "modules/tenant/infrastructure/organizations-rls.spec.ts",
       "layer": "infrastructure",
       "cases": 4
@@ -681,6 +696,11 @@
       "file": "apps/api/organization-create.integration.spec.ts",
       "layer": "integration",
       "cases": 13
+    },
+    {
+      "file": "apps/api/organization-switch.integration.spec.ts",
+      "layer": "integration",
+      "cases": 12
     },
     {
       "file": "apps/api/store-create.integration.spec.ts",
@@ -746,6 +766,11 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/organizations/:organizationId/switch",
+      "file": "modules/tenant/interfaces/organization-switch.controller.ts"
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/stores",
       "file": "modules/tenant/interfaces/store-create.controller.ts"
     },
@@ -759,10 +784,10 @@
     "modules": 6,
     "tables": 14,
     "tablesWithRls": 6,
-    "capabilities": 8,
-    "routes": 8,
-    "testFiles": 30,
-    "testCases": 281,
+    "capabilities": 9,
+    "routes": 9,
+    "testFiles": 32,
+    "testCases": 295,
     "adrs": 38,
     "adrsAccepted": 30
   }

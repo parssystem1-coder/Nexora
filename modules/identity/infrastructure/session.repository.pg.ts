@@ -51,4 +51,14 @@ export class SessionRepositoryPg implements SessionRepository {
       })
       .execute();
   }
+
+  /** Scoped to ACTIVE as defense in depth — SessionGuard already established this session is valid before this ever runs. */
+  async setActiveOrganization(sessionId: string, organizationId: string): Promise<void> {
+    await this.conn
+      .updateTable("sessions")
+      .set({ active_organization_id: organizationId })
+      .where("id", "=", sessionId)
+      .where("status", "=", "ACTIVE")
+      .execute();
+  }
 }

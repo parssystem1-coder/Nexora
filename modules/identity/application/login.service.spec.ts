@@ -62,6 +62,9 @@ function fakes(options: {
     create: async (command) => {
       sessionsCreated.push(command);
     },
+    setActiveOrganization: async () => {
+      throw new Error("LoginService must not change the active organization.");
+    },
   };
   const hasher = fakeHasher(
     options.passwordMatchesReal === false ? [] : [{ hash: "real-hash", password: COMMAND.password }],
@@ -187,6 +190,9 @@ describe("LoginService", () => {
       findByTokenHash: async () => null,
       create: async () => {
         throw new Error("must not create a session");
+      },
+      setActiveOrganization: async () => {
+        throw new Error("must not change the active organization");
       },
     };
     const hasher: PasswordHasher = {

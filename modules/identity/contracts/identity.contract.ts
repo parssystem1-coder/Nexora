@@ -25,3 +25,13 @@ export type { UserRepository } from "../domain/user.repository.js";
  */
 export { SessionRevocationRepositoryPg } from "../infrastructure/session-revocation.repository.pg.js";
 export type { SessionRevocationRepository } from "../domain/session-revocation.repository.js";
+
+/**
+ * `organization.switch` (modules/tenant) writes `sessions.active_organization_id`
+ * through this — the same ADR-030 dependency-direction rule as above: no
+ * module reaches into modules/identity's tables directly. `SessionRepository`
+ * is the same port `auth.login`/`SessionGuard` already use internally; this
+ * exposes it rather than adding a third, narrower one for the same table.
+ */
+export { SessionRepositoryPg } from "../infrastructure/session.repository.pg.js";
+export type { SessionRepository } from "../domain/session.repository.js";

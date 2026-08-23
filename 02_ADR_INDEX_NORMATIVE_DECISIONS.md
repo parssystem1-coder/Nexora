@@ -68,7 +68,7 @@ For each ADR, completion requires:
 | ADR-032 | Storefront Read Path Separation | Storefront / Performance | **ACCEPTED (new)** | Phase 4 |
 | ADR-033 | API Schema Artifact Generation | Platform / Contracts | **ACCEPTED (new)** | Task 2 (Phase 1) |
 | ADR-034 | Audit Event Placement and Durability | Platform / Audit | **ACCEPTED (new)** | Phase 1 (in effect), Task 2 |
-| ADR-035 | Platform-Scope Audit Events | Platform / Audit | **ACCEPTED (new)** | Task 2, `auth.login`/`auth.logout`/`auth.logout_all`/`organization.switch` |
+| ADR-035 | Platform-Scope Audit Events | Platform / Audit | **ACCEPTED (new)** | Task 2, `auth.login`/`auth.logout`/`auth.logout_all` (NOT `organization.switch` — it has a real tenant; see the ADR body) |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -1566,7 +1566,7 @@ Rejected: writing the event *inside* the domain transaction, where the failure i
 
 ## ADR-035 - Platform-Scope Audit Events
 
-**ACCEPTED**, new, applies from Task 2 (`auth.login`, first user; `auth.logout` and `auth.logout_all` now its second and third — the first evidence this generalizes rather than being built for `auth.login` alone; `organization.switch` next)
+**ACCEPTED**, new, applies from Task 2 (`auth.login`, first user; `auth.logout` and `auth.logout_all` its second and third — evidence this generalizes rather than being built for `auth.login` alone). `organization.switch` (Task 2 slice 6) was expected to be a fourth user but is NOT: it resolves a real organization before it ever writes an audit row, so it uses that organization's real `tenant_id` like any other tenant-scoped capability, not this sentinel — see DECISION_LOG.md 2026-08-24, decision 4. This ADR governs a capability with no tenant to attribute to; `organization.switch` has one.
 
 ### Problem
 

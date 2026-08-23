@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `94e4bc5` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `9f012e6` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 6 modules · 14 tables (6 with RLS) · 8 capabilities · 8 routes · 281 test cases in 30 files · 38 ADRs (30 accepted)
+**At a glance:** 6 modules · 14 tables (6 with RLS) · 9 capabilities · 9 routes · 295 test cases in 32 files · 38 ADRs (30 accepted)
 
 ## Modules
 
@@ -15,7 +15,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `capability` | contracts, domain, interfaces | 6 | — | — |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 40 | `audit`, `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
-| `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 57 | `audit`, `authorization`, `capability`, `identity` | yes |
+| `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 62 | `audit`, `authorization`, `capability`, `identity` | yes |
 
 ## Tables
 
@@ -48,6 +48,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `membership.invite` | `POST /api/v1/organizations/:organizationId/memberships` | `membership.invite` | MEDIUM_WRITE | yes | — |
 | `membership.role.assign` | `POST /api/v1/organizations/:organizationId/memberships/:membershipId/roles` | `membership.role.assign` | HIGH_WRITE | yes | — |
 | `organization.create` | `POST /api/v1/organizations` | — | MEDIUM_WRITE | yes | — |
+| `organization.switch` | `POST /api/v1/organizations/:organizationId/switch` | — | LOW_WRITE | yes | — |
 | `store.create` | `POST /api/v1/stores` | `store.create` | MEDIUM_WRITE | yes | — |
 | `store.read` | `GET /api/v1/stores/:storeId` | `store.read` | READ | yes | yes |
 
@@ -64,11 +65,11 @@ Roles ADR-030 requires exactly one implementation of.
 
 | layer | files | cases |
 |---|---|---|
-| application | 11 | 61 |
+| application | 12 | 63 |
 | conformance | 2 | 26 |
 | domain | 2 | 21 |
 | infrastructure | 4 | 15 |
-| integration | 8 | 141 |
+| integration | 9 | 153 |
 | other | 2 | 12 |
 | platform | 1 | 5 |
 
@@ -92,6 +93,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/tenant/application/invite-member.service.spec.ts` | application | 7 |
 | `modules/tenant/application/read-store.service.spec.ts` | application | 4 |
 | `modules/tenant/application/resolve-store-access.service.spec.ts` | application | 4 |
+| `modules/tenant/application/switch-organization.service.spec.ts` | application | 2 |
 | `modules/tenant/infrastructure/organizations-rls.spec.ts` | infrastructure | 4 |
 | `platform/db/tenant-context.spec.ts` | platform | 5 |
 | `apps/api/auth-login.integration.spec.ts` | integration | 19 |
@@ -100,6 +102,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `apps/api/membership-invite.integration.spec.ts` | integration | 24 |
 | `apps/api/membership-role-assign.integration.spec.ts` | integration | 30 |
 | `apps/api/organization-create.integration.spec.ts` | integration | 13 |
+| `apps/api/organization-switch.integration.spec.ts` | integration | 12 |
 | `apps/api/store-create.integration.spec.ts` | integration | 24 |
 | `apps/api/store-read.integration.spec.ts` | integration | 15 |
 | `tools/conformance/harness.selftest.live-db.spec.ts` | conformance | 6 |

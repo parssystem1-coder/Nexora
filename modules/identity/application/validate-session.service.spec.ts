@@ -10,11 +10,14 @@ const NOW = new Date("2026-08-22T12:00:00Z");
 const CREATED_AT = new Date("2026-08-22T10:00:00Z");
 const fixedClock: Clock = { now: () => NOW };
 
-/** Never exercised in this spec: ValidateSessionService only reads. Present because auth.login added create() to the port. */
-function neverCreateSessions(): Pick<SessionRepository, "create"> {
+/** Never exercised in this spec: ValidateSessionService only reads. Present because auth.login added create() and organization.switch added setActiveOrganization() to the port. */
+function neverCreateSessions(): Pick<SessionRepository, "create" | "setActiveOrganization"> {
   return {
     create: async () => {
       throw new Error("ValidateSessionService must not create sessions.");
+    },
+    setActiveOrganization: async () => {
+      throw new Error("ValidateSessionService must not change the active organization.");
     },
   };
 }

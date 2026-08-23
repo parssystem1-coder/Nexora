@@ -183,15 +183,15 @@ If the harness flags something, **do not weaken the rule and do not add an excep
 
 ## Remaining Phase 1 slices, in order
 
-Per `08_PHASE_1_BRIEF.md` §3 — this order is normative, not a suggestion. Items 1–5 are done; item 6 is what is actually left.
+Per `08_PHASE_1_BRIEF.md` §3 — this order is normative, not a suggestion. All six items are done; Task 2 is complete.
 
 1. ✅ `organization.create` — done, "tenant: organization.create slice, plus the ADR-033 OpenAPI artifact" (`e024613`)
 2. ✅ `membership.invite` — done, "tenant: membership.invite slice" (`7bdaea7`)
 3. ✅ `membership.role.assign` — done, "tenant: membership.role.assign slice" (`88f2a6d`)
 4. ✅ `store.create` — done, "tenant: store.create slice" (`82c1f05`)
 5. ✅ `auth.login`, `auth.logout`, `auth.logout_all` — all done. `auth.login` needed `credentials`, Argon2id per ADR-029 (DECISION_LOG.md 2026-08-23 for the `credentials` tenancy decision, ADR-035 for auditing with no established tenant). `auth.logout`/`auth.logout_all` were implemented together as one run, deliberately (DECISION_LOG.md 2026-08-24 explains why two capabilities count as one slice here) — they originally added `SessionTerminationRepository` as a sibling port to `SessionRevocationRepository` rather than a widening of it, collapsed back into one port on 2026-08-24 (see `SessionRevocationRepository`'s own doc comment and DECISION_LOG.md) once it was clear "the fake must pass untouched" meant "don't regress it," not "never edit it." `auth.logout_all` ends the caller's own session too (same precedent `membership.role.assign` set for self-assignment).
-6. `organization.switch`
+6. ✅ `organization.switch` — done, "identity/tenant: organization.switch slice (Task 2 slice 6, complete)". Updates `sessions.active_organization_id` only (ADR-002) — proved by test, not just asserted, that no capability's authorization changes as a result. Its audit event uses the real organization's tenant id, NOT ADR-035's platform sentinel (see the ADR-035 entry above) — the first user-scoped capability with an actual tenant to attribute to. 05 §4.1 rates it `READ`; declared `LOW_WRITE` instead, recorded rather than silently changed (DECISION_LOG.md 2026-08-24).
 
-One Phase 1 exit criterion is still open: revoking a membership must invalidate active sessions within one request (`08_PHASE_1_BRIEF.md` §6 row 4). It needs `membership.revoke`, which is not itself one of the six slices above — it is not scheduled. The `Money` allocator test criterion is already met (`modules/money/domain/money.vo.spec.ts`, "money: Money value object, currencies registry and allocator (Phase 1 step 4)" (`20085bc`)).
+All six of Task 2's slices are now done. One Phase 1 exit criterion is still open: revoking a membership must invalidate active sessions within one request (`08_PHASE_1_BRIEF.md` §6 row 4). It needs `membership.revoke`, which is not itself one of the six slices above — it is not scheduled. Neither `membership.revoke` nor the phase gate review has been started. The `Money` allocator test criterion is already met (`modules/money/domain/money.vo.spec.ts`, "money: Money value object, currencies registry and allocator (Phase 1 step 4)" (`20085bc`)).
 
 `08` §5's "sessions invalidate immediately on password change, membership revocation and role change" has one of its three triggers implemented: role change, built in slice 3 (`membership.role.assign`). Password change and membership revocation are not — see `DECISION_LOG.md` 2026-08-23 ("`membership.role.assign`", decision 9) before assuming session invalidation is fully covered.
