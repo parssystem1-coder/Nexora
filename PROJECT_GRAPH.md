@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `0ec1c49` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `c5edc8c` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 6 modules · 14 tables (6 with RLS) · 8 capabilities · 8 routes · 276 test cases in 29 files · 38 ADRs (30 accepted)
+**At a glance:** 6 modules · 14 tables (6 with RLS) · 8 capabilities · 8 routes · 279 test cases in 30 files · 38 ADRs (30 accepted)
 
 ## Modules
 
@@ -69,7 +69,7 @@ Roles ADR-030 requires exactly one implementation of.
 | domain | 2 | 21 |
 | infrastructure | 4 | 15 |
 | integration | 8 | 141 |
-| other | 1 | 7 |
+| other | 2 | 10 |
 | platform | 1 | 5 |
 
 <details><summary>Per file</summary>
@@ -104,6 +104,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `apps/api/store-read.integration.spec.ts` | integration | 15 |
 | `tools/conformance/harness.selftest.live-db.spec.ts` | conformance | 6 |
 | `tools/conformance/harness.selftest.spec.ts` | conformance | 20 |
+| `tools/graph/extract.spec.ts` | other | 3 |
 | `tools/openapi/openapi.spec.ts` | other | 7 |
 
 </details>

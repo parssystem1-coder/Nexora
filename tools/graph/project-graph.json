@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "0ec1c49",
+    "commit": "c5edc8c",
     "dirty": true
   },
   "modules": [
@@ -705,6 +705,11 @@
       "cases": 20
     },
     {
+      "file": "tools/graph/extract.spec.ts",
+      "layer": "other",
+      "cases": 3
+    },
+    {
       "file": "tools/openapi/openapi.spec.ts",
       "layer": "other",
       "cases": 7
@@ -758,8 +763,8 @@
     "tablesWithRls": 6,
     "capabilities": 8,
     "routes": 8,
-    "testFiles": 29,
-    "testCases": 276,
+    "testFiles": 30,
+    "testCases": 279,
     "adrs": 38,
     "adrsAccepted": 30
   }

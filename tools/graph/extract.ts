@@ -23,7 +23,7 @@
  */
 
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
-import { join, relative, sep, dirname } from "node:path";
+import { join, relative, sep, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
@@ -38,6 +38,22 @@ const JSON_REL = "tools/graph/project-graph.json";
 
 function posix(p: string): string {
   return p.split(sep).join("/");
+}
+
+/**
+ * Plain UTF-16 code-unit comparison — NOT `String.prototype.localeCompare`.
+ * `localeCompare`'s ordering of punctuation (`.`, `_`, `-`, `/`, `:` — exactly
+ * what table names, capability ids, routes and singleton roles are full of)
+ * depends on the ICU collation data linked into the Node build and the
+ * platform's default locale, neither of which this codebase controls or can
+ * assume matches between the machine a slice is authored on and the Linux CI
+ * runner it is checked on. A default, comparator-less `Array.prototype.sort`
+ * over plain strings does not have this problem (ECMA-262 mandates UTF-16
+ * code-unit comparison there), so `cmp` gives every OBJECT-keyed sort here
+ * that same guarantee explicitly. See DECISION_LOG.md 2026-08-24.
+ */
+function cmp(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 function listFiles(dir: string, ext: string[]): string[] {
@@ -114,7 +130,7 @@ interface TestNode {
   cases: number;
 }
 
-interface Graph {
+export interface Graph {
   generatedFrom: { commit: string; dirty: boolean };
   modules: ModuleNode[];
   tables: TableNode[];
@@ -235,7 +251,7 @@ function extractTables(): TableNode[] {
     }
   }
 
-  return tables.sort((a, b) => a.name.localeCompare(b.name));
+  return tables.sort((a, b) => cmp(a.name, b.name));
 }
 
 // ------------------------------------------------- capabilities and routes
@@ -257,7 +273,7 @@ function extractRoutes(): { method: string; path: string; file: string }[] {
       out.push({ method, path, file });
     }
   }
-  return out.sort((a, b) => a.path.localeCompare(b.path));
+  return out.sort((a, b) => cmp(a.path, b.path));
 }
 
 function extractCapabilities(routes: { method: string; path: string; file: string }[]): CapabilityNode[] {
@@ -300,7 +316,7 @@ function extractCapabilities(routes: { method: string; path: string; file: strin
     });
   }
 
-  return out.sort((a, b) => a.id.localeCompare(b.id));
+  return out.sort((a, b) => cmp(a.id, b.id));
 }
 
 // --------------------------------------------------------------- singletons
@@ -317,7 +333,7 @@ function extractSingletons(): { role: string; file: string }[] {
       if (m[1]) out.push({ role: m[1], file });
     }
   }
-  return out.sort((a, b) => a.role.localeCompare(b.role));
+  return out.sort((a, b) => cmp(a.role, b.role));
 }
 
 // --------------------------------------------------------------------- ADRs
@@ -380,7 +396,7 @@ function gitInfo(): { commit: string; dirty: boolean } {
   }
 }
 
-function build(): Graph {
+export function build(): Graph {
   const routes = extractRoutes();
   const modules = extractModules();
   const tables = extractTables();
@@ -507,7 +523,7 @@ function render(g: Graph): string {
   }
   L.push("| layer | files | cases |");
   L.push("|---|---|---|");
-  for (const [layer, e] of [...byLayer].sort()) L.push(`| ${layer} | ${e.files} | ${e.cases} |`);
+  for (const [layer, e] of [...byLayer].sort((a, b) => cmp(a[0], b[0]))) L.push(`| ${layer} | ${e.files} | ${e.cases} |`);
   L.push("");
   L.push("<details><summary>Per file</summary>");
   L.push("");
@@ -529,6 +545,61 @@ function render(g: Graph): string {
 }
 
 // --------------------------------------------------------------------- diff
+
+/**
+ * A minimal unified-style diff (LCS-based, no external dependency — this
+ * tool has none and one line-level check does not warrant adding one).
+ * No context lines or `@@` hunk headers, just `---`/`+++` labels and the
+ * `-`/`+` lines that actually differ: enough to say WHAT changed, which is
+ * the entire point (`role-catalog-agreement.spec.ts` names the offending key
+ * on each side rather than asserting a bare boolean; this is the same move
+ * for a generated-file staleness check).
+ */
+function unifiedDiff(actualLabel: string, actual: string, expectedLabel: string, expected: string): string {
+  const a = actual.split("\n");
+  const b = expected.split("\n");
+  const n = a.length;
+  const m = b.length;
+
+  // lcs[i][j] = length of the longest common suffix of a[i:] and b[j:].
+  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[i]![j] = a[i] === b[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+    }
+  }
+
+  const lines: string[] = [`--- ${actualLabel}`, `+++ ${expectedLabel}`];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) {
+      i++;
+      j++;
+    } else if (lcs[i + 1]![j]! >= lcs[i]![j + 1]!) {
+      lines.push(`-${a[i]}`);
+      i++;
+    } else {
+      lines.push(`+${b[j]}`);
+      j++;
+    }
+  }
+  while (i < n) {
+    lines.push(`-${a[i]}`);
+    i++;
+  }
+  while (j < m) {
+    lines.push(`+${b[j]}`);
+    j++;
+  }
+  return lines.join("\n");
+}
+
+/** `generatedFrom` legitimately changes every commit — excluded from equality/diff the same way the Markdown's "**Generated**" line is. */
+function stripGeneratedFrom(g: Graph): Omit<Graph, "generatedFrom"> {
+  const { generatedFrom: _generatedFrom, ...rest } = g;
+  return rest;
+}
 
 function diffAgainst(ref: string, current: Graph): string {
   let previous: Graph;
@@ -584,38 +655,84 @@ function diffAgainst(ref: string, current: Graph): string {
 
 // --------------------------------------------------------------------- main
 
-const args = process.argv.slice(2);
-const graph = build();
+function main(): void {
+  const args = process.argv.slice(2);
+  const graph = build();
 
-if (args.includes("--check")) {
-  const expected = render(graph);
-  const actual = existsSync(MD_OUT) ? readFileSync(MD_OUT, "utf8") : "";
-  // The generated-from line carries the commit hash, which legitimately moves
-  // every commit; compare everything after it so --check catches real drift.
-  const strip = (s: string) => s.split("\n").filter((l) => !l.startsWith("**Generated**")).join("\n");
-  if (strip(expected) !== strip(actual)) {
-    console.error("PROJECT_GRAPH.md is stale. Run `npm run graph` and commit the result.");
-    process.exit(1);
+  if (args.includes("--check")) {
+    let stale = false;
+
+    // The generated-from line carries the commit hash, which legitimately
+    // moves every commit; compare everything after it so --check catches real
+    // drift instead of flagging every commit as stale by construction.
+    const expectedMd = render(graph);
+    const actualMd = existsSync(MD_OUT) ? readFileSync(MD_OUT, "utf8") : "";
+    const stripGeneratedLine = (s: string) => s.split("\n").filter((l) => !l.startsWith("**Generated**")).join("\n");
+    const expectedMdStripped = stripGeneratedLine(expectedMd);
+    const actualMdStripped = stripGeneratedLine(actualMd);
+    if (expectedMdStripped !== actualMdStripped) {
+      console.error(`PROJECT_GRAPH.md is stale:\n`);
+      console.error(unifiedDiff("committed PROJECT_GRAPH.md", actualMdStripped, "freshly generated", expectedMdStripped));
+      console.error("");
+      stale = true;
+    }
+
+    // project-graph.json was NOT covered by this check before — an ordering
+    // bug (or anything else that changes array order without changing set
+    // membership) can drift the JSON's array order while every Markdown table
+    // still renders identically, since the Markdown only ever displays what
+    // the JSON already decided the order was. Same exclusion for the same
+    // legitimately-moving field, applied by omitting it before serializing
+    // rather than by filtering rendered lines (there is no stable single line
+    // to filter in JSON the way there is in the Markdown).
+    const expectedJson = JSON.stringify(stripGeneratedFrom(graph), null, 2);
+    const actualJsonRaw = existsSync(JSON_OUT) ? readFileSync(JSON_OUT, "utf8") : "";
+    let actualJson = "";
+    try {
+      actualJson = actualJsonRaw ? JSON.stringify(stripGeneratedFrom(JSON.parse(actualJsonRaw) as Graph), null, 2) : "";
+    } catch {
+      actualJson = actualJsonRaw; // unparsable committed JSON is itself a diff worth showing verbatim
+    }
+    if (expectedJson !== actualJson) {
+      console.error(`${JSON_REL} is stale:\n`);
+      console.error(unifiedDiff(`committed ${JSON_REL}`, actualJson, "freshly generated", expectedJson));
+      console.error("");
+      stale = true;
+    }
+
+    if (stale) {
+      console.error("Run `npm run graph` and commit the result.");
+      process.exit(1);
+    }
+    console.log("Project graph: up to date.");
+    process.exit(0);
   }
-  console.log("Project graph: up to date.");
-  process.exit(0);
+
+  const sinceIndex = args.indexOf("--since");
+  if (sinceIndex !== -1) {
+    const ref = args[sinceIndex + 1];
+    if (!ref) {
+      console.error("--since needs a git ref, e.g. --since HEAD~5");
+      process.exit(1);
+    }
+    process.stdout.write(diffAgainst(ref, graph));
+    process.exit(0);
+  }
+
+  writeFileSync(MD_OUT, render(graph), "utf8");
+  writeFileSync(JSON_OUT, JSON.stringify(graph, null, 2) + "\n", "utf8");
+  const c = graph.counts;
+  console.log(
+    `Project graph written: ${c.modules} modules, ${c.tables} tables, ${c.capabilities} capabilities, ` +
+      `${c.routes} routes, ${c.testCases} test cases, ${c.adrs} ADRs.`,
+  );
 }
 
-const sinceIndex = args.indexOf("--since");
-if (sinceIndex !== -1) {
-  const ref = args[sinceIndex + 1];
-  if (!ref) {
-    console.error("--since needs a git ref, e.g. --since HEAD~5");
-    process.exit(1);
-  }
-  process.stdout.write(diffAgainst(ref, graph));
-  process.exit(0);
+// Only act as a CLI when executed directly, so a test can import build()/render()
+// (and, deliberately, cmp/unifiedDiff/stripGeneratedFrom) without triggering a
+// write to PROJECT_GRAPH.md/project-graph.json as a side effect of the import —
+// the same guard tools/openapi/generate.ts already uses for the same reason.
+const invokedAs = process.argv[1];
+if (invokedAs !== undefined && basename(invokedAs) === "extract.ts" && basename(dirname(invokedAs)) === "graph") {
+  main();
 }
-
-writeFileSync(MD_OUT, render(graph), "utf8");
-writeFileSync(JSON_OUT, JSON.stringify(graph, null, 2) + "\n", "utf8");
-const c = graph.counts;
-console.log(
-  `Project graph written: ${c.modules} modules, ${c.tables} tables, ${c.capabilities} capabilities, ` +
-    `${c.routes} routes, ${c.testCases} test cases, ${c.adrs} ADRs.`,
-);
