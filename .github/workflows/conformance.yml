@@ -27,15 +27,28 @@ jobs:
       - run: npm ci
       - name: Start PostgreSQL (docker-compose.yml)
         run: docker compose up -d --wait
+      # The compose container above starts with no schema at all - it is a
+      # brand-new volume on every run. This step is therefore also the
+      # "every migration applies cleanly from an empty database" proof
+      # CLAUDE.md's local verification ritual (typecheck && test &&
+      # conformance && db:migrate) has otherwise only ever been done by hand,
+      # against a throwaway database on the maintainer's machine. Doing it
+      # here means that guarantee now holds on every push, for free, instead
+      # of only when someone remembers to check it locally.
+      - name: Apply migrations (also proves every migration applies cleanly from an empty database)
+        run: npm run db:migrate
       - name: Type check
         run: npm run typecheck
       - name: Harness self-test (proves every rule detects its fixture, incl. against real PostgreSQL)
         run: npm test
       - name: Conformance scan of real source tree
+        if: always()
         run: npm run conformance
       - name: Project graph up to date
+        if: always()
         run: npm run graph -- --check
       - name: OpenAPI artifact up to date (ADR-033)
+        if: always()
         run: npm run openapi -- --check
       - name: Stop PostgreSQL
         if: always()
