@@ -15,6 +15,29 @@ Template for a new entry:
 
 ---
 
+## 2026-08-24 — A layer with no files is not a layer: `PROJECT_GRAPH.md` had been reporting a local filesystem artifact, not the repository
+
+**Context:** the previous entry's new diagnosable `--check` immediately paid for itself: the very next CI run failed `npm run graph -- --check` again, but this time printed exactly what differed —
+
+```
+-| `audit` | application, contracts, domain, infrastructure, interfaces, migrations |
++| `audit` | contracts, domain, infrastructure, migrations |
+```
+
+`modules/audit/application/` and `modules/audit/interfaces/` existed on the machine this repository is developed on as empty directories, leftover from Phase 0's initial module scaffolding (2026-08-22, when the six-directory layout was first laid down for every module, including `audit`, which never ended up needing an `application` or `interfaces` layer — all of its real code lives in `contracts`/`domain`/`infrastructure`/`migrations`). Git does not track empty directories at all, so they were never committed, never present on any other checkout, including CI's — and `extractModules()` inferred a layer's existence from `statSync(...).isDirectory()` alone, which answers "does this path exist on THIS filesystem," not "does the repository actually have anything here."
+
+**What class of error this was.** `PROJECT_GRAPH.md`'s own text, and the `/project-graph` skill's description, both tell the team every row is mechanically extracted from source and therefore trustworthy without re-verification. For an unknown period going back to Phase 0 (2026-08-22) — every single regeneration of this artifact on this machine, across every slice since, until this exact fix — one row was reporting local filesystem leftovers, not the repository. Nobody could have caught it by reading the file, because the whole point of a mechanically-generated artifact is that you stop re-verifying it; and nobody could catch it by running the check locally, because the same leftover directories that produced the wrong answer were also what made the check agree with itself. Only a fresh checkout — which `npm run graph -- --check` had never actually run against until CI executed for the first time this week (see the two entries above) — could ever have surfaced it. This is the general failure mode: a tool whose correctness implicitly assumes "the working directory equals the repository" will silently drift the moment that assumption breaks, and nothing about running it more often on the SAME machine would ever have revealed that.
+
+**Fix.** `extractModules()` no longer infers presence from directory existence anywhere — not for a layer, and (the same class of risk, fixed consistently rather than patching only the reported symptom) not for a module itself. A new `hasAnyFile(dir, ext)` recursively checks for at least one file the extractor would otherwise list; a directory only counts if it does. The layer-detection logic was factored out into an exported `detectLayers(moduleDir)` specifically so a test could build a fixture directory tree at test time (including one deliberately empty layer) and run the real extraction logic against it — committing an empty directory as a fixture is impossible (git cannot store one), which is itself part of what made the original bug invisible for so long, and is exactly why the test builds its fixture rather than checking one in. Verified failing against the pre-fix logic (`interfaces` wrongly appeared) and passing against the fix, before committing either.
+
+**Cleanup.** Deleted `modules/audit/application/` and `modules/audit/interfaces/` from this machine, so its checkout now matches a fresh one. Checked every other module for the same shape of leftover (a layer subdirectory recursively containing zero files) — `audit` was the only offender; no module-level (whole-module) empty directories exist. `modules/.gitkeep` is untouched — a deliberate, tracked placeholder, not a leftover.
+
+**Related observation, not acted on here:** the conformance harness (ADR-030) also walks the working tree, not the git index — an untracked file present locally is scanned locally and simply absent in CI. That is arguably the correct behavior for a tool whose job is checking *source*, but it means "green locally" and "green in CI" are not strictly the same claim, the same category of gap this whole entry is about, in a different tool. Recorded for the record; a decision about whether/how to close it belongs to its own task, not folded into this one.
+
+**Status:** RESOLVED.
+
+---
+
 ## 2026-08-24 — `npm run graph -- --check`: made diagnosable, then found and fixed why it disagreed between Windows and Linux
 
 **Context:** with CI's migration gap fixed (previous entry), the next run was green on every step except `npm run graph -- --check`, which printed only `PROJECT_GRAPH.md is stale. Run npm run graph and commit the result.` — no diff, nothing actionable. The same check passed on the Windows machine this repository is developed on, and regenerating locally there produced a file that, after stripping the self-referential commit-hash line, was byte-identical to what was committed. Line endings were checked directly and ruled out — zero `\r` bytes existed anywhere in the tracked tree or its git blobs at that point. Something the extractor *computes* differed between the two platforms, and the check had no way to say what.

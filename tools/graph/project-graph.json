@@ -1,17 +1,15 @@
 {
   "generatedFrom": {
-    "commit": "c5edc8c",
+    "commit": "94e4bc5",
     "dirty": true
   },
   "modules": [
     {
       "name": "audit",
       "layers": [
-        "application",
         "contracts",
         "domain",
         "infrastructure",
-        "interfaces",
         "migrations"
       ],
       "files": 10,
@@ -707,7 +705,7 @@
     {
       "file": "tools/graph/extract.spec.ts",
       "layer": "other",
-      "cases": 3
+      "cases": 5
     },
     {
       "file": "tools/openapi/openapi.spec.ts",
@@ -764,7 +762,7 @@
     "capabilities": 8,
     "routes": 8,
     "testFiles": 30,
-    "testCases": 279,
+    "testCases": 281,
     "adrs": 38,
     "adrsAccepted": 30
   }

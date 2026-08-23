@@ -56,6 +56,44 @@ function cmp(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/**
+ * Whether `dir` actually contains at least one file the extractor would
+ * otherwise list (recursively — a layer's own subdirectories count). Git
+ * does not track empty directories at all, so an empty directory on one
+ * machine's checkout (leftover scaffolding, an old branch, a half-finished
+ * slice) simply does not exist on any OTHER checkout of the same commit —
+ * including CI's. `statSync(...).isDirectory()` alone answers "does this
+ * path exist on THIS filesystem", which is a question about the machine,
+ * not the repository; this answers "does the repository actually have
+ * anything here", which is the question `extractModules` needs answered for
+ * both a module and each of its layers. See DECISION_LOG.md 2026-08-24,
+ * "a layer with no files is not a layer".
+ */
+function hasAnyFile(dir: string, ext: string[]): boolean {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return false;
+  }
+  for (const entry of entries) {
+    if (IGNORE.has(entry)) continue;
+    const full = join(dir, entry);
+    let st;
+    try {
+      st = statSync(full);
+    } catch {
+      continue;
+    }
+    if (st.isDirectory()) {
+      if (hasAnyFile(full, ext)) return true;
+    } else if (ext.some((e) => entry.endsWith(e))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function listFiles(dir: string, ext: string[]): string[] {
   const out: string[] = [];
   const walk = (d: string) => {
@@ -144,13 +182,40 @@ export interface Graph {
 
 // ------------------------------------------------------------------ modules
 
+const CODE_EXT = [".ts", ".sql"];
+
+/**
+ * Which of `moduleDir`'s immediate subdirectories count as a real layer —
+ * one that holds at least one file the extractor would otherwise list, not
+ * merely one that happens to exist on this filesystem (2026-08-24: `audit`
+ * reported `application`/`interfaces` as layers because both existed as
+ * empty leftovers on one machine — see `hasAnyFile`'s comment and
+ * DECISION_LOG.md). Exported and factored out specifically so a test can
+ * build a fixture directory tree, including a deliberately empty one, and
+ * run this exact function against it — the real rule, not a re-description
+ * of it.
+ */
+export function detectLayers(moduleDir: string): string[] {
+  return readdirSync(moduleDir)
+    .filter((l) => {
+      try {
+        const layerDir = join(moduleDir, l);
+        return statSync(layerDir).isDirectory() && hasAnyFile(layerDir, CODE_EXT);
+      } catch {
+        return false;
+      }
+    })
+    .sort();
+}
+
 function extractModules(): ModuleNode[] {
   const modulesDir = join(ROOT, "modules");
   if (!existsSync(modulesDir)) return [];
 
   const names = readdirSync(modulesDir).filter((n) => {
     try {
-      return statSync(join(modulesDir, n)).isDirectory() && !IGNORE.has(n);
+      const dir = join(modulesDir, n);
+      return statSync(dir).isDirectory() && !IGNORE.has(n) && hasAnyFile(dir, CODE_EXT);
     } catch {
       return false;
     }
@@ -158,17 +223,9 @@ function extractModules(): ModuleNode[] {
 
   return names.sort().map((name) => {
     const dir = join(modulesDir, name);
-    const layers = readdirSync(dir)
-      .filter((l) => {
-        try {
-          return statSync(join(dir, l)).isDirectory();
-        } catch {
-          return false;
-        }
-      })
-      .sort();
+    const layers = detectLayers(dir);
 
-    const files = listFiles(dir, [".ts", ".sql"]);
+    const files = listFiles(dir, CODE_EXT);
     const deps = new Set<string>();
     let platform = false;
 
