@@ -15,6 +15,24 @@ Template for a new entry:
 
 ---
 
+## 2026-08-24 — Housekeeping: two session ports collapsed to one, and commit hashes cited before 2026-08-23 are dangling by construction
+
+**Context:** a small housekeeping commit closing five unrelated debts. Two are worth recording here; the other three (a real README, a `.gitattributes` pinning line endings, closing out `RISK_REGISTER.md` R-001) needed no decision, only doing.
+
+**Session ports.** `modules/identity/domain/session-revocation.repository.ts` had two interfaces over the same table and the same concern — `SessionRevocationRepository` (`revokeAllForUser`) and `SessionTerminationRepository` (`revokeOne`, `revokeAll`) — implemented by one adapter. The split existed only because the instruction driving the `auth.logout`/`auth.logout_all` slice said `membership.role.assign`'s tests "must pass untouched," which was read as "never edit its hand-written fake." The actual requirement was narrower: don't regress what that fake's assertions prove. Collapsed back into one `SessionRevocationRepository` with `revokeOne` and a count-returning `revokeAllForUser` (the count is genuinely useful — `auth.logout_all` reports it, and `membership.role.assign` continues to discard it, exactly as before). Touched: `logout.service.ts`, `logout-all.service.ts`, and their spec files (import/type rename only, same behavior); `session-revocation.repository.pg.ts` (one class implementing one interface instead of two); `assign-membership-role.service.spec.ts`'s fake, which gained a `revokeOne` stub that throws (never called by that service) and now returns a count from `revokeAllForUser`. No assertion in that spec file changed — none of them ever read `revokeAllForUser`'s return value, only the side-effecting `revocations` array.
+
+**Dangling commit hashes.** The 2026-08-23 `git pull --rebase origin main` rewrote every commit's hash. Hashes cited in documentation written before that rebase — `979bf3d`, `aa1f749`, `23107f4`, `53d0850`, `3cd2c6d`, `63ac5cb`, `78b3d1b`, `02a7a82`, `91136da`, and any other hash cited before 2026-08-23 not listed here — are **dangling by construction**: verified directly (`git cat-file -e` finds the object, since local reflog garbage collection hasn't run yet; `git merge-base --is-ancestor <hash> main` fails for every one of them, proving none is reachable from current history). They will eventually stop resolving at all once garbage collection runs, on this machine or any clone.
+
+To find one of these anyway: the commit **subject line** survived the rebase unchanged (a rebase replays commits, it does not reword them). `git log --oneline --all | grep '<subject text>'` finds the current hash for any subject cited in old documentation, including this one.
+
+Fixed the forward-looking documents a reader actually navigates by — `CLAUDE.md`, `RISK_REGISTER.md` (no stale hashes found there), and `.claude/skills/new-slice/SKILL.md` — replacing each stale bare hash with the commit subject and its current hash together, so the next rebase degrades gracefully (a reader can still find the commit by subject) instead of dangling silently again. Historical entries in this file, above, are **not** rewritten — a decision log is a dated record of what was decided when, and retroactively editing old entries to look correct is the opposite of what it is for. Any bare hash in an entry dated before 2026-08-24 should be treated as dangling and located by subject, per the paragraph above, not trusted as a live pointer.
+
+**Adopted going forward, in every document, including this one:** cite a commit by its **subject**, optionally with its hash for convenience — never a bare hash alone. A subject survives a rebase; a hash does not.
+
+**Status:** RESOLVED.
+
+---
+
 ## 2026-08-24 — A layer with no files is not a layer: `PROJECT_GRAPH.md` had been reporting a local filesystem artifact, not the repository
 
 **Context:** the previous entry's new diagnosable `--check` immediately paid for itself: the very next CI run failed `npm run graph -- --check` again, but this time printed exactly what differed —

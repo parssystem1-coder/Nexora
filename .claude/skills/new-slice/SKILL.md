@@ -126,7 +126,7 @@ Compare as **text**, not uuid: `current_setting(..., true)` returns `''` for an 
 
 **Exempt from `tenant_id` + RLS, and only these:** `users`, `sessions`, `credentials`, `currencies`, `reserved_subdomains`, `roles`, `permissions`, `role_permissions`. `membership_roles` is **not** exempt. `identity_providers` is not yet built and its tenancy is undecided — do not assume it joins this list without its own decision. Adding to this list requires a recorded decision, not implementer authority.
 
-**Do not create a table outside the phase brief's scope list.** For the remaining Phase 1 slices that means only: `identity_providers`, `outbox_events`. (`currencies` and `credentials` were in this list too, but both are already built — `modules/money` Phase 1 step 4 commit `aa1f749`, and `modules/identity`'s `auth.login` slice respectively.) No billing, commerce, domain, plugin, AI or MCP tables.
+**Do not create a table outside the phase brief's scope list.** For the remaining Phase 1 slices that means only: `identity_providers`, `outbox_events`. (`currencies` and `credentials` were in this list too, but both are already built — `modules/money` Phase 1 step 4, "money: Money value object, currencies registry and allocator (Phase 1 step 4)" (`20085bc`), and `modules/identity`'s `auth.login` slice respectively.) No billing, commerce, domain, plugin, AI or MCP tables.
 
 Two more traps the golden path already hit:
 
@@ -185,13 +185,13 @@ If the harness flags something, **do not weaken the rule and do not add an excep
 
 Per `08_PHASE_1_BRIEF.md` §3 — this order is normative, not a suggestion. Items 1–5 are done; item 6 is what is actually left.
 
-1. ✅ `organization.create` — done, commit `23107f4`
-2. ✅ `membership.invite` — done, commit `53d0850`
-3. ✅ `membership.role.assign` — done, commit `3cd2c6d`
-4. ✅ `store.create` — done, commit `78b3d1b`
-5. ✅ `auth.login`, `auth.logout`, `auth.logout_all` — all done. `auth.login` needed `credentials`, Argon2id per ADR-029 (DECISION_LOG.md 2026-08-23 for the `credentials` tenancy decision, ADR-035 for auditing with no established tenant). `auth.logout`/`auth.logout_all` were implemented together as one run, deliberately (DECISION_LOG.md 2026-08-24 explains why two capabilities count as one slice here) — they added `SessionTerminationRepository`, a sibling port to `SessionRevocationRepository` rather than a widening of it, and decided that `auth.logout_all` ends the caller's own session too (same precedent `membership.role.assign` set for self-assignment).
+1. ✅ `organization.create` — done, "tenant: organization.create slice, plus the ADR-033 OpenAPI artifact" (`e024613`)
+2. ✅ `membership.invite` — done, "tenant: membership.invite slice" (`7bdaea7`)
+3. ✅ `membership.role.assign` — done, "tenant: membership.role.assign slice" (`88f2a6d`)
+4. ✅ `store.create` — done, "tenant: store.create slice" (`82c1f05`)
+5. ✅ `auth.login`, `auth.logout`, `auth.logout_all` — all done. `auth.login` needed `credentials`, Argon2id per ADR-029 (DECISION_LOG.md 2026-08-23 for the `credentials` tenancy decision, ADR-035 for auditing with no established tenant). `auth.logout`/`auth.logout_all` were implemented together as one run, deliberately (DECISION_LOG.md 2026-08-24 explains why two capabilities count as one slice here) — they originally added `SessionTerminationRepository` as a sibling port to `SessionRevocationRepository` rather than a widening of it, collapsed back into one port on 2026-08-24 (see `SessionRevocationRepository`'s own doc comment and DECISION_LOG.md) once it was clear "the fake must pass untouched" meant "don't regress it," not "never edit it." `auth.logout_all` ends the caller's own session too (same precedent `membership.role.assign` set for self-assignment).
 6. `organization.switch`
 
-One Phase 1 exit criterion is still open: revoking a membership must invalidate active sessions within one request (`08_PHASE_1_BRIEF.md` §6 row 4). It needs `membership.revoke`, which is not itself one of the six slices above — it is not scheduled. The `Money` allocator test criterion is already met (`modules/money/domain/money.vo.spec.ts`, commit `aa1f749`).
+One Phase 1 exit criterion is still open: revoking a membership must invalidate active sessions within one request (`08_PHASE_1_BRIEF.md` §6 row 4). It needs `membership.revoke`, which is not itself one of the six slices above — it is not scheduled. The `Money` allocator test criterion is already met (`modules/money/domain/money.vo.spec.ts`, "money: Money value object, currencies registry and allocator (Phase 1 step 4)" (`20085bc`)).
 
 `08` §5's "sessions invalidate immediately on password change, membership revocation and role change" has one of its three triggers implemented: role change, built in slice 3 (`membership.role.assign`). Password change and membership revocation are not — see `DECISION_LOG.md` 2026-08-23 ("`membership.role.assign`", decision 9) before assuming session invalidation is fully covered.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { LogoutService } from "./logout.service.js";
-import type { SessionTerminationRepository } from "../domain/session-revocation.repository.js";
+import type { SessionRevocationRepository } from "../domain/session-revocation.repository.js";
 import type { Clock } from "../../../platform/clock.js";
 
 const CREATED_AT = new Date("2026-08-24T09:00:00.000Z");
@@ -11,12 +11,12 @@ const USER_ID = "22222222-2222-2222-2222-222222222222";
 
 function fakes() {
   const revocations: Array<{ sessionId: string; userId: string; revokedAt: Date }> = [];
-  const sessions: SessionTerminationRepository = {
+  const sessions: SessionRevocationRepository = {
     revokeOne: async (sessionId, userId, revokedAt) => {
       revocations.push({ sessionId, userId, revokedAt });
     },
-    revokeAll: async () => {
-      throw new Error("LogoutService must not call revokeAll - that is LogoutAllService's job.");
+    revokeAllForUser: async () => {
+      throw new Error("LogoutService must not call revokeAllForUser - that is LogoutAllService's job.");
     },
   };
   return { revocations, service: new LogoutService(sessions, clock) };
@@ -38,7 +38,7 @@ describe("LogoutService", () => {
     expect(revocations).toEqual([{ sessionId: SESSION_ID, userId: USER_ID, revokedAt: CREATED_AT }]);
   });
 
-  it("never calls revokeAll - logout ends one session, not every session for the user", async () => {
+  it("never calls revokeAllForUser - logout ends one session, not every session for the user", async () => {
     const { service } = fakes();
     await expect(service.execute({ sessionId: SESSION_ID, userId: USER_ID })).resolves.toBeUndefined();
   });

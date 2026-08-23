@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { LogoutAllService } from "./logout-all.service.js";
-import type { SessionTerminationRepository } from "../domain/session-revocation.repository.js";
+import type { SessionRevocationRepository } from "../domain/session-revocation.repository.js";
 import type { Clock } from "../../../platform/clock.js";
 
 const CREATED_AT = new Date("2026-08-24T09:00:00.000Z");
@@ -10,11 +10,11 @@ const USER_ID = "22222222-2222-2222-2222-222222222222";
 
 function fakes(revokedCount: number) {
   const calls: Array<{ userId: string; revokedAt: Date }> = [];
-  const sessions: SessionTerminationRepository = {
+  const sessions: SessionRevocationRepository = {
     revokeOne: async () => {
       throw new Error("LogoutAllService must not call revokeOne - that is LogoutService's job.");
     },
-    revokeAll: async (userId, revokedAt) => {
+    revokeAllForUser: async (userId, revokedAt) => {
       calls.push({ userId, revokedAt });
       return revokedCount;
     },

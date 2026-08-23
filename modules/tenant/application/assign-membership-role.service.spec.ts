@@ -44,6 +44,10 @@ function fakes(options: { target?: Membership | null; onGrant?: () => never } = 
   const sessions: SessionRevocationRepository = {
     revokeAllForUser: async (userId, revokedAt) => {
       revocations.push({ userId, revokedAt });
+      return 1;
+    },
+    revokeOne: async () => {
+      throw new Error("AssignMembershipRoleService must not call revokeOne - it revokes every session, not one.");
     },
   };
 

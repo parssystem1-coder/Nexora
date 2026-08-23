@@ -12,7 +12,7 @@ When documents disagree: **ADR Index > Architecture RFC > Technical/Database/Con
 
 ## Current state
 
-Phase 0 complete. Phase 1 Task 0 and Task 1 (golden path `store.read`) complete and **repaired** — an independent audit found six defects (audit events not surviving their own transaction, a 404 returning `VALIDATION_ERROR`, three connection pools created at import time, `organizations`' RLS `WITH CHECK` covering UPDATE with no real predicate, `audit_events` not actually append-only) and all six are fixed as of commit `979bf3d`; see `PHASE_1_REPAIR_REPORT.md` for the defect-by-defect record.
+Phase 0 complete. Phase 1 Task 0 and Task 1 (golden path `store.read`) complete and **repaired** — an independent audit found six defects (audit events not surviving their own transaction, a 404 returning `VALIDATION_ERROR`, three connection pools created at import time, `organizations`' RLS `WITH CHECK` covering UPDATE with no real predicate, `audit_events` not actually append-only) and all six are fixed as of "Repair item 6: audit_events is append-only for the app role, not just by convention" (`a726dfe`); see `PHASE_1_REPAIR_REPORT.md` for the defect-by-defect record.
 
 Audit placement is now ADR-034 (`03` §3.1 and `08` §2 step 8 previously contradicted each other and both misdescribed the shipped design).
 
@@ -60,7 +60,9 @@ Argon2id via `@node-rs/argon2` (prebuilt binaries, no node-gyp — this machine 
 
 Slice 6 (`organization.switch`) not started. Exit criteria still **eight of nine** (`PHASE_1_TASK_1_COMPLETION_AND_TASK_2_SCOPE.md` §4); the remaining row is "revoking a membership invalidates active sessions," which needs `membership.revoke` (not one of the six slices).
 
-288 tests passing (29 files), conformance 0 violations, 19 migrations apply cleanly from empty.
+293 tests passing (30 files), conformance 0 violations, 19 migrations apply cleanly from empty.
+
+**CI is live.** `origin/main` on GitHub is a real remote as of 2026-08-23 (this repository had none before); `.github/workflows/conformance.yml` now runs on every push to `main` and actually applies migrations, so the artifact drift checks (`graph -- --check`, `openapi -- --check`) and the live-DB conformance scan all execute for real on `ubuntu-latest`/Node 24, not merely on this Windows machine. First fully green run: 2026-08-24 ("graph: a layer with no files is not a layer", CI run `32666989546`) — see `RISK_REGISTER.md` R-001 (now CLOSED) and `DECISION_LOG.md` 2026-08-24 for the two real defects the two red runs before it caught (a missing migration step; platform-dependent sorting) plus one defect the diagnosability work it forced then surfaced on its own (an empty-directory artifact in `PROJECT_GRAPH.md`).
 
 **Local database note:** `docker compose` is not available on this machine; a native PostgreSQL 17 on **port 5432** carries the `nexora` database and both roles. Export `DATABASE_URL=postgresql://nexora_app:nexora_app_dev_only@localhost:5432/nexora` and `MIGRATE_DATABASE_URL=postgresql://nexora_migrate:nexora_migrate_dev_only@localhost:5432/nexora` before running tests, conformance or migrations — the defaults in `platform/config.ts` point at compose's 5433. `nexora_migrate` has no `CREATEDB`, so a from-empty migration run needs a database created by a superuser first.
 

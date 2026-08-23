@@ -1,0 +1,8 @@
+# Every tracked file in this repository is text (verified 2026-08-24 — no
+# binary file is tracked). Normalize line endings to LF in the repository
+# regardless of what a given checkout's `core.autocrlf` does locally: CI's
+# drift checks (`npm run graph -- --check`, `npm run openapi -- --check`)
+# compare committed bytes, and `core.autocrlf=true` plus no .gitattributes
+# meant that guarantee was accidental rather than enforced — see
+# DECISION_LOG.md 2026-08-24.
+* text=auto eol=lf

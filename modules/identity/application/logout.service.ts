@@ -1,5 +1,5 @@
 import type { Clock } from "../../../platform/clock.js";
-import type { SessionTerminationRepository } from "../domain/session-revocation.repository.js";
+import type { SessionRevocationRepository } from "../domain/session-revocation.repository.js";
 
 export interface LogoutCommand {
   sessionId: string;
@@ -19,7 +19,7 @@ export interface LogoutCommand {
  */
 export class LogoutService {
   constructor(
-    private readonly sessions: SessionTerminationRepository,
+    private readonly sessions: SessionRevocationRepository,
     private readonly clock: Clock,
   ) {}
 

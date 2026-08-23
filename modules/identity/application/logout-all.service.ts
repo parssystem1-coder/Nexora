@@ -1,5 +1,5 @@
 import type { Clock } from "../../../platform/clock.js";
-import type { SessionTerminationRepository } from "../domain/session-revocation.repository.js";
+import type { SessionRevocationRepository } from "../domain/session-revocation.repository.js";
 
 export interface LogoutAllCommand {
   userId: string;
@@ -23,12 +23,12 @@ export interface LogoutAllResult {
  */
 export class LogoutAllService {
   constructor(
-    private readonly sessions: SessionTerminationRepository,
+    private readonly sessions: SessionRevocationRepository,
     private readonly clock: Clock,
   ) {}
 
   async execute(command: LogoutAllCommand): Promise<LogoutAllResult> {
-    const sessionsRevoked = await this.sessions.revokeAll(command.userId, this.clock.now());
+    const sessionsRevoked = await this.sessions.revokeAllForUser(command.userId, this.clock.now());
     return { sessionsRevoked };
   }
 }

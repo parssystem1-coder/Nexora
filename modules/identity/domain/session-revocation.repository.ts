@@ -18,30 +18,34 @@
  * everywhere, exactly as password-change invalidation would. Revoking
  * everywhere, not narrowly, is the correct reading of an
  * organization-independent trigger, not an over-broad one.
+ *
+ * Widened for `auth.logout`/`auth.logout_all` (08_PHASE_1_BRIEF.md §3 slice
+ * 5, ADR-029 item 6's "explicit logout" and "logout-all-devices" triggers)
+ * with `revokeOne` — ending exactly the caller's current session, not every
+ * session for the user. This briefly lived as a second interface,
+ * `SessionTerminationRepository`, specifically so `membership.role.assign`'s
+ * hand-written fake (typed exactly as this interface, in
+ * assign-membership-role.service.spec.ts) would not need to change at all.
+ * That read "its tests must pass untouched" as "never edit its fake even by
+ * one line," which was stricter than intended — the actual requirement was
+ * "do not regress what that fake's assertions prove." Collapsed back into
+ * one port, 2026-08-24 (DECISION_LOG.md): one table, one concern, one
+ * interface. The fake was updated (not left alone) to add `revokeOne` and to
+ * return a count from `revokeAllForUser`; every existing assertion in that
+ * spec file is unchanged.
  */
 export interface SessionRevocationRepository {
-  /** Sets every ACTIVE session for `userId` to REVOKED, stamping `revokedAt` (ADR-031: caller-supplied, never a direct system clock call). Idempotent — revoking an already-revoked or nonexistent session set is a no-op. */
-  revokeAllForUser(userId: string, revokedAt: Date): Promise<void>;
-}
+  /**
+   * Sets every ACTIVE session for `userId` to REVOKED, stamping `revokedAt`
+   * (ADR-031: caller-supplied, never a direct system clock call). Idempotent
+   * — revoking an already-revoked or nonexistent session set is a no-op.
+   * Returns how many sessions were actually revoked — `membership.role
+   * .assign` has never needed this and continues to discard it;
+   * `auth.logout_all` reports it to the caller (decision 7, DECISION_LOG.md
+   * 2026-08-24).
+   */
+  revokeAllForUser(userId: string, revokedAt: Date): Promise<number>;
 
-/**
- * Added for `auth.logout` / `auth.logout_all` (08_PHASE_1_BRIEF.md §3 slice
- * 5, second and third capability — ADR-029 item 6's "explicit logout" and
- * "logout-all-devices" triggers). Deliberately a SEPARATE interface from
- * `SessionRevocationRepository` above, not a widening of it, even though the
- * instruction driving this slice was to "extend `SessionRevocationRepository`
- * rather than reaching into `sessions` from a second place": adding a new
- * required method to that interface would force
- * `assign-membership-role.service.spec.ts`'s hand-written fake (typed exactly
- * as `SessionRevocationRepository`) to implement it too, which is the one
- * thing this slice was told not to disturb ("its tests must pass
- * untouched"). This interface lives in the same file and is implemented by
- * the same `SessionRevocationRepositoryPg` class below (see
- * session-revocation.repository.pg.ts) — one adapter, one place that ever
- * writes a revocation to `sessions`, just declared through two narrow ports
- * instead of one growing one. See DECISION_LOG.md 2026-08-24.
- */
-export interface SessionTerminationRepository {
   /**
    * Revokes exactly one ACTIVE session. Scoped by `userId` as well as
    * `sessionId` — defense in depth, not a reachable check in practice: the
@@ -52,17 +56,4 @@ export interface SessionTerminationRepository {
    * revoking an already-revoked or nonexistent session is a no-op.
    */
   revokeOne(sessionId: string, userId: string, revokedAt: Date): Promise<void>;
-
-  /**
-   * Revokes every ACTIVE session for `userId`, INCLUDING the one the caller
-   * is using right now (DECISION_LOG.md 2026-08-24, decision 3: `auth.logout_all`
-   * ends the caller's own session too, the same accepted consequence
-   * `membership.role.assign` already established for self-assignment).
-   * Returns how many sessions were actually revoked, so the capability can
-   * report it — `revokeAllForUser` above returns nothing because nothing
-   * before this slice ever needed the count; this is a distinct method
-   * rather than a changed return type on that one precisely so its signature
-   * (and its one caller's fake) never has to change.
-   */
-  revokeAll(userId: string, revokedAt: Date): Promise<number>;
 }
