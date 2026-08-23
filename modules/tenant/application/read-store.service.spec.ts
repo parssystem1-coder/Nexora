@@ -10,6 +10,11 @@ describe("ReadStoreService", () => {
     const createdAt = new Date("2026-08-22T10:30:00.000Z");
     const stores: StoreRepository = {
       findById: async () => new Store("store-1", "tenant-1", "Main", "main", "ACTIVE", createdAt),
+      // Never exercised here: ReadStoreService only reads. Present because
+      // store.create added create() to the port.
+      create: async () => {
+        throw new Error("ReadStoreService must not create stores.");
+      },
     };
 
     const dto = await new ReadStoreService(stores).execute(COMMAND);
@@ -25,7 +30,12 @@ describe("ReadStoreService", () => {
   });
 
   it("raises RESOURCE_NOT_FOUND when the store is not visible", async () => {
-    const stores: StoreRepository = { findById: async () => null };
+    const stores: StoreRepository = {
+      findById: async () => null,
+      create: async () => {
+        throw new Error("ReadStoreService must not create stores.");
+      },
+    };
 
     await expect(new ReadStoreService(stores).execute(COMMAND)).rejects.toMatchObject({
       code: "RESOURCE_NOT_FOUND",
@@ -37,6 +47,9 @@ describe("ReadStoreService", () => {
     // this pins the mapping so a future change cannot start echoing a caller-supplied tenantId.
     const stores: StoreRepository = {
       findById: async () => new Store("store-1", "tenant-1", "Main", "main", "ACTIVE", new Date()),
+      create: async () => {
+        throw new Error("ReadStoreService must not create stores.");
+      },
     };
 
     const dto = await new ReadStoreService(stores).execute(COMMAND);

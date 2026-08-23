@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "3cd2c6d",
+    "commit": "63ac5cb",
     "dirty": true
   },
   "modules": [
@@ -28,7 +28,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 15,
+      "files": 16,
       "dependsOn": [
         "capability"
       ],
@@ -83,7 +83,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 48,
+      "files": 56,
       "dependsOn": [
         "audit",
         "authorization",
@@ -151,6 +151,15 @@
       "name": "permissions",
       "module": "authorization",
       "migration": "20260822090600_authorization__create_permission_catalog.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "reserved_subdomains",
+      "module": "tenant",
+      "migration": "20260823110000_tenant__create_reserved_subdomains.sql",
       "tenantId": false,
       "rlsEnabled": false,
       "rlsForced": false,
@@ -249,6 +258,18 @@
       "audit": true,
       "storeScoped": false,
       "route": "POST /api/v1/organizations"
+    },
+    {
+      "id": "store.create",
+      "module": "tenant",
+      "file": "modules/tenant/interfaces/store-create.capability.ts",
+      "permissions": [
+        "store.create"
+      ],
+      "risk": "MEDIUM_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/stores"
     },
     {
       "id": "store.read",
@@ -544,6 +565,11 @@
       "cases": 6
     },
     {
+      "file": "modules/tenant/application/create-store.service.spec.ts",
+      "layer": "application",
+      "cases": 8
+    },
+    {
       "file": "modules/tenant/application/invite-member.service.spec.ts",
       "layer": "application",
       "cases": 7
@@ -589,6 +615,11 @@
       "cases": 13
     },
     {
+      "file": "apps/api/store-create.integration.spec.ts",
+      "layer": "integration",
+      "cases": 24
+    },
+    {
       "file": "apps/api/store-read.integration.spec.ts",
       "layer": "integration",
       "cases": 15
@@ -626,6 +657,11 @@
       "file": "modules/tenant/interfaces/membership-role.controller.ts"
     },
     {
+      "method": "POST",
+      "path": "/api/v1/stores",
+      "file": "modules/tenant/interfaces/store-create.controller.ts"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/stores/:storeId",
       "file": "modules/tenant/interfaces/store.controller.ts"
@@ -633,12 +669,12 @@
   ],
   "counts": {
     "modules": 6,
-    "tables": 12,
+    "tables": 13,
     "tablesWithRls": 6,
-    "capabilities": 4,
-    "routes": 4,
-    "testFiles": 22,
-    "testCases": 190,
+    "capabilities": 5,
+    "routes": 5,
+    "testFiles": 24,
+    "testCases": 222,
     "adrs": 37,
     "adrsAccepted": 29
   }

@@ -11,3 +11,4 @@ export { storeReadCapability } from "../interfaces/store-read.capability.js";
 export { organizationCreateCapability } from "../interfaces/organization-create.capability.js";
 export { membershipInviteCapability } from "../interfaces/membership-invite.capability.js";
 export { membershipRoleAssignCapability } from "../interfaces/membership-role-assign.capability.js";
+export { storeCreateCapability } from "../interfaces/store-create.capability.js";

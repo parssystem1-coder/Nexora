@@ -16,11 +16,20 @@ import { organizationScopeSchema } from "../application/organization-scope.input
  * membership in the explicitly-supplied organization, then builds the trusted
  * TenantContext. Must run after SessionGuard.
  *
- * `organizationId` is a path parameter, never `sessions.active_organization_id`
- * (ADR-002: the tenant is not derived from the token). That column is a UI
- * convenience recording which organization the user last looked at; treating
- * it as authority would mean a stale or attacker-influenced session value
- * decided which tenant a write landed in.
+ * `organizationId` is read from the path parameter if present, falling back
+ * to the request body otherwise — never from
+ * `sessions.active_organization_id` (ADR-002: the tenant is not derived from
+ * the token). Both a path segment and a body field are equally "an explicit
+ * application-level input" under ADR-002; neither is derived from the
+ * session. The fallback exists because `store.create` follows
+ * `05_API_CAPABILITY_CONTRACTS.md` §6.1's worked contract literally
+ * (`POST /api/v1/stores`, `organizationId` in the body), while
+ * `membership.invite` and `membership.role.assign` both nest it in the path
+ * — see DECISION_LOG.md "store.create: the route, and why it breaks the
+ * organizationId-in-the-path pattern". Path takes precedence when both are
+ * present, purely because that is what every existing route already relies
+ * on; no route in this codebase currently sends both, so the ordering is
+ * unexercised in practice, not load-bearing.
  *
  * Like StoreAccessGuard this runs in the bootstrap RLS phase - `app.user_id`
  * set, `app.tenant_id` still null - relying on the `memberships` self-access
@@ -49,7 +58,13 @@ export class OrganizationAccessGuard implements CanActivate {
       );
     }
 
-    const parsed = organizationScopeSchema.safeParse({ organizationId: request.params["organizationId"] });
+    const organizationIdCandidate =
+      request.params["organizationId"] ??
+      (typeof request.body === "object" && request.body !== null
+        ? (request.body as Record<string, unknown>)["organizationId"]
+        : undefined);
+
+    const parsed = organizationScopeSchema.safeParse({ organizationId: organizationIdCandidate });
     if (!parsed.success) {
       throw new CapabilityError("VALIDATION_ERROR", "organizationId must be a valid UUID.", {
         issues: parsed.error.issues,

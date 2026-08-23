@@ -14,6 +14,11 @@ const MEMBER_SINCE = new Date("2026-08-22T10:00:00.000Z");
 function fakeRepos(options: { storeMembership: StoreMembership | null; membership: Membership | null }) {
   const storeMemberships: StoreMembershipRepository = {
     findByUserAndStore: async () => options.storeMembership,
+    // Never exercised here: ResolveStoreAccessService only reads. Present
+    // because store.create added create() to the port.
+    create: async () => {
+      throw new Error("ResolveStoreAccessService must not create store memberships.");
+    },
   };
   const memberships: MembershipRepository = {
     findByUserAndTenant: async () => options.membership,

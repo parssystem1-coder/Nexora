@@ -38,11 +38,17 @@ export interface StoreMembershipsTable {
   created_at: ColumnType<Date, string | undefined, never>;
 }
 
+/** Platform-wide reference data, no tenant_id/RLS (08_PHASE_1_BRIEF.md §5) — see the creating migration's comment. */
+export interface ReservedSubdomainsTable {
+  name: string;
+}
+
 declare module "../../../platform/db/kysely.js" {
   interface Database {
     organizations: OrganizationsTable;
     memberships: MembershipsTable;
     stores: StoresTable;
     store_memberships: StoreMembershipsTable;
+    reserved_subdomains: ReservedSubdomainsTable;
   }
 }

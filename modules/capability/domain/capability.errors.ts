@@ -12,6 +12,7 @@ export type CapabilityErrorCode =
   | "VALIDATION_ERROR"
   | "RESOURCE_NOT_FOUND"
   | "CONFLICT"
+  | "DOMAIN_RESERVED"
   | "INTERNAL_ERROR";
 
 const STATUS_BY_CODE: Record<CapabilityErrorCode, number> = {
@@ -23,6 +24,10 @@ const STATUS_BY_CODE: Record<CapabilityErrorCode, number> = {
   VALIDATION_ERROR: 400,
   RESOURCE_NOT_FOUND: 404,
   CONFLICT: 409,
+  // 409, the same class as CONFLICT but a distinct code: the slug conflicts
+  // with a platform-reserved word, not with another row's unique index.
+  // store.create (05_API_CAPABILITY_CONTRACTS.md §7) is its first user.
+  DOMAIN_RESERVED: 409,
   INTERNAL_ERROR: 500,
 };
 
