@@ -1,4 +1,4 @@
-export { CapabilityError, httpStatusForCode } from "./capability.contract.js";
+export { CapabilityError, httpStatusForCode, resolvePathOrBodyValue, buildValidationInput } from "./capability.contract.js";
 export type {
   CapabilityErrorCode,
   CapabilityDefinition,

@@ -4,7 +4,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import { APP_DB } from "../../../platform/db/connections.js";
-import { CapabilityError } from "../../capability/contracts/index.js";
+import { CapabilityError, resolvePathOrBodyValue } from "../../capability/contracts/index.js";
 import type { RequestWithTenantContext } from "./tenant-context.js";
 import { MembershipRepositoryPg } from "../infrastructure/membership.repository.pg.js";
 import { ResolveOrganizationAccessService } from "../application/resolve-organization-access.service.js";
@@ -26,10 +26,19 @@ import { organizationScopeSchema } from "../application/organization-scope.input
  * (`POST /api/v1/stores`, `organizationId` in the body), while
  * `membership.invite` and `membership.role.assign` both nest it in the path
  * — see DECISION_LOG.md "store.create: the route, and why it breaks the
- * organizationId-in-the-path pattern". Path takes precedence when both are
- * present, purely because that is what every existing route already relies
- * on; no route in this codebase currently sends both, so the ordering is
- * unexercised in practice, not load-bearing.
+ * organizationId-in-the-path pattern".
+ *
+ * The path value is authoritative and load-bearing — not merely preferred —
+ * per `resolvePathOrBodyValue` (`modules/capability/interfaces/
+ * path-body-conflict.ts`): if a route's path supplies `organizationId` AND
+ * the body ALSO supplies a DIFFERENT value, the request is rejected with
+ * `VALIDATION_ERROR` rather than silently using the path value and ignoring
+ * the mismatch. See DECISION_LOG.md "A path parameter is authoritative; a
+ * differing body value is rejected, not silently overridden" — an earlier
+ * version of this comment called the ordering "unexercised in practice, not
+ * load-bearing," which stopped being true the moment anything actually
+ * inspected `request.body.organizationId` for a route where the path also
+ * supplies it; nothing had, until this rule was written.
  *
  * Like StoreAccessGuard this runs in the bootstrap RLS phase - `app.user_id`
  * set, `app.tenant_id` still null - relying on the `memberships` self-access
@@ -58,11 +67,7 @@ export class OrganizationAccessGuard implements CanActivate {
       );
     }
 
-    const organizationIdCandidate =
-      request.params["organizationId"] ??
-      (typeof request.body === "object" && request.body !== null
-        ? (request.body as Record<string, unknown>)["organizationId"]
-        : undefined);
+    const organizationIdCandidate = resolvePathOrBodyValue("organizationId", request.params["organizationId"], request.body);
 
     const parsed = organizationScopeSchema.safeParse({ organizationId: organizationIdCandidate });
     if (!parsed.success) {

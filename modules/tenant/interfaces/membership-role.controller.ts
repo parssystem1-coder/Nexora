@@ -5,7 +5,7 @@ import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { systemClock } from "../../../platform/clock.js";
-import { CapabilityError } from "../../capability/contracts/index.js";
+import { CapabilityError, buildValidationInput } from "../../capability/contracts/index.js";
 import { SessionGuard, SessionRevocationRepositoryPg } from "../../identity/contracts/index.js";
 import { CheckPermissionService, PermissionCheckRepositoryPg, RoleGrantRepositoryPg } from "../../authorization/contracts/index.js";
 import { AuditEvent, recordAuditEventDurable, type AuditOutcome } from "../../audit/contracts/index.js";
@@ -50,6 +50,15 @@ import type { MembershipRoleDto } from "../contracts/index.js";
  * written. The target membershipId and roleKey go in the audit metadata,
  * which is what makes a FAILURE row diagnosable - `resource_id` alone names
  * a grant that, on failure, was never created.
+ *
+ * `buildValidationInput` (`modules/capability/contracts/index.ts`) resolves
+ * `organizationId` and `membershipId` against the path, rejecting rather
+ * than silently overriding if the body names a different value for either -
+ * see DECISION_LOG.md "A path parameter is authoritative; a differing body
+ * value is rejected, not silently overridden". Before this, a body
+ * `membershipId` silently won over the path's (the object literal spread the
+ * body last), so the membership the URL named and the membership actually
+ * granted a role could differ.
  */
 @Controller("api/v1/organizations/:organizationId/memberships/:membershipId/roles")
 export class MembershipRoleController {
@@ -77,11 +86,9 @@ export class MembershipRoleController {
       throw new Error("OrganizationAccessGuard resolved a TenantContext without a membershipId.");
     }
 
-    const parsed = assignMembershipRoleInputSchema.safeParse({
-      organizationId,
-      membershipId,
-      ...(typeof body === "object" && body !== null ? body : {}),
-    });
+    const parsed = assignMembershipRoleInputSchema.safeParse(
+      buildValidationInput(membershipRoleAssignCapability.route, { organizationId, membershipId }, body),
+    );
     if (!parsed.success) {
       throw new CapabilityError("VALIDATION_ERROR", "Invalid role assignment payload.", {
         issues: parsed.error.issues,

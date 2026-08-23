@@ -256,6 +256,37 @@ describe("POST /api/v1/organizations/:organizationId/memberships - denial paths"
   });
 });
 
+describe("POST /api/v1/organizations/:organizationId/memberships - a body field must not override a path parameter", () => {
+  it("rejects a body organizationId that differs from the path organizationId, even when the caller belongs to both, and invites no one", async () => {
+    const orgA = await orgWithMember("orgmismatch", "owner");
+    const orgBId = await seedOrganization(db, "Org Mismatch B", `orgmismatch-b-${orgA.suffix}`);
+    const orgBMembershipId = await seedMembership(db, orgBId, orgA.userId, "ACTIVE");
+    await grantRole(db, orgBId, orgBMembershipId, "owner");
+    const invitee = await outsider("orgmismatch");
+
+    const res = await invite(orgA.orgId, orgA.token, { email: invitee.email, organizationId: orgBId });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_ERROR");
+
+    const membershipsInA = await withTenantContext(db, { tenantId: orgA.orgId, userId: orgA.userId, storeId: null }, (trx) =>
+      trx.selectFrom("memberships").select("id").where("tenant_id", "=", orgA.orgId).execute(),
+    );
+    expect(membershipsInA).toHaveLength(1); // only the caller's own, from setup
+    expect(await auditRowsFor(orgA.orgId, orgA.userId)).toEqual([]);
+    expect(await auditRowsFor(orgBId, orgA.userId)).toEqual([]);
+  });
+
+  it("accepts a body organizationId that is IDENTICAL to the path organizationId - an echo is not an error", async () => {
+    const caller = await orgWithMember("orgidentical", "owner");
+    const invitee = await outsider("orgidentical");
+
+    const res = await invite(caller.orgId, caller.token, { email: invitee.email, organizationId: caller.orgId });
+
+    expect(res.status).toBe(201);
+  });
+});
+
 describe("POST /api/v1/organizations/:organizationId/memberships - audit (ADR-034)", () => {
   it("records one SUCCESS event carrying the invitee's address in metadata", async () => {
     const caller = await orgWithMember("auditok", "owner");

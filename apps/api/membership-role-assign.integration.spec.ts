@@ -342,6 +342,68 @@ describe("POST .../memberships/:membershipId/roles - denial paths", () => {
   });
 });
 
+describe("POST .../memberships/:membershipId/roles - a body field must not override a path parameter", () => {
+  it("rejects a body membershipId that differs from the path membershipId, and grants no role to either", async () => {
+    const caller = await orgWithMember("pathbodymismatch", "owner");
+    const pathTarget = await memberOf(caller.orgId, "pathbodymismatch-path");
+    const bodyTarget = await memberOf(caller.orgId, "pathbodymismatch-body");
+
+    const res = await assign(caller.orgId, pathTarget.membershipId, caller.token, {
+      roleKey: "admin",
+      membershipId: bodyTarget.membershipId,
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_ERROR");
+
+    const pathTargetRoles = await withTenantContext(db, { tenantId: caller.orgId, userId: caller.userId, storeId: null }, (trx) =>
+      trx.selectFrom("membership_roles").select("id").where("membership_id", "=", pathTarget.membershipId).execute(),
+    );
+    const bodyTargetRoles = await withTenantContext(db, { tenantId: caller.orgId, userId: caller.userId, storeId: null }, (trx) =>
+      trx.selectFrom("membership_roles").select("id").where("membership_id", "=", bodyTarget.membershipId).execute(),
+    );
+    expect(pathTargetRoles).toEqual([]);
+    expect(bodyTargetRoles).toEqual([]);
+
+    expect(await auditRowsFor(caller.orgId, caller.userId)).toEqual([]);
+  });
+
+  it("rejects a body organizationId that differs from the path organizationId, even when the caller belongs to both", async () => {
+    const orgA = await orgWithMember("orgmismatch", "owner");
+    const orgBId = await seedOrganization(db, "Org Mismatch B", `orgmismatch-b-${orgA.suffix}`);
+    const orgBMembershipId = await seedMembership(db, orgBId, orgA.userId, "ACTIVE");
+    await grantRole(db, orgBId, orgBMembershipId, "owner");
+    const target = await memberOf(orgA.orgId, "orgmismatch-target");
+
+    const res = await assign(orgA.orgId, target.membershipId, orgA.token, {
+      roleKey: "admin",
+      organizationId: orgBId,
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_ERROR");
+
+    const targetRoles = await withTenantContext(db, { tenantId: orgA.orgId, userId: orgA.userId, storeId: null }, (trx) =>
+      trx.selectFrom("membership_roles").select("id").where("membership_id", "=", target.membershipId).execute(),
+    );
+    expect(targetRoles).toEqual([]);
+    expect(await auditRowsFor(orgA.orgId, orgA.userId)).toEqual([]);
+    expect(await auditRowsFor(orgBId, orgA.userId)).toEqual([]);
+  });
+
+  it("accepts a body membershipId that is IDENTICAL to the path membershipId - an echo is not an error", async () => {
+    const caller = await orgWithMember("pathbodyidentical", "owner");
+    const target = await memberOf(caller.orgId, "pathbodyidentical-target");
+
+    const res = await assign(caller.orgId, target.membershipId, caller.token, {
+      roleKey: "admin",
+      membershipId: target.membershipId,
+    });
+
+    expect(res.status).toBe(201);
+  });
+});
+
 describe("POST .../memberships/:membershipId/roles - audit (ADR-034)", () => {
   it("records one SUCCESS event carrying the target membership and role key in metadata", async () => {
     const caller = await orgWithMember("auditok", "owner");

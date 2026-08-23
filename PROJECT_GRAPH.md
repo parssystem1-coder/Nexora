@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `63ac5cb` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `78b3d1b` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 6 modules · 13 tables (6 with RLS) · 5 capabilities · 5 routes · 222 test cases in 24 files · 37 ADRs (29 accepted)
+**At a glance:** 6 modules · 13 tables (6 with RLS) · 5 capabilities · 5 routes · 227 test cases in 24 files · 37 ADRs (29 accepted)
 
 ## Modules
 
@@ -12,7 +12,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 |---|---|---|---|---|
 | `audit` | application, contracts, domain, infrastructure, interfaces, migrations | 9 | — | yes |
 | `authorization` | application, contracts, domain, infrastructure, interfaces, migrations | 16 | `capability` | yes |
-| `capability` | contracts, domain, interfaces | 5 | — | — |
+| `capability` | contracts, domain, interfaces | 6 | — | — |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 19 | `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
 | `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 56 | `audit`, `authorization`, `capability`, `identity` | yes |
@@ -64,7 +64,7 @@ Roles ADR-030 requires exactly one implementation of.
 | conformance | 2 | 26 |
 | domain | 2 | 21 |
 | infrastructure | 4 | 15 |
-| integration | 6 | 104 |
+| integration | 6 | 109 |
 | other | 1 | 7 |
 | platform | 1 | 5 |
 
@@ -88,8 +88,8 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/tenant/infrastructure/organizations-rls.spec.ts` | infrastructure | 4 |
 | `platform/db/tenant-context.spec.ts` | platform | 5 |
 | `apps/api/error-contract.integration.spec.ts` | integration | 3 |
-| `apps/api/membership-invite.integration.spec.ts` | integration | 22 |
-| `apps/api/membership-role-assign.integration.spec.ts` | integration | 27 |
+| `apps/api/membership-invite.integration.spec.ts` | integration | 24 |
+| `apps/api/membership-role-assign.integration.spec.ts` | integration | 30 |
 | `apps/api/organization-create.integration.spec.ts` | integration | 13 |
 | `apps/api/store-create.integration.spec.ts` | integration | 24 |
 | `apps/api/store-read.integration.spec.ts` | integration | 15 |

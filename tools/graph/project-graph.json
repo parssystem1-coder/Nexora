@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "63ac5cb",
+    "commit": "78b3d1b",
     "dirty": true
   },
   "modules": [
@@ -41,7 +41,7 @@
         "domain",
         "interfaces"
       ],
-      "files": 5,
+      "files": 6,
       "dependsOn": [],
       "dependsOnPlatform": false
     },
@@ -602,12 +602,12 @@
     {
       "file": "apps/api/membership-invite.integration.spec.ts",
       "layer": "integration",
-      "cases": 22
+      "cases": 24
     },
     {
       "file": "apps/api/membership-role-assign.integration.spec.ts",
       "layer": "integration",
-      "cases": 27
+      "cases": 30
     },
     {
       "file": "apps/api/organization-create.integration.spec.ts",
@@ -674,7 +674,7 @@
     "capabilities": 5,
     "routes": 5,
     "testFiles": 24,
-    "testCases": 222,
+    "testCases": 227,
     "adrs": 37,
     "adrsAccepted": 29
   }

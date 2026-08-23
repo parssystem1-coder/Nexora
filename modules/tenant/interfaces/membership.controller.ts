@@ -5,7 +5,7 @@ import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { systemClock } from "../../../platform/clock.js";
-import { CapabilityError } from "../../capability/contracts/index.js";
+import { CapabilityError, buildValidationInput } from "../../capability/contracts/index.js";
 import { SessionGuard, UserRepositoryPg } from "../../identity/contracts/index.js";
 import { CheckPermissionService, PermissionCheckRepositoryPg } from "../../authorization/contracts/index.js";
 import { AuditEvent, recordAuditEventDurable, type AuditOutcome } from "../../audit/contracts/index.js";
@@ -44,6 +44,12 @@ import type { MembershipDto } from "../contracts/index.js";
  * ever written. The invitee's email goes in the audit metadata, which is what
  * makes a FAILURE row diagnosable at all - `resource_id` alone cannot say who
  * the attempt was about.
+ *
+ * `buildValidationInput` (`modules/capability/contracts/index.ts`) resolves
+ * `organizationId` against the path, rejecting rather than silently
+ * overriding if the body names a different value - see DECISION_LOG.md "A
+ * path parameter is authoritative; a differing body value is rejected, not
+ * silently overridden".
  */
 @Controller("api/v1/organizations/:organizationId/memberships")
 export class MembershipController {
@@ -70,10 +76,9 @@ export class MembershipController {
       throw new Error("OrganizationAccessGuard resolved a TenantContext without a membershipId.");
     }
 
-    const parsed = inviteMemberInputSchema.safeParse({
-      organizationId,
-      ...(typeof body === "object" && body !== null ? body : {}),
-    });
+    const parsed = inviteMemberInputSchema.safeParse(
+      buildValidationInput(membershipInviteCapability.route, { organizationId }, body),
+    );
     if (!parsed.success) {
       throw new CapabilityError("VALIDATION_ERROR", "Invalid invitation payload.", {
         issues: parsed.error.issues,
