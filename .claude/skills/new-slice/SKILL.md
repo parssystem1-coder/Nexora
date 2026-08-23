@@ -183,13 +183,13 @@ If the harness flags something, **do not weaken the rule and do not add an excep
 
 ## Remaining Phase 1 slices, in order
 
-Per `08_PHASE_1_BRIEF.md` §3 — this order is normative, not a suggestion. Items 1–4 are done; item 5 is one third done (`auth.login`); items 5 (remainder) and 6 are what is actually left.
+Per `08_PHASE_1_BRIEF.md` §3 — this order is normative, not a suggestion. Items 1–5 are done; item 6 is what is actually left.
 
 1. ✅ `organization.create` — done, commit `23107f4`
 2. ✅ `membership.invite` — done, commit `53d0850`
 3. ✅ `membership.role.assign` — done, commit `3cd2c6d`
 4. ✅ `store.create` — done, commit `78b3d1b`
-5. `auth.login` ✅ done (needed `credentials`, Argon2id per ADR-029 — see DECISION_LOG.md 2026-08-23 for the `credentials` tenancy decision and ADR-035 for how it audits with no established tenant). `auth.logout`, `auth.logout_all` — not started.
+5. ✅ `auth.login`, `auth.logout`, `auth.logout_all` — all done. `auth.login` needed `credentials`, Argon2id per ADR-029 (DECISION_LOG.md 2026-08-23 for the `credentials` tenancy decision, ADR-035 for auditing with no established tenant). `auth.logout`/`auth.logout_all` were implemented together as one run, deliberately (DECISION_LOG.md 2026-08-24 explains why two capabilities count as one slice here) — they added `SessionTerminationRepository`, a sibling port to `SessionRevocationRepository` rather than a widening of it, and decided that `auth.logout_all` ends the caller's own session too (same precedent `membership.role.assign` set for self-assignment).
 6. `organization.switch`
 
 One Phase 1 exit criterion is still open: revoking a membership must invalidate active sessions within one request (`08_PHASE_1_BRIEF.md` §6 row 4). It needs `membership.revoke`, which is not itself one of the six slices above — it is not scheduled. The `Money` allocator test criterion is already met (`modules/money/domain/money.vo.spec.ts`, commit `aa1f749`).

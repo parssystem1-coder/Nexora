@@ -6,7 +6,7 @@ import {
   membershipRoleAssignCapability,
   storeCreateCapability,
 } from "../../modules/tenant/contracts/index.js";
-import { authLoginCapability } from "../../modules/identity/contracts/index.js";
+import { authLoginCapability, authLogoutCapability, authLogoutAllCapability } from "../../modules/identity/contracts/index.js";
 
 /**
  * Every implemented capability, in a stable order.
@@ -28,6 +28,8 @@ import { authLoginCapability } from "../../modules/identity/contracts/index.js";
  */
 export const CAPABILITIES: readonly CapabilityDefinition[] = [
   authLoginCapability,
+  authLogoutCapability,
+  authLogoutAllCapability,
   membershipInviteCapability,
   membershipRoleAssignCapability,
   organizationCreateCapability,

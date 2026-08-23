@@ -1566,7 +1566,7 @@ Rejected: writing the event *inside* the domain transaction, where the failure i
 
 ## ADR-035 - Platform-Scope Audit Events
 
-**ACCEPTED**, new, applies from Task 2 (`auth.login`, first user; `auth.logout`, `auth.logout_all`, `organization.switch` next)
+**ACCEPTED**, new, applies from Task 2 (`auth.login`, first user; `auth.logout` and `auth.logout_all` now its second and third — the first evidence this generalizes rather than being built for `auth.login` alone; `organization.switch` next)
 
 ### Problem
 
@@ -1587,6 +1587,8 @@ Not auditing this capability (dropping the exit criterion for global-scope capab
 
 Rejected: nullable `tenant_id` (permanently unreadable, per above); a second RLS policy branch keyed on an "is this a platform actor" claim (speculative machinery with no consumer yet, and a new trust boundary to audit for a problem the sentinel already solves without one); auditing only on success (ADR-034 already rejected this generally, and a failed login is the more valuable half of this specific record).
 
+5. **Amendment, 2026-08-24 (`auth.logout`/`auth.logout_all`, the sentinel's second user):** decision 1's safety argument for the sentinel — "probability effectively zero" plus "no foreign key exists to violate" — is an argument about likelihood, not a structural guarantee. Nothing before this amendment actually forbade an `organizations` row from holding `PLATFORM_TENANT_ID`; if one ever did, that organization would read every platform-scope audit row ever written. Closed mechanically with a forward-only `CHECK` constraint (`organizations_id_not_platform_tenant_sentinel`, `modules/tenant/migrations/20260824090000_tenant__forbid_platform_tenant_id_sentinel.sql`), not a live-DB conformance rule: a `CHECK` prevents the bad row from ever being written, by any future writer (migration, seed script, or a capability not yet built), where a conformance rule only detects it after the fact, the next time someone happens to run `npm run conformance`. This does not change the sentinel value, the schema, or the RLS policy — it only closes a gap decision 1 left open. See DECISION_LOG.md 2026-08-24, correction (a).
+
 ### Verification
 
 - [ ] a capability with no established tenant (`auth.login`) writes exactly one audit row per attempt, on both outcomes
@@ -1594,6 +1596,7 @@ Rejected: nullable `tenant_id` (permanently unreadable, per above); a second RLS
 - [ ] that row is invisible from every other tenant's context, the same fail-closed guarantee every tenant-scoped table has
 - [ ] `PLATFORM_TENANT_ID` never appears in `request.tenantContext`, a structured log line, or a response body
 - [ ] no RLS policy on `audit_events` changed
+- [ ] `organizations` cannot hold `PLATFORM_TENANT_ID` as a real row's id — enforced by a `CHECK` constraint, not merely an improbability argument
 
 ---
 

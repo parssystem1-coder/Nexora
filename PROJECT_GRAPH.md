@@ -1,21 +1,21 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `91136da`. **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `0ec1c49` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 6 modules · 14 tables (6 with RLS) · 6 capabilities · 6 routes · 256 test cases in 26 files · 38 ADRs (30 accepted)
+**At a glance:** 6 modules · 14 tables (6 with RLS) · 8 capabilities · 8 routes · 276 test cases in 29 files · 38 ADRs (30 accepted)
 
 ## Modules
 
 | module | layers | files | depends on | platform |
 |---|---|---|---|---|
-| `audit` | application, contracts, domain, infrastructure, interfaces, migrations | 9 | — | yes |
-| `authorization` | application, contracts, domain, infrastructure, interfaces, migrations | 16 | `capability` | yes |
+| `audit` | application, contracts, domain, infrastructure, interfaces, migrations | 10 | — | yes |
+| `authorization` | application, contracts, domain, infrastructure, migrations | 16 | `capability` | yes |
 | `capability` | contracts, domain, interfaces | 6 | — | — |
-| `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 30 | `audit`, `capability` | yes |
+| `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 40 | `audit`, `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
-| `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 56 | `audit`, `authorization`, `capability`, `identity` | yes |
+| `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 57 | `audit`, `authorization`, `capability`, `identity` | yes |
 
 ## Tables
 
@@ -43,6 +43,8 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | capability | route | permissions | risk | audit | store-scoped |
 |---|---|---|---|---|---|
 | `auth.login` | `POST /api/v1/auth/login` | — | LOW_WRITE | yes | — |
+| `auth.logout` | `POST /api/v1/auth/logout` | — | LOW_WRITE | yes | — |
+| `auth.logout_all` | `POST /api/v1/auth/logout-all` | — | MEDIUM_WRITE | yes | — |
 | `membership.invite` | `POST /api/v1/organizations/:organizationId/memberships` | `membership.invite` | MEDIUM_WRITE | yes | — |
 | `membership.role.assign` | `POST /api/v1/organizations/:organizationId/memberships/:membershipId/roles` | `membership.role.assign` | HIGH_WRITE | yes | — |
 | `organization.create` | `POST /api/v1/organizations` | — | MEDIUM_WRITE | yes | — |
@@ -62,11 +64,11 @@ Roles ADR-030 requires exactly one implementation of.
 
 | layer | files | cases |
 |---|---|---|
-| application | 9 | 54 |
+| application | 11 | 61 |
 | conformance | 2 | 26 |
 | domain | 2 | 21 |
 | infrastructure | 4 | 15 |
-| integration | 7 | 128 |
+| integration | 8 | 141 |
 | other | 1 | 7 |
 | platform | 1 | 5 |
 
@@ -78,6 +80,8 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/authorization/application/check-permission.service.spec.ts` | application | 2 |
 | `modules/authorization/infrastructure/role-catalog-agreement.spec.ts` | infrastructure | 1 |
 | `modules/identity/application/login.service.spec.ts` | application | 10 |
+| `modules/identity/application/logout-all.service.spec.ts` | application | 4 |
+| `modules/identity/application/logout.service.spec.ts` | application | 3 |
 | `modules/identity/application/validate-session.service.spec.ts` | application | 4 |
 | `modules/identity/domain/session.entity.spec.ts` | domain | 4 |
 | `modules/money/domain/money.vo.spec.ts` | domain | 17 |
@@ -91,6 +95,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/tenant/infrastructure/organizations-rls.spec.ts` | infrastructure | 4 |
 | `platform/db/tenant-context.spec.ts` | platform | 5 |
 | `apps/api/auth-login.integration.spec.ts` | integration | 19 |
+| `apps/api/auth-logout.integration.spec.ts` | integration | 13 |
 | `apps/api/error-contract.integration.spec.ts` | integration | 3 |
 | `apps/api/membership-invite.integration.spec.ts` | integration | 24 |
 | `apps/api/membership-role-assign.integration.spec.ts` | integration | 30 |

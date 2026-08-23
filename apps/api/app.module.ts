@@ -6,6 +6,8 @@ import { MembershipController } from "../../modules/tenant/interfaces/membership
 import { MembershipRoleController } from "../../modules/tenant/interfaces/membership-role.controller.js";
 import { StoreCreateController } from "../../modules/tenant/interfaces/store-create.controller.js";
 import { AuthLoginController } from "../../modules/identity/interfaces/auth-login.controller.js";
+import { AuthLogoutController } from "../../modules/identity/interfaces/auth-logout.controller.js";
+import { AuthLogoutAllController } from "../../modules/identity/interfaces/auth-logout-all.controller.js";
 import { StoreAccessGuard } from "../../modules/tenant/interfaces/store-access.guard.js";
 import { OrganizationAccessGuard } from "../../modules/tenant/interfaces/organization-access.guard.js";
 import { SessionGuard } from "../../modules/identity/interfaces/session.guard.js";
@@ -27,6 +29,8 @@ import { DatabaseLifecycle } from "./database-lifecycle.provider.js";
     MembershipRoleController,
     StoreCreateController,
     AuthLoginController,
+    AuthLogoutController,
+    AuthLogoutAllController,
   ],
   providers: [
     { provide: APP_DB, useFactory: createAppDb },

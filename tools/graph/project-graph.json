@@ -1,7 +1,7 @@
 {
   "generatedFrom": {
-    "commit": "91136da",
-    "dirty": false
+    "commit": "0ec1c49",
+    "dirty": true
   },
   "modules": [
     {
@@ -14,7 +14,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 9,
+      "files": 10,
       "dependsOn": [],
       "dependsOnPlatform": true
     },
@@ -25,7 +25,6 @@
         "contracts",
         "domain",
         "infrastructure",
-        "interfaces",
         "migrations"
       ],
       "files": 16,
@@ -55,7 +54,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 30,
+      "files": 40,
       "dependsOn": [
         "audit",
         "capability"
@@ -84,7 +83,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 56,
+      "files": 57,
       "dependsOn": [
         "audit",
         "authorization",
@@ -244,6 +243,26 @@
       "audit": true,
       "storeScoped": false,
       "route": "POST /api/v1/auth/login"
+    },
+    {
+      "id": "auth.logout",
+      "module": "identity",
+      "file": "modules/identity/interfaces/auth-logout.capability.ts",
+      "permissions": [],
+      "risk": "LOW_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/auth/logout"
+    },
+    {
+      "id": "auth.logout_all",
+      "module": "identity",
+      "file": "modules/identity/interfaces/auth-logout-all.capability.ts",
+      "permissions": [],
+      "risk": "MEDIUM_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/auth/logout-all"
     },
     {
       "id": "membership.invite",
@@ -566,6 +585,16 @@
       "cases": 10
     },
     {
+      "file": "modules/identity/application/logout-all.service.spec.ts",
+      "layer": "application",
+      "cases": 4
+    },
+    {
+      "file": "modules/identity/application/logout.service.spec.ts",
+      "layer": "application",
+      "cases": 3
+    },
+    {
       "file": "modules/identity/application/validate-session.service.spec.ts",
       "layer": "application",
       "cases": 4
@@ -631,6 +660,11 @@
       "cases": 19
     },
     {
+      "file": "apps/api/auth-logout.integration.spec.ts",
+      "layer": "integration",
+      "cases": 13
+    },
+    {
       "file": "apps/api/error-contract.integration.spec.ts",
       "layer": "integration",
       "cases": 3
@@ -684,6 +718,16 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "file": "modules/identity/interfaces/auth-logout.controller.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout-all",
+      "file": "modules/identity/interfaces/auth-logout-all.controller.ts"
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/organizations",
       "file": "modules/tenant/interfaces/organization.controller.ts"
     },
@@ -712,10 +756,10 @@
     "modules": 6,
     "tables": 14,
     "tablesWithRls": 6,
-    "capabilities": 6,
-    "routes": 6,
-    "testFiles": 26,
-    "testCases": 256,
+    "capabilities": 8,
+    "routes": 8,
+    "testFiles": 29,
+    "testCases": 276,
     "adrs": 38,
     "adrsAccepted": 30
   }
