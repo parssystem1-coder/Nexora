@@ -68,6 +68,7 @@ For each ADR, completion requires:
 | ADR-032 | Storefront Read Path Separation | Storefront / Performance | **ACCEPTED (new)** | Phase 4 |
 | ADR-033 | API Schema Artifact Generation | Platform / Contracts | **ACCEPTED (new)** | Task 2 (Phase 1) |
 | ADR-034 | Audit Event Placement and Durability | Platform / Audit | **ACCEPTED (new)** | Phase 1 (in effect), Task 2 |
+| ADR-035 | Platform-Scope Audit Events | Platform / Audit | **ACCEPTED (new)** | Task 2, `auth.login`/`auth.logout`/`auth.logout_all`/`organization.switch` |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -1560,6 +1561,39 @@ Rejected: writing the event *inside* the domain transaction, where the failure i
 - [ ] the audit write executes on a connection distinct from the one holding the domain transaction
 - [ ] no application service writes an audit event directly
 - [ ] the request handler does not resolve until the audit write has completed
+
+---
+
+## ADR-035 - Platform-Scope Audit Events
+
+**ACCEPTED**, new, applies from Task 2 (`auth.login`, first user; `auth.logout`, `auth.logout_all`, `organization.switch` next)
+
+### Problem
+
+`08_PHASE_1_BRIEF.md` §6 exit criterion 5 requires "every capability in scope emits an audit event." `audit_events.tenant_id` is `uuid NOT NULL`, with exactly one RLS policy: `USING (tenant_id::text = current_setting('app.tenant_id', true))`. `05_API_CAPABILITY_CONTRACTS.md` §4.1 scopes `auth.login` **global** — at the moment a login attempt is evaluated there is no tenant, and on a failed attempt there may be no known user either. The schema and the exit criterion are in direct tension for the first time: nothing before Task 2 built a capability with no tenant at all.
+
+### Constraint that eliminates the obvious fixes
+
+Making `tenant_id` nullable does not resolve the tension, it relocates it. `NULL::text = current_setting(...)` is `NULL`, never `TRUE`, under any context — including the unset context RLS is supposed to fail closed on. A nullable `tenant_id` row is therefore not "visible only when explicitly queried," it is **permanently unreadable** through the existing policy and every helper built on it (`withTenantContext`, `recordAuditEventDurable`), for every future consumer, including a hypothetical platform-admin audit viewer that does not exist yet and this ADR does not build. Making the row unreadable to close the tension is not meaningfully different from not auditing at all — it fails the exit criterion in substance while appearing to satisfy it in schema.
+
+Not auditing this capability (dropping the exit criterion for global-scope capabilities specifically) was considered and rejected outright: a failed login is precisely the event a real platform most wants recorded, and a documented exit criterion is not implementer authority to narrow.
+
+### Decision
+
+1. **A reserved sentinel tenant id**, `00000000-0000-0000-0000-000000000000` (`PLATFORM_TENANT_ID`, `modules/audit/domain/audit-event.entity.ts`), used as `audit_events.tenant_id` for a capability with no established tenant. `gen_random_uuid()` cannot produce this value for a real organization (probability effectively zero), and no foreign key from `audit_events.tenant_id` to `organizations.id` exists for it to violate.
+2. **No schema change.** `audit_events.tenant_id` stays `uuid NOT NULL`; the existing single RLS policy is untouched. Reading a platform-scope row back is `withTenantContext(db, { tenantId: PLATFORM_TENANT_ID, ... })` — identical to reading any other tenant's rows, through the same helper, with no second policy branch, no bypass path, and nothing new to audit in the RLS surface itself.
+3. **The sentinel is an audit-storage device only.** It is never attached to `request.tenantContext`, never surfaced in a structured log line, and never returned to a client. A request with no real tenant logs `tenantId: null` honestly; conflating "the value audit_events needs to stay queryable" with "the tenant this request actually acted under" would misrepresent the second thing to make the first thing easier.
+4. **Everything else about ADR-034 is unchanged.** One event per attempt, both outcomes, written on `AUDIT_DB` after the domain work resolves and before the handler returns or re-throws. A global-scope capability differs only in which `tenant_id` value it writes, not in when, how many times, or through which connection.
+
+Rejected: nullable `tenant_id` (permanently unreadable, per above); a second RLS policy branch keyed on an "is this a platform actor" claim (speculative machinery with no consumer yet, and a new trust boundary to audit for a problem the sentinel already solves without one); auditing only on success (ADR-034 already rejected this generally, and a failed login is the more valuable half of this specific record).
+
+### Verification
+
+- [ ] a capability with no established tenant (`auth.login`) writes exactly one audit row per attempt, on both outcomes
+- [ ] that row is readable via `withTenantContext(db, { tenantId: PLATFORM_TENANT_ID, ... })`, with no code path other than the standard helper
+- [ ] that row is invisible from every other tenant's context, the same fail-closed guarantee every tenant-scoped table has
+- [ ] `PLATFORM_TENANT_ID` never appears in `request.tenantContext`, a structured log line, or a response body
+- [ ] no RLS policy on `audit_events` changed
 
 ---
 

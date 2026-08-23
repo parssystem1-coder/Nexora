@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "78b3d1b",
+    "commit": "02a7a82",
     "dirty": true
   },
   "modules": [
@@ -55,8 +55,9 @@
         "interfaces",
         "migrations"
       ],
-      "files": 19,
+      "files": 30,
       "dependsOn": [
+        "audit",
         "capability"
       ],
       "dependsOnPlatform": true
@@ -104,6 +105,15 @@
       "policies": [
         "audit_events_tenant_isolation"
       ]
+    },
+    {
+      "name": "credentials",
+      "module": "identity",
+      "migration": "20260823130000_identity__create_credentials.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
     },
     {
       "name": "currencies",
@@ -225,6 +235,16 @@
     }
   ],
   "capabilities": [
+    {
+      "id": "auth.login",
+      "module": "identity",
+      "file": "modules/identity/interfaces/auth-login.capability.ts",
+      "permissions": [],
+      "risk": "LOW_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/auth/login"
+    },
     {
       "id": "membership.invite",
       "module": "tenant",
@@ -470,6 +490,12 @@
       "blocks": "Phase 1 (in effect), Task 2"
     },
     {
+      "id": "ADR-035",
+      "title": "Platform-Scope Audit Events",
+      "status": "ACCEPTED (new)",
+      "blocks": "Task 2, `auth.login`/`auth.logout`/`auth.logout_all`/`organization.switch`"
+    },
+    {
       "id": "ADR-011",
       "title": "Co-Pilot Cadence vs AI Credit Cost",
       "status": "DEFERRED",
@@ -535,6 +561,11 @@
       "cases": 1
     },
     {
+      "file": "modules/identity/application/login.service.spec.ts",
+      "layer": "application",
+      "cases": 10
+    },
+    {
       "file": "modules/identity/application/validate-session.service.spec.ts",
       "layer": "application",
       "cases": 4
@@ -595,6 +626,11 @@
       "cases": 5
     },
     {
+      "file": "apps/api/auth-login.integration.spec.ts",
+      "layer": "integration",
+      "cases": 19
+    },
+    {
       "file": "apps/api/error-contract.integration.spec.ts",
       "layer": "integration",
       "cases": 3
@@ -643,6 +679,11 @@
   "routes": [
     {
       "method": "POST",
+      "path": "/api/v1/auth/login",
+      "file": "modules/identity/interfaces/auth-login.controller.ts"
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/organizations",
       "file": "modules/tenant/interfaces/organization.controller.ts"
     },
@@ -669,13 +710,13 @@
   ],
   "counts": {
     "modules": 6,
-    "tables": 13,
+    "tables": 14,
     "tablesWithRls": 6,
-    "capabilities": 5,
-    "routes": 5,
-    "testFiles": 24,
-    "testCases": 227,
-    "adrs": 37,
-    "adrsAccepted": 29
+    "capabilities": 6,
+    "routes": 6,
+    "testFiles": 26,
+    "testCases": 256,
+    "adrs": 38,
+    "adrsAccepted": 30
   }
 }

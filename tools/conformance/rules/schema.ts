@@ -4,16 +4,18 @@ import { listFiles } from "../lib/walk.js";
 import type { Violation } from "../lib/types.js";
 
 // 08_PHASE_1_BRIEF.md §5 exempts `users`, `currencies`, `reserved_subdomains`.
-// The remaining four are platform-global by explicit decision (2026-08-22, see
+// The remaining five are platform-global by explicit decision (2026-08-22, see
 // DECISION_LOG.md) rather than by implementer discretion:
 //   sessions          — a user belongs to several organizations at once, so a
 //                       session row has no single correct tenant_id
 //   roles/permissions/role_permissions
 //                     — Phase 1 core catalog; capability keys are platform-
 //                       defined, not per-tenant
-// `credentials` and `identity_providers` do not exist yet. They are the same
-// structural case as `sessions`, but that is NOT pre-decided here — the call
-// is made when the slice that creates them (auth.login, Task 2) lands.
+//   credentials       — decided 2026-08-23 (auth.login, Task 2 slice 5): a
+//                       password belongs to the person, not to any one
+//                       organization they hold membership in, same reasoning
+//                       as `sessions`. `identity_providers` remains
+//                       undecided — this slice does not create it.
 const TENANT_EXEMPT = new Set([
   "users",
   "currencies",
@@ -22,6 +24,7 @@ const TENANT_EXEMPT = new Set([
   "roles",
   "permissions",
   "role_permissions",
+  "credentials",
 ]);
 
 const CREATE_TABLE_RE = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([a-zA-Z_][\w]*)"?\s*\(([\s\S]*?)\n\)\s*;/gi;

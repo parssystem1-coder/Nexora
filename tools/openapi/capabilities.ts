@@ -6,6 +6,7 @@ import {
   membershipRoleAssignCapability,
   storeCreateCapability,
 } from "../../modules/tenant/contracts/index.js";
+import { authLoginCapability } from "../../modules/identity/contracts/index.js";
 
 /**
  * Every implemented capability, in a stable order.
@@ -17,11 +18,16 @@ import {
  * its interfaces/ or infrastructure/) is what keeps that true: nothing here
  * pulls in a controller, a Nest module, or a connection pool.
  *
+ * `auth.login` is the first capability sourced from a module other than
+ * `modules/tenant` — importing straight from `modules/identity/contracts`
+ * needed no change to this file's shape, only a second import.
+ *
  * Adding a capability without adding it here is caught by
  * tools/openapi/openapi.spec.ts, which asserts the registry covers every
  * `*.capability.ts` file in the tree.
  */
 export const CAPABILITIES: readonly CapabilityDefinition[] = [
+  authLoginCapability,
   membershipInviteCapability,
   membershipRoleAssignCapability,
   organizationCreateCapability,

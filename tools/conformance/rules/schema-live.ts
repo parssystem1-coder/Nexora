@@ -14,6 +14,7 @@ const TENANT_EXEMPT = new Set([
   "roles",
   "permissions",
   "role_permissions",
+  "credentials",
   "schema_migrations",
 ]);
 

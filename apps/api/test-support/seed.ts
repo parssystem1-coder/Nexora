@@ -2,14 +2,17 @@ import type { Kysely } from "kysely";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../../../platform/db/kysely.js";
 import { generateSessionToken, hashSessionToken } from "../../../modules/identity/domain/session-token.vo.js";
+import { Argon2PasswordHasher } from "../../../modules/identity/infrastructure/password-hasher.argon2.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
 
 /**
- * Test-only seeding, bypassing the (not-yet-built, Task 2) capabilities that
- * would normally create this data — auth.login, organization.create,
- * membership.invite, store.create. Lives under apps/ specifically because it
- * legitimately needs to touch every module's tables directly, which no
- * single module's own code is allowed to do (DEP-DIRECTION-CROSS-MODULE).
+ * Test-only seeding, bypassing the real capabilities that would normally
+ * create this data (`auth.login`, `organization.create`, `membership.invite`,
+ * `store.create` — all four exist now, but a test that is not specifically
+ * proving one of them is faster and more direct going straight to the
+ * tables). Lives under apps/ specifically because it legitimately needs to
+ * touch every module's tables directly, which no single module's own code
+ * is allowed to do (DEP-DIRECTION-CROSS-MODULE).
  */
 
 export async function seedUser(db: Kysely<Database>, email: string): Promise<string> {
@@ -19,6 +22,22 @@ export async function seedUser(db: Kysely<Database>, email: string): Promise<str
     .returning("id")
     .executeTakeFirstOrThrow();
   return row.id;
+}
+
+/**
+ * Not folded into `seedUser`: most tests that seed a user never touch
+ * `auth.login` at all, and hashing a real Argon2id credential on every one
+ * of them (real, not a shortcut — see below) would slow down the entire
+ * suite for no benefit. Callers that need one call this explicitly.
+ *
+ * Hashes through the real `Argon2PasswordHasher`, not a plaintext or fake
+ * shortcut, so `auth.login`'s tests exercise the genuine verify() path
+ * end to end rather than a seed-only stand-in that could silently diverge
+ * from it.
+ */
+export async function seedCredential(db: Kysely<Database>, userId: string, plainPassword: string): Promise<void> {
+  const passwordHash = await new Argon2PasswordHasher().hash(plainPassword);
+  await db.insertInto("credentials").values({ user_id: userId, password_hash: passwordHash }).execute();
 }
 
 export async function seedSession(

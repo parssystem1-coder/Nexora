@@ -2,11 +2,11 @@ import type { Kysely, Transaction } from "kysely";
 import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import type { RlsContext } from "../../../platform/db/tenant-context.js";
-import { AuditEvent } from "../domain/audit-event.entity.js";
+import { AuditEvent, PLATFORM_TENANT_ID } from "../domain/audit-event.entity.js";
 import type { AuditEventRepository } from "../domain/audit-event.repository.js";
 import { AuditEventRepositoryPg } from "../infrastructure/audit-event.repository.pg.js";
 
-export { AuditEvent };
+export { AuditEvent, PLATFORM_TENANT_ID };
 export type { AuditEventRepository };
 export type { ActorType, AuditOutcome } from "../domain/audit-event.entity.js";
 

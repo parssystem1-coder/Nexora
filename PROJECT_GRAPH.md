@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `78b3d1b` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `02a7a82` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 6 modules · 13 tables (6 with RLS) · 5 capabilities · 5 routes · 227 test cases in 24 files · 37 ADRs (29 accepted)
+**At a glance:** 6 modules · 14 tables (6 with RLS) · 6 capabilities · 6 routes · 256 test cases in 26 files · 38 ADRs (30 accepted)
 
 ## Modules
 
@@ -13,7 +13,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `audit` | application, contracts, domain, infrastructure, interfaces, migrations | 9 | — | yes |
 | `authorization` | application, contracts, domain, infrastructure, interfaces, migrations | 16 | `capability` | yes |
 | `capability` | contracts, domain, interfaces | 6 | — | — |
-| `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 19 | `capability` | yes |
+| `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 30 | `audit`, `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
 | `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 56 | `audit`, `authorization`, `capability`, `identity` | yes |
 
@@ -24,6 +24,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | table | module | tenant_id | RLS | FORCE | policies | migration |
 |---|---|---|---|---|---|---|
 | `audit_events` | audit | yes | yes | yes | `audit_events_tenant_isolation` | `20260822090800_audit__create_audit_events.sql` |
+| `credentials` | identity | — | — | — | — | `20260823130000_identity__create_credentials.sql` |
 | `currencies` | money | — | — | — | — | `20260822110000_money__create_currencies.sql` |
 | `membership_roles` | authorization | yes | yes | yes | `membership_roles_tenant_isolation` | `20260822090700_authorization__create_membership_roles.sql` |
 | `memberships` | tenant | yes | yes | yes | `memberships_self_or_tenant_access` | `20260822090300_tenant__create_memberships.sql` |
@@ -41,6 +42,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 
 | capability | route | permissions | risk | audit | store-scoped |
 |---|---|---|---|---|---|
+| `auth.login` | `POST /api/v1/auth/login` | — | LOW_WRITE | yes | — |
 | `membership.invite` | `POST /api/v1/organizations/:organizationId/memberships` | `membership.invite` | MEDIUM_WRITE | yes | — |
 | `membership.role.assign` | `POST /api/v1/organizations/:organizationId/memberships/:membershipId/roles` | `membership.role.assign` | HIGH_WRITE | yes | — |
 | `organization.create` | `POST /api/v1/organizations` | — | MEDIUM_WRITE | yes | — |
@@ -60,11 +62,11 @@ Roles ADR-030 requires exactly one implementation of.
 
 | layer | files | cases |
 |---|---|---|
-| application | 8 | 44 |
+| application | 9 | 54 |
 | conformance | 2 | 26 |
 | domain | 2 | 21 |
 | infrastructure | 4 | 15 |
-| integration | 6 | 109 |
+| integration | 7 | 128 |
 | other | 1 | 7 |
 | platform | 1 | 5 |
 
@@ -75,6 +77,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/audit/infrastructure/audit-events-append-only.spec.ts` | infrastructure | 3 |
 | `modules/authorization/application/check-permission.service.spec.ts` | application | 2 |
 | `modules/authorization/infrastructure/role-catalog-agreement.spec.ts` | infrastructure | 1 |
+| `modules/identity/application/login.service.spec.ts` | application | 10 |
 | `modules/identity/application/validate-session.service.spec.ts` | application | 4 |
 | `modules/identity/domain/session.entity.spec.ts` | domain | 4 |
 | `modules/money/domain/money.vo.spec.ts` | domain | 17 |
@@ -87,6 +90,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/tenant/application/resolve-store-access.service.spec.ts` | application | 4 |
 | `modules/tenant/infrastructure/organizations-rls.spec.ts` | infrastructure | 4 |
 | `platform/db/tenant-context.spec.ts` | platform | 5 |
+| `apps/api/auth-login.integration.spec.ts` | integration | 19 |
 | `apps/api/error-contract.integration.spec.ts` | integration | 3 |
 | `apps/api/membership-invite.integration.spec.ts` | integration | 24 |
 | `apps/api/membership-role-assign.integration.spec.ts` | integration | 30 |
@@ -132,6 +136,7 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-032 | Storefront Read Path Separation | ACCEPTED (new) | Phase 4 |
 | ADR-033 | API Schema Artifact Generation | ACCEPTED (new) | Task 2 (Phase 1) |
 | ADR-034 | Audit Event Placement and Durability | ACCEPTED (new) | Phase 1 (in effect), Task 2 |
+| ADR-035 | Platform-Scope Audit Events | ACCEPTED (new) | Task 2, `auth.login`/`auth.logout`/`auth.logout_all`/`organization.switch` |
 | ADR-011 | Co-Pilot Cadence vs AI Credit Cost | DEFERRED | Phase 12 |
 | ADR-012 | Autonomous AI Execution Opt-In | DEFERRED | Phase 13 |
 | ADR-013 | Voice Input Retention | DEFERRED | Phase 14 |

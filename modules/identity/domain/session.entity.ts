@@ -4,8 +4,10 @@ export class Session {
   constructor(
     public readonly id: string,
     public readonly userId: string,
+    public readonly tokenHash: string,
     public readonly activeOrganizationId: string | null,
     public readonly status: SessionStatus,
+    public readonly createdAt: Date,
     public readonly expiresAt: Date,
   ) {}
 

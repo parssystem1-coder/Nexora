@@ -15,18 +15,22 @@ export class UserRepositoryPg implements UserRepository {
   constructor(private readonly conn: Kysely<Database> | Transaction<Database>) {}
 
   async findById(id: string): Promise<User | null> {
-    const row = await this.conn.selectFrom("users").select(["id", "status"]).where("id", "=", id).executeTakeFirst();
+    const row = await this.conn
+      .selectFrom("users")
+      .select(["id", "email", "display_name", "status"])
+      .where("id", "=", id)
+      .executeTakeFirst();
     if (!row) return null;
-    return new User(row.id, row.status as "ACTIVE" | "SUSPENDED");
+    return new User(row.id, row.email, row.display_name, row.status as "ACTIVE" | "SUSPENDED");
   }
 
   async findByEmail(email: string): Promise<User | null> {
     const row = await this.conn
       .selectFrom("users")
-      .select(["id", "status"])
+      .select(["id", "email", "display_name", "status"])
       .where("email_normalized", "=", normalizeEmail(email))
       .executeTakeFirst();
     if (!row) return null;
-    return new User(row.id, row.status as "ACTIVE" | "SUSPENDED");
+    return new User(row.id, row.email, row.display_name, row.status as "ACTIVE" | "SUSPENDED");
   }
 }

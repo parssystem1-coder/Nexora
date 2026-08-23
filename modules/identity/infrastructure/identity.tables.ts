@@ -32,9 +32,19 @@ export interface SessionsTable {
   revoked_at: ColumnType<Date | null, string | null | undefined, string | null>;
 }
 
+/** Exempt from tenant_id/RLS — see 20260823130000_identity__create_credentials.sql's comment. */
+export interface CredentialsTable {
+  id: Generated<string>;
+  user_id: string;
+  password_hash: string;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, never>;
+}
+
 declare module "../../../platform/db/kysely.js" {
   interface Database {
     users: UsersTable;
     sessions: SessionsTable;
+    credentials: CredentialsTable;
   }
 }
