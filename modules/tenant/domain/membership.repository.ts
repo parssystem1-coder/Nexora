@@ -56,4 +56,26 @@ export interface MembershipRepository {
    * "this returned a row" already proves it belongs to the current tenant.
    */
   findById(id: string): Promise<Membership | null>;
+
+  /**
+   * Added for `membership.revoke`'s "cannot revoke the organization's only
+   * remaining member" protection (DECISION_LOG.md 2026-08-24, decision 3).
+   * Counts ACTIVE memberships only — a REVOKED one does not keep the
+   * organization administrable, so it must not count toward "still has
+   * someone left."
+   */
+  countActive(tenantId: string): Promise<number>;
+
+  /**
+   * Sets a membership's status to REVOKED and stamps `updated_at` — the only
+   * place this ever moves in that direction. Never deletes the row: 08 §5
+   * forbids deleting tenant data without an explicit policy, and `status`
+   * already exists precisely so a membership's history survives (matching
+   * `sessions.status`'s own REVOKED-not-deleted shape). Idempotent at the
+   * storage layer (setting REVOKED on an already-REVOKED row is a no-op
+   * update) — `RevokeMembershipService` rejects this case earlier with
+   * CONFLICT before ever reaching here, so this method itself is never
+   * actually exercised against an already-revoked row in practice.
+   */
+  revoke(membershipId: string, revokedAt: Date): Promise<void>;
 }

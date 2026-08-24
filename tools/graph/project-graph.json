@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "e203c01",
+    "commit": "371e80a",
     "dirty": true
   },
   "modules": [
@@ -25,7 +25,7 @@
         "infrastructure",
         "migrations"
       ],
-      "files": 16,
+      "files": 17,
       "dependsOn": [
         "capability"
       ],
@@ -81,7 +81,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 62,
+      "files": 67,
       "dependsOn": [
         "audit",
         "authorization",
@@ -273,6 +273,18 @@
       "audit": true,
       "storeScoped": false,
       "route": "POST /api/v1/organizations/:organizationId/memberships"
+    },
+    {
+      "id": "membership.revoke",
+      "module": "tenant",
+      "file": "modules/tenant/interfaces/membership-revoke.capability.ts",
+      "permissions": [
+        "membership.revoke"
+      ],
+      "risk": "HIGH_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/organizations/:organizationId/memberships/:membershipId/revoke"
     },
     {
       "id": "membership.role.assign",
@@ -653,6 +665,11 @@
       "cases": 4
     },
     {
+      "file": "modules/tenant/application/revoke-membership.service.spec.ts",
+      "layer": "application",
+      "cases": 9
+    },
+    {
       "file": "modules/tenant/application/switch-organization.service.spec.ts",
       "layer": "application",
       "cases": 2
@@ -686,6 +703,11 @@
       "file": "apps/api/membership-invite.integration.spec.ts",
       "layer": "integration",
       "cases": 24
+    },
+    {
+      "file": "apps/api/membership-revoke.integration.spec.ts",
+      "layer": "integration",
+      "cases": 23
     },
     {
       "file": "apps/api/membership-role-assign.integration.spec.ts",
@@ -761,6 +783,11 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/organizations/:organizationId/memberships/:membershipId/revoke",
+      "file": "modules/tenant/interfaces/membership-revoke.controller.ts"
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/organizations/:organizationId/memberships/:membershipId/roles",
       "file": "modules/tenant/interfaces/membership-role.controller.ts"
     },
@@ -784,10 +811,10 @@
     "modules": 6,
     "tables": 14,
     "tablesWithRls": 6,
-    "capabilities": 9,
-    "routes": 9,
-    "testFiles": 32,
-    "testCases": 298,
+    "capabilities": 10,
+    "routes": 10,
+    "testFiles": 34,
+    "testCases": 330,
     "adrs": 38,
     "adrsAccepted": 30
   }

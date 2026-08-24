@@ -40,6 +40,12 @@ function fakes(options: { user?: User | null; onCreate?: () => never } = {}) {
       if (options.onCreate) options.onCreate();
       created.push(membership);
     },
+    countActive: async () => {
+      throw new Error("InviteMemberService must not count active memberships.");
+    },
+    revoke: async () => {
+      throw new Error("InviteMemberService must not revoke memberships.");
+    },
   };
 
   return { created, lookedUp, service: new InviteMemberService(users, memberships, clock) };

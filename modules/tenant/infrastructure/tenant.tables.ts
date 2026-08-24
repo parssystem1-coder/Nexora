@@ -17,7 +17,16 @@ export interface MembershipsTable {
   user_id: string;
   status: string;
   created_at: ColumnType<Date, string | undefined, never>;
-  updated_at: ColumnType<Date, string | undefined, never>;
+  /**
+   * Updatable, unlike `created_at` and unlike `OrganizationsTable`/
+   * `StoresTable`'s own `updated_at` (left as `never` — nothing in this
+   * codebase updates those yet, and widening them isn't this slice's job).
+   * `membership.revoke` (DECISION_LOG.md 2026-08-24) is the first thing that
+   * ever needs to bump this column: the same silent-un-updatable pattern
+   * `sessions.revoked_at` had before `auth.login`/`auth.logout` needed it —
+   * nothing had tried to write here through Kysely until now.
+   */
+  updated_at: ColumnType<Date, string | undefined, string>;
 }
 
 export interface StoresTable {

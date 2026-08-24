@@ -43,11 +43,23 @@ function fakes(options: { onCreate?: () => never } = {}) {
     create: async (membership) => {
       recorded.memberships.push(membership);
     },
+    countActive: async () => {
+      throw new Error("CreateOrganizationService must not count active memberships.");
+    },
+    revoke: async () => {
+      throw new Error("CreateOrganizationService must not revoke memberships.");
+    },
   };
   const roleGrants: RoleGrantRepository = {
     grantRoleByKey: async (grant) => {
       recorded.grants.push({ tenantId: grant.tenantId, membershipId: grant.membershipId, roleKey: grant.roleKey });
       return { id: grant.id, tenantId: grant.tenantId, membershipId: grant.membershipId, roleKey: grant.roleKey, createdAt: grant.createdAt };
+    },
+    hasRole: async () => {
+      throw new Error("CreateOrganizationService must not check role membership.");
+    },
+    countActiveMembersWithRole: async () => {
+      throw new Error("CreateOrganizationService must not count members by role.");
     },
   };
 

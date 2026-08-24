@@ -31,6 +31,12 @@ function fakeRepos(options: { storeMembership: StoreMembership | null; membershi
     findById: async () => {
       throw new Error("ResolveStoreAccessService must not look up memberships by id.");
     },
+    countActive: async () => {
+      throw new Error("ResolveStoreAccessService must not count active memberships.");
+    },
+    revoke: async () => {
+      throw new Error("ResolveStoreAccessService must not revoke memberships.");
+    },
   };
   return { storeMemberships, memberships };
 }

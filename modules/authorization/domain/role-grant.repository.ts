@@ -84,6 +84,24 @@ export interface RoleGrantRepository {
    * (membershipId, roleKey) pair.
    */
   grantRoleByKey(grant: GrantRoleCommand): Promise<RoleGrant>;
+
+  /**
+   * Added for `membership.revoke`'s "cannot revoke the organization's only
+   * remaining owner" protection (DECISION_LOG.md 2026-08-24, decision 3) —
+   * does the target membership currently hold `roleKey`, regardless of
+   * whether other roles are also granted.
+   */
+  hasRole(membershipId: string, roleKey: string): Promise<boolean>;
+
+  /**
+   * Count of ACTIVE memberships in `tenantId` currently holding `roleKey` —
+   * the other half of the same protection. Scoped to ACTIVE memberships
+   * only: a REVOKED membership's `membership_roles` rows are deliberately
+   * left in place (`MembershipRepository.revoke`'s own doc comment), so a
+   * naive count over `membership_roles` alone would still count a former
+   * owner who no longer effectively holds anything.
+   */
+  countActiveMembersWithRole(tenantId: string, roleKey: string): Promise<number>;
 }
 
 export type { RoleKey };

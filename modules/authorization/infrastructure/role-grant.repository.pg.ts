@@ -39,4 +39,28 @@ export class RoleGrantRepositoryPg implements RoleGrantRepository {
 
     return { id: grant.id, tenantId: grant.tenantId, membershipId: grant.membershipId, roleKey: grant.roleKey, createdAt: grant.createdAt };
   }
+
+  async hasRole(membershipId: string, roleKey: string): Promise<boolean> {
+    const row = await this.conn
+      .selectFrom("membership_roles")
+      .innerJoin("roles", "roles.id", "membership_roles.role_id")
+      .select("membership_roles.id")
+      .where("membership_roles.membership_id", "=", membershipId)
+      .where("roles.key", "=", roleKey)
+      .executeTakeFirst();
+    return row !== undefined;
+  }
+
+  async countActiveMembersWithRole(tenantId: string, roleKey: string): Promise<number> {
+    const result = await this.conn
+      .selectFrom("membership_roles")
+      .innerJoin("roles", "roles.id", "membership_roles.role_id")
+      .innerJoin("memberships", "memberships.id", "membership_roles.membership_id")
+      .select((eb) => eb.fn.countAll<string>().as("count"))
+      .where("membership_roles.tenant_id", "=", tenantId)
+      .where("roles.key", "=", roleKey)
+      .where("memberships.status", "=", "ACTIVE")
+      .executeTakeFirstOrThrow();
+    return Number(result.count);
+  }
 }

@@ -4,6 +4,7 @@ import { StoreController } from "../../modules/tenant/interfaces/store.controlle
 import { OrganizationController } from "../../modules/tenant/interfaces/organization.controller.js";
 import { MembershipController } from "../../modules/tenant/interfaces/membership.controller.js";
 import { MembershipRoleController } from "../../modules/tenant/interfaces/membership-role.controller.js";
+import { MembershipRevokeController } from "../../modules/tenant/interfaces/membership-revoke.controller.js";
 import { StoreCreateController } from "../../modules/tenant/interfaces/store-create.controller.js";
 import { OrganizationSwitchController } from "../../modules/tenant/interfaces/organization-switch.controller.js";
 import { AuthLoginController } from "../../modules/identity/interfaces/auth-login.controller.js";
@@ -28,6 +29,7 @@ import { DatabaseLifecycle } from "./database-lifecycle.provider.js";
     OrganizationController,
     MembershipController,
     MembershipRoleController,
+    MembershipRevokeController,
     StoreCreateController,
     OrganizationSwitchController,
     AuthLoginController,

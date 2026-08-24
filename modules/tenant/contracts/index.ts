@@ -13,3 +13,4 @@ export { membershipInviteCapability } from "../interfaces/membership-invite.capa
 export { membershipRoleAssignCapability } from "../interfaces/membership-role-assign.capability.js";
 export { storeCreateCapability } from "../interfaces/store-create.capability.js";
 export { organizationSwitchCapability } from "../interfaces/organization-switch.capability.js";
+export { membershipRevokeCapability } from "../interfaces/membership-revoke.capability.js";

@@ -32,6 +32,12 @@ function fakes(options: { target?: Membership | null; onGrant?: () => never } = 
       throw new Error("AssignMembershipRoleService must not create memberships.");
     },
     findById: async () => (options.target === undefined ? activeTarget : options.target),
+    countActive: async () => {
+      throw new Error("AssignMembershipRoleService must not count active memberships.");
+    },
+    revoke: async () => {
+      throw new Error("AssignMembershipRoleService must not revoke memberships.");
+    },
   };
   const roleGrants: RoleGrantRepository = {
     grantRoleByKey: async (grant) => {
@@ -39,6 +45,12 @@ function fakes(options: { target?: Membership | null; onGrant?: () => never } = 
       const result: RoleGrant = { id: grant.id, tenantId: grant.tenantId, membershipId: grant.membershipId, roleKey: grant.roleKey, createdAt: grant.createdAt };
       grants.push(result);
       return result;
+    },
+    hasRole: async () => {
+      throw new Error("AssignMembershipRoleService must not check role membership.");
+    },
+    countActiveMembersWithRole: async () => {
+      throw new Error("AssignMembershipRoleService must not count members by role.");
     },
   };
   const sessions: SessionRevocationRepository = {

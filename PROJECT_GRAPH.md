@@ -1,21 +1,21 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `e203c01` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `371e80a` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 6 modules · 14 tables (6 with RLS) · 9 capabilities · 9 routes · 298 test cases in 32 files · 38 ADRs (30 accepted)
+**At a glance:** 6 modules · 14 tables (6 with RLS) · 10 capabilities · 10 routes · 330 test cases in 34 files · 38 ADRs (30 accepted)
 
 ## Modules
 
 | module | layers | files | depends on | platform |
 |---|---|---|---|---|
 | `audit` | contracts, domain, infrastructure, migrations | 10 | — | yes |
-| `authorization` | application, contracts, domain, infrastructure, migrations | 16 | `capability` | yes |
+| `authorization` | application, contracts, domain, infrastructure, migrations | 17 | `capability` | yes |
 | `capability` | contracts, domain, interfaces | 6 | — | — |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 40 | `audit`, `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
-| `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 62 | `audit`, `authorization`, `capability`, `identity` | yes |
+| `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 67 | `audit`, `authorization`, `capability`, `identity` | yes |
 
 ## Tables
 
@@ -46,6 +46,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `auth.logout` | `POST /api/v1/auth/logout` | — | LOW_WRITE | yes | — |
 | `auth.logout_all` | `POST /api/v1/auth/logout-all` | — | MEDIUM_WRITE | yes | — |
 | `membership.invite` | `POST /api/v1/organizations/:organizationId/memberships` | `membership.invite` | MEDIUM_WRITE | yes | — |
+| `membership.revoke` | `POST /api/v1/organizations/:organizationId/memberships/:membershipId/revoke` | `membership.revoke` | HIGH_WRITE | yes | — |
 | `membership.role.assign` | `POST /api/v1/organizations/:organizationId/memberships/:membershipId/roles` | `membership.role.assign` | HIGH_WRITE | yes | — |
 | `organization.create` | `POST /api/v1/organizations` | — | MEDIUM_WRITE | yes | — |
 | `organization.switch` | `POST /api/v1/organizations/:organizationId/switch` | — | LOW_WRITE | yes | — |
@@ -65,11 +66,11 @@ Roles ADR-030 requires exactly one implementation of.
 
 | layer | files | cases |
 |---|---|---|
-| application | 12 | 63 |
+| application | 13 | 72 |
 | conformance | 2 | 29 |
 | domain | 2 | 21 |
 | infrastructure | 4 | 15 |
-| integration | 9 | 153 |
+| integration | 10 | 176 |
 | other | 2 | 12 |
 | platform | 1 | 5 |
 
@@ -93,6 +94,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/tenant/application/invite-member.service.spec.ts` | application | 7 |
 | `modules/tenant/application/read-store.service.spec.ts` | application | 4 |
 | `modules/tenant/application/resolve-store-access.service.spec.ts` | application | 4 |
+| `modules/tenant/application/revoke-membership.service.spec.ts` | application | 9 |
 | `modules/tenant/application/switch-organization.service.spec.ts` | application | 2 |
 | `modules/tenant/infrastructure/organizations-rls.spec.ts` | infrastructure | 4 |
 | `platform/db/tenant-context.spec.ts` | platform | 5 |
@@ -100,6 +102,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `apps/api/auth-logout.integration.spec.ts` | integration | 13 |
 | `apps/api/error-contract.integration.spec.ts` | integration | 3 |
 | `apps/api/membership-invite.integration.spec.ts` | integration | 24 |
+| `apps/api/membership-revoke.integration.spec.ts` | integration | 23 |
 | `apps/api/membership-role-assign.integration.spec.ts` | integration | 30 |
 | `apps/api/organization-create.integration.spec.ts` | integration | 13 |
 | `apps/api/organization-switch.integration.spec.ts` | integration | 12 |

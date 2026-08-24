@@ -34,6 +34,24 @@ export class MembershipRepositoryPg implements MembershipRepository {
     return new Membership(row.id, row.tenant_id, row.user_id, row.status as "ACTIVE" | "REVOKED", row.created_at);
   }
 
+  async countActive(tenantId: string): Promise<number> {
+    const result = await this.conn
+      .selectFrom("memberships")
+      .select((eb) => eb.fn.countAll<string>().as("count"))
+      .where("tenant_id", "=", tenantId)
+      .where("status", "=", "ACTIVE")
+      .executeTakeFirstOrThrow();
+    return Number(result.count);
+  }
+
+  async revoke(membershipId: string, revokedAt: Date): Promise<void> {
+    await this.conn
+      .updateTable("memberships")
+      .set({ status: "REVOKED", updated_at: revokedAt.toISOString() })
+      .where("id", "=", membershipId)
+      .execute();
+  }
+
   /** See MembershipRepository.create: id supplied by the caller, no RETURNING. */
   async create(membership: Membership): Promise<void> {
     try {
