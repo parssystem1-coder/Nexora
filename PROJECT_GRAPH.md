@@ -1,6 +1,6 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `9f012e6` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `8a11446` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
@@ -145,7 +145,7 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-032 | Storefront Read Path Separation | ACCEPTED (new) | Phase 4 |
 | ADR-033 | API Schema Artifact Generation | ACCEPTED (new) | Task 2 (Phase 1) |
 | ADR-034 | Audit Event Placement and Durability | ACCEPTED (new) | Phase 1 (in effect), Task 2 |
-| ADR-035 | Platform-Scope Audit Events | ACCEPTED (new) | Task 2, `auth.login`/`auth.logout`/`auth.logout_all`/`organization.switch` |
+| ADR-035 | Platform-Scope Audit Events | ACCEPTED (new) | Task 2, `auth.login`/`auth.logout`/`auth.logout_all` (NOT `organization.switch` — it has a real tenant; see the ADR body) |
 | ADR-011 | Co-Pilot Cadence vs AI Credit Cost | DEFERRED | Phase 12 |
 | ADR-012 | Autonomous AI Execution Opt-In | DEFERRED | Phase 13 |
 | ADR-013 | Voice Input Retention | DEFERRED | Phase 14 |

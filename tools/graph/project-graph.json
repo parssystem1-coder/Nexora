@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "9f012e6",
+    "commit": "8a11446",
     "dirty": true
   },
   "modules": [
@@ -520,7 +520,7 @@
       "id": "ADR-035",
       "title": "Platform-Scope Audit Events",
       "status": "ACCEPTED (new)",
-      "blocks": "Task 2, `auth.login`/`auth.logout`/`auth.logout_all`/`organization.switch`"
+      "blocks": "Task 2, `auth.login`/`auth.logout`/`auth.logout_all` (NOT `organization.switch` — it has a real tenant; see the ADR body)"
     },
     {
       "id": "ADR-011",
