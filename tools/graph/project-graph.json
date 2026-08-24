@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "8a11446",
+    "commit": "e203c01",
     "dirty": true
   },
   "modules": [
@@ -720,7 +720,7 @@
     {
       "file": "tools/conformance/harness.selftest.spec.ts",
       "layer": "conformance",
-      "cases": 20
+      "cases": 23
     },
     {
       "file": "tools/graph/extract.spec.ts",
@@ -787,7 +787,7 @@
     "capabilities": 9,
     "routes": 9,
     "testFiles": 32,
-    "testCases": 295,
+    "testCases": 298,
     "adrs": 38,
     "adrsAccepted": 30
   }

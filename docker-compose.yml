@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       # This bootstrap user is a Postgres superuser (how the official image
       # works) and is used only to run platform/db/init/*.sql on first

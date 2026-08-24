@@ -6,6 +6,7 @@ import { checkSingletons } from "./rules/singleton.js";
 import { checkSchema } from "./rules/schema.js";
 import { checkSecrets } from "./rules/secrets.js";
 import { checkDbAccess } from "./rules/db-access.js";
+import { checkErrorCodeContract } from "./rules/error-codes.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) => join(HERE, "fixtures", name);
@@ -125,6 +126,26 @@ describe("db access rules", () => {
   });
 });
 
+describe("error-code contract (gate review 2026-08-24, Finding 2)", () => {
+  // Fixture roots have no 05_API_CAPABILITY_CONTRACTS.md of their own, so the
+  // documented set is supplied explicitly rather than read from disk.
+  const documented = new Set(["AUTHENTICATION_REQUIRED", "VALIDATION_ERROR", "FORBIDDEN"]);
+
+  it("flags a capability declaring an error code 05 §7 does not document", () => {
+    const violations = checkErrorCodeContract(fixture("error-code-undocumented"), documented);
+    expect(violations.map((v) => v.rule)).toContain("ERROR-CODE-UNDOCUMENTED");
+  });
+
+  it("flags a code thrown by a guard the controller imports, but missing from the capability's declared errorCodes", () => {
+    const violations = checkErrorCodeContract(fixture("error-code-undeclared"), documented);
+    expect(violations.map((v) => v.rule)).toContain("ERROR-CODE-UNDECLARED");
+  });
+
+  it("does not flag a capability whose declared errorCodes matches what its controller and guard actually throw", () => {
+    expect(checkErrorCodeContract(fixture("error-code-clean"), documented)).toEqual([]);
+  });
+});
+
 describe("clean control tree", () => {
   it("produces zero violations across every rule set", () => {
     const root = fixture("clean");
@@ -133,5 +154,6 @@ describe("clean control tree", () => {
     expect(checkSchema(root)).toEqual([]);
     expect(checkSecrets(root)).toEqual([]);
     expect(checkDbAccess(root)).toEqual([]);
+    expect(checkErrorCodeContract(root)).toEqual([]);
   });
 });

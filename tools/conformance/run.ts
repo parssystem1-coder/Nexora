@@ -7,6 +7,7 @@ import { checkSchema } from "./rules/schema.js";
 import { checkSecrets } from "./rules/secrets.js";
 import { checkSchemaLive } from "./rules/schema-live.js";
 import { checkDbAccess } from "./rules/db-access.js";
+import { checkErrorCodeContract } from "./rules/error-codes.js";
 import { loadExceptions, applyExceptions } from "./lib/exceptions.js";
 import { loadMigrateDbConfig } from "../../platform/config.js";
 import { discoverModuleMigrations } from "../../platform/db/discover-migrations.js";
@@ -25,6 +26,7 @@ async function run() {
     ...checkSchema(ROOT),
     ...checkSecrets(ROOT),
     ...checkDbAccess(ROOT),
+    ...checkErrorCodeContract(ROOT),
     ...(await checkSchemaLiveAgainstRealTree()),
   ];
 

@@ -303,7 +303,19 @@ describe("RLS fails closed on the stores table (08_PHASE_1_BRIEF.md §6 exit cri
     expect(rows).toEqual([]);
   });
 
-  it("the application layer raises a stable AUTHENTICATION_REQUIRED error for the same case, never a raw DB error", async () => {
+  // This is NOT the application-layer half of the criterion above — that
+  // scenario (an authenticated request whose query somehow runs with no
+  // tenant context established) has no reachable code path to test at all.
+  // See DECISION_LOG.md 2026-08-24 ("exit criterion 3's application half is
+  // met by construction") for the full argument: SessionGuard rejects an
+  // unauthenticated request before any transaction opens, and every
+  // controller's own withTenantContext() call is built from
+  // TenantContext.tenantId, typed `string`, never `null` — a guard either
+  // populates it with a real, verified tenant id or throws first. This test
+  // instead proves an adjacent, real requirement — no cookie at all is
+  // rejected cleanly, never as a raw DB error — which is worth having on its
+  // own merits.
+  it("with no session cookie at all, the application layer raises a stable AUTHENTICATION_REQUIRED, never a raw DB error", async () => {
     const res = await request(app.getHttpServer()).get(`/api/v1/stores/${randomUUID()}`);
 
     expect(res.status).toBe(401);

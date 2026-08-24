@@ -123,7 +123,7 @@ Neither `tenant_id` nor an RLS policy had to be removed for (1) or (2) — those
 | Redis in `docker-compose.yml` | omitted as unused; add when sessions/idempotency need it |
 | `credentials` / `identity_providers` tenancy | same structural case as `sessions`, deliberately **not** pre-decided — the call belongs to the Task 2 slice that creates them |
 
-Open risks in `RISK_REGISTER.md`: **R-001** (the Docker compose path itself is still unverified — a native PostgreSQL 17 install is the verification basis) and **R-003** (tenant isolation for the two membership tables depends on a `user_id`-keyed RLS clause; Task 2 re-evaluates a clause-free alternative).
+Open risks in `RISK_REGISTER.md` as of this document's date (2026-08-22): **R-001** (the Docker compose path itself is still unverified — a native PostgreSQL 17 install is the verification basis) and **R-003** (tenant isolation for the two membership tables depends on a `user_id`-keyed RLS clause; Task 2 re-evaluates a clause-free alternative). **R-001 is CLOSED as of 2026-08-24** — CI has since run the compose path for real and passed end to end, on the same PostgreSQL major version (17) this document names, not the 16 that briefly diverged in between; see `RISK_REGISTER.md`. R-003 is ACCEPTED, not resolved, as of the same date — see that document, not this one, for current status.
 
 ---
 
