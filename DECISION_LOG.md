@@ -15,6 +15,15 @@ Template for a new entry:
 
 ---
 
+## 2026-08-27 — CI outage: repository went private, blocking Actions; deliberately public until the quota resets
+
+**Context:** `PHASE_1_GATE_CONFIRMATION_2026-08-26.md` withheld the Phase 1 gate for one reason — CI run `32985409838` on `fd13c1e` sat `queued` with zero jobs for over 30 minutes, never scheduled. Root cause, confirmed after that report was written: the repository had been switched to **private** on 2026-08-26, which blocks GitHub Actions from scheduling runs under the account's current plan/quota.
+**Decision:** the repository has been switched back to **public** so Actions can run again — confirmed by a real green run (`33014271741` on `fbc7ba4`, see `PHASE_1_GATE_OPEN_2026-08-27.md`). The repository is **deliberately public for now**, specifically so CI keeps running; it is intended to return to private once the Actions quota/plan issue that caused this is resolved (a paid runner minutes tier, or an org/plan change enabling private-repo Actions).
+**This is an open operational item, not a solved one:** switching back to private will break CI again in exactly the same way unless a runner or plan change lands first. Nothing in this repository enforces or reminds about that dependency — whoever flips visibility back to private should first confirm Actions still runs, or accept the same stuck-queue failure mode recurring.
+**Status:** OPEN (operational, not a documentation or code gap) — track before next toggling repository visibility.
+
+---
+
 ## 2026-08-24 — Closing the two remaining findings from the second gate review (`PHASE_1_GATE_REVIEW_2026-08-24-II.md`)
 
 **Context:** the second gate review (HEAD `7d18296`) found exit criterion 1 `PARTIAL` (Finding 2 — cross-tenant write/delete protection empirically correct but proven in CI for only one of six tenant-owned tables) and a genuine, previously unfound concurrency defect in `membership.revoke` (Finding 1 — a read-then-write race on the last-owner/last-member checks). Its recommended order put both ahead of Finding 3 (a documentation staleness gap) and the Phase 2 prerequisites. This entry closes Findings 1 and 2; Finding 3 is closed separately, directly in `REPOSITORY_AUDIT_REPORT.md`'s own amendment note.
