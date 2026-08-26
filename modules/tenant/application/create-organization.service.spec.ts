@@ -43,8 +43,8 @@ function fakes(options: { onCreate?: () => never } = {}) {
     create: async (membership) => {
       recorded.memberships.push(membership);
     },
-    countActive: async () => {
-      throw new Error("CreateOrganizationService must not count active memberships.");
+    lockActiveForUpdate: async () => {
+      throw new Error("CreateOrganizationService must not lock active memberships.");
     },
     revoke: async () => {
       throw new Error("CreateOrganizationService must not revoke memberships.");

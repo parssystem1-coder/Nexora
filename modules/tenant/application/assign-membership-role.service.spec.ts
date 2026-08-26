@@ -32,8 +32,8 @@ function fakes(options: { target?: Membership | null; onGrant?: () => never } = 
       throw new Error("AssignMembershipRoleService must not create memberships.");
     },
     findById: async () => (options.target === undefined ? activeTarget : options.target),
-    countActive: async () => {
-      throw new Error("AssignMembershipRoleService must not count active memberships.");
+    lockActiveForUpdate: async () => {
+      throw new Error("AssignMembershipRoleService must not lock active memberships.");
     },
     revoke: async () => {
       throw new Error("AssignMembershipRoleService must not revoke memberships.");

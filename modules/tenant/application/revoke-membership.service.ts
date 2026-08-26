@@ -81,12 +81,21 @@ export class RevokeMembershipService {
     if (!target || target.tenantId !== command.tenantId) {
       throw new CapabilityError("RESOURCE_NOT_FOUND", "No membership with that id in this organization.");
     }
-    if (!target.isActive) {
+
+    // Locks every ACTIVE membership row in this tenant before deciding
+    // anything from a count — see MembershipRepository.lockActiveForUpdate.
+    // A concurrent revoke in the SAME organization blocks here until this
+    // transaction resolves, so two racing revokes can never both read a
+    // pre-write count. The "already revoked" check below reads this locked,
+    // fresh set rather than `target`'s own (possibly stale) snapshot from
+    // the read above, for the same reason.
+    const lockedActive = await this.memberships.lockActiveForUpdate(command.tenantId);
+    const targetIsStillActive = lockedActive.some((m) => m.id === target.id);
+
+    if (!targetIsStillActive) {
       throw new CapabilityError("CONFLICT", "This membership is already revoked.");
     }
-
-    const activeMemberCount = await this.memberships.countActive(command.tenantId);
-    if (activeMemberCount <= 1) {
+    if (lockedActive.length <= 1) {
       throw new CapabilityError("CONFLICT", "Cannot revoke the organization's only remaining member.");
     }
 

@@ -392,4 +392,70 @@ describe("POST /api/v1/organizations/{organizationId}/memberships/{membershipId}
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ tenantId: caller.orgId, status: 200, method: "POST" });
   });
+
+  /**
+   * DECISION_LOG.md 2026-08-24, "membership.revoke: closing the
+   * last-owner/last-member race" — genuinely concurrent, not simulated: two
+   * real HTTP requests fired together (`Promise.all`, no `await` between
+   * them) against the real running app and real PostgreSQL, each targeting
+   * the OTHER of an organization's only two owners. Before the fix, both
+   * requests' `SELECT count(...)` read "2 active owners" before either
+   * commit, so both passed the last-owner check and the organization ended
+   * with zero. `MembershipRepository.lockActiveForUpdate`'s row lock is what
+   * this proves: only one request should ever see the post-lock, post-write
+   * state and refuse.
+   *
+   * This is real database-level concurrency, not an artificially injected
+   * delay — Postgres' own row lock is what serializes the two requests, so
+   * there is no scheduling trick to keep synchronized. It is not proven
+   * deterministic down to the microsecond (a sufficiently unlucky scheduler
+   * could in principle serialize the two requests so completely that no
+   * overlap ever occurs), but firing both from the same tick with no await
+   * between them, against a real network-facing Postgres connection for
+   * every step of each request's own pipeline, gives the two requests ample,
+   * realistic opportunity to interleave — the same opportunity a real
+   * production race would have. This test was run repeatedly against the
+   * pre-fix `countActive`-based code (with `.forUpdate()` temporarily
+   * removed) specifically to confirm it reproduces the defect before being
+   * kept here as the fix's regression proof — see the commit message.
+   *
+   * The losing request's status code is genuinely NOT always 409, and
+   * running this repeatedly (both before and after the fix) is what
+   * surfaced that rather than an assumption: whichever request's transaction
+   * commits first also revokes every session belonging to ITS target — who
+   * is the OTHER request's own caller. If that commit lands before the
+   * loser's own `SessionGuard` has run, the loser's cookie is already
+   * invalid and it never reaches the last-owner check at all, returning 401
+   * `AUTHENTICATION_REQUIRED` instead of 409 `CONFLICT`. Both are correct,
+   * not a second bug: exit criterion 4 (`membership-revoke.integration.spec.
+   * ts`'s "revokes the target's session... on the very next request" test)
+   * already establishes that a revoked user's cookie stops working
+   * immediately, and this is that same property firing on the loser's OWN
+   * in-flight request rather than a subsequent one. What must hold
+   * regardless of which of the two lands is the actual invariant this test
+   * exists to prove: exactly one request succeeds, and the organization
+   * never ends with zero active owners.
+   */
+  it("two concurrent revokes of an organization's only two owners, each targeting the other: exactly one succeeds, and the organization never reaches zero owners", async () => {
+    const ownerA = await orgWithMember("race", "owner");
+    const ownerB = await memberOf(ownerA.orgId, "race-b", "owner");
+
+    const [resAtoB, resBtoA] = await Promise.all([
+      revoke(ownerA.orgId, ownerB.membershipId, ownerA.token),
+      revoke(ownerA.orgId, ownerA.membershipId, ownerB.token),
+    ]);
+
+    const statuses = [resAtoB.status, resBtoA.status];
+    const successes = statuses.filter((s) => s === 200);
+    const losses = statuses.filter((s) => s === 409 || s === 401);
+    expect(successes).toHaveLength(1);
+    expect(losses).toHaveLength(1);
+
+    const [statusA, statusB] = await Promise.all([
+      membershipStatus(ownerA.orgId, ownerA.membershipId),
+      membershipStatus(ownerA.orgId, ownerB.membershipId),
+    ]);
+    const activeOwners = [statusA, statusB].filter((s) => s === "ACTIVE");
+    expect(activeOwners).toHaveLength(1);
+  });
 });

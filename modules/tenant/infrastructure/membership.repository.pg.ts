@@ -34,14 +34,16 @@ export class MembershipRepositoryPg implements MembershipRepository {
     return new Membership(row.id, row.tenant_id, row.user_id, row.status as "ACTIVE" | "REVOKED", row.created_at);
   }
 
-  async countActive(tenantId: string): Promise<number> {
-    const result = await this.conn
+  /** See MembershipRepository.lockActiveForUpdate's doc comment for why this locks rather than counts. */
+  async lockActiveForUpdate(tenantId: string): Promise<Membership[]> {
+    const rows = await this.conn
       .selectFrom("memberships")
-      .select((eb) => eb.fn.countAll<string>().as("count"))
+      .select(["id", "tenant_id", "user_id", "status", "created_at"])
       .where("tenant_id", "=", tenantId)
       .where("status", "=", "ACTIVE")
-      .executeTakeFirstOrThrow();
-    return Number(result.count);
+      .forUpdate()
+      .execute();
+    return rows.map((row) => new Membership(row.id, row.tenant_id, row.user_id, row.status as "ACTIVE" | "REVOKED", row.created_at));
   }
 
   async revoke(membershipId: string, revokedAt: Date): Promise<void> {

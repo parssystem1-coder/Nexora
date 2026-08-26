@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "371e80a",
+    "commit": "d7bdf7d",
     "dirty": true
   },
   "modules": [
@@ -707,7 +707,7 @@
     {
       "file": "apps/api/membership-revoke.integration.spec.ts",
       "layer": "integration",
-      "cases": 23
+      "cases": 24
     },
     {
       "file": "apps/api/membership-role-assign.integration.spec.ts",
@@ -733,6 +733,11 @@
       "file": "apps/api/store-read.integration.spec.ts",
       "layer": "integration",
       "cases": 15
+    },
+    {
+      "file": "apps/api/tenant-isolation-rls.spec.ts",
+      "layer": "integration",
+      "cases": 3
     },
     {
       "file": "tools/conformance/harness.selftest.live-db.spec.ts",
@@ -813,8 +818,8 @@
     "tablesWithRls": 6,
     "capabilities": 10,
     "routes": 10,
-    "testFiles": 34,
-    "testCases": 330,
+    "testFiles": 35,
+    "testCases": 334,
     "adrs": 38,
     "adrsAccepted": 30
   }

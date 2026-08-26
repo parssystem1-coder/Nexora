@@ -59,12 +59,33 @@ export interface MembershipRepository {
 
   /**
    * Added for `membership.revoke`'s "cannot revoke the organization's only
-   * remaining member" protection (DECISION_LOG.md 2026-08-24, decision 3).
-   * Counts ACTIVE memberships only — a REVOKED one does not keep the
-   * organization administrable, so it must not count toward "still has
-   * someone left."
+   * remaining member/owner" protection, and rewritten from a plain count to a
+   * row lock (DECISION_LOG.md 2026-08-24, "membership.revoke: closing the
+   * last-owner/last-member race") after the phase-gate review found the
+   * original `countActive` read-then-write had no lock and no constraint
+   * behind it: two concurrent revokes of an organization's only two owners
+   * could each read a count of 2 before either committed, and both proceed.
+   *
+   * `SELECT ... FOR UPDATE` locks every currently-ACTIVE membership row in
+   * the tenant before the caller decides anything from the result, so a
+   * second, concurrent call against the SAME tenant blocks until the first
+   * transaction commits or rolls back, then re-reads a state that already
+   * reflects it — the same "lock what you're about to count" fix `AGENTS.md`
+   * §4's constraint-over-precheck principle already applies elsewhere via a
+   * UNIQUE index, used here instead of one because "at least one active
+   * owner" is not a uniqueness property a plain constraint can express.
+   *
+   * Deliberately not narrowed to just the target's own row: the caller needs
+   * the tenant-wide ACTIVE count (and, by construction, whether the target
+   * itself is still among them) in one locked read. Also sufficient to
+   * protect the *owner* count `RevokeMembershipService` derives afterward
+   * via `RoleGrantRepository.countActiveMembersWithRole`, without a second
+   * lock on `membership_roles` — no capability in this codebase ever removes
+   * a role grant (`membership.revoke` itself deliberately does not, and
+   * `membership.role.assign` only adds), so `memberships.status` is the only
+   * column either count can ever change through, and this lock covers it.
    */
-  countActive(tenantId: string): Promise<number>;
+  lockActiveForUpdate(tenantId: string): Promise<Membership[]>;
 
   /**
    * Sets a membership's status to REVOKED and stamps `updated_at` — the only
