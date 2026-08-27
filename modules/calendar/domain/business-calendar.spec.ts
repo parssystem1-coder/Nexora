@@ -45,7 +45,9 @@ describe("getZonedDateTimeParts / zonedTimeToInstant round trip", () => {
     const zones = ["UTC", "Asia/Tehran", "America/New_York", "Pacific/Kiritimati", "Pacific/Marquesas"];
     for (let i = 0; i < 500; i++) {
       // Sample across roughly 1990-2040 so both DST-observing and post-abolition eras are covered.
-      const ms = Math.floor(rng() * (new Date("2040-01-01").getTime() - new Date("1990-01-01").getTime())) + new Date("1990-01-01").getTime();
+      const ms =
+        Math.floor(rng() * (new Date("2040-01-01").getTime() - new Date("1990-01-01").getTime())) +
+        new Date("1990-01-01").getTime();
       const original = new Date(ms);
       const zone = zones[Math.floor(rng() * zones.length)]!;
       const parts = getZonedDateTimeParts(original, zone);
@@ -56,9 +58,9 @@ describe("getZonedDateTimeParts / zonedTimeToInstant round trip", () => {
 
   it("rejects a string that Intl does not recognize as an IANA zone", () => {
     expect(() => getZonedDateTimeParts(new Date(), "Mars/Cydonia")).toThrow(InvalidTimeZoneError);
-    expect(() => zonedTimeToInstant({ year: 2026, month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 }, "not a zone")).toThrow(
-      InvalidTimeZoneError,
-    );
+    expect(() =>
+      zonedTimeToInstant({ year: 2026, month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 }, "not a zone"),
+    ).toThrow(InvalidTimeZoneError);
   });
 });
 
@@ -127,14 +129,21 @@ describe("addCalendarMonths — end-of-month clamping (ADR-031 item 3)", () => {
   });
 
   it("crosses a year boundary forward and backward", () => {
-    expect(addCalendarMonths(new Date("2026-12-15T00:00:00.000Z"), 1, "UTC").toISOString()).toBe("2027-01-15T00:00:00.000Z");
-    expect(addCalendarMonths(new Date("2026-01-15T00:00:00.000Z"), -1, "UTC").toISOString()).toBe("2025-12-15T00:00:00.000Z");
+    expect(addCalendarMonths(new Date("2026-12-15T00:00:00.000Z"), 1, "UTC").toISOString()).toBe(
+      "2027-01-15T00:00:00.000Z",
+    );
+    expect(addCalendarMonths(new Date("2026-01-15T00:00:00.000Z"), -1, "UTC").toISOString()).toBe(
+      "2025-12-15T00:00:00.000Z",
+    );
   });
 
   it("preserves the wall-clock time-of-day across a spring-forward day it lands on", () => {
     // Feb 8 2026, 01:30 EST + 1 month = Mar 8 2026, 01:30 EST — the transition
     // that day happens at 02:00, so 01:30 still exists and is unaffected.
-    const start = zonedTimeToInstant({ year: 2026, month: 2, day: 8, hour: 1, minute: 30, second: 0, millisecond: 0 }, "America/New_York");
+    const start = zonedTimeToInstant(
+      { year: 2026, month: 2, day: 8, hour: 1, minute: 30, second: 0, millisecond: 0 },
+      "America/New_York",
+    );
     const result = addCalendarMonths(start, 1, "America/New_York");
     expect(result.toISOString()).toBe("2026-03-08T06:30:00.000Z"); // 01:30 EST = 06:30Z
   });
@@ -153,7 +162,9 @@ describe("addCalendarYears — leap-day anniversaries (ADR-024 verification: pro
 
   it("is equivalent to 12x the month arithmetic, not a separately-implemented rule", () => {
     const start = new Date("2026-05-17T14:00:00.000Z");
-    expect(addCalendarYears(start, 2, "Asia/Tehran").getTime()).toBe(addCalendarMonths(start, 24, "Asia/Tehran").getTime());
+    expect(addCalendarYears(start, 2, "Asia/Tehran").getTime()).toBe(
+      addCalendarMonths(start, 24, "Asia/Tehran").getTime(),
+    );
   });
 
   it("crosses Asia/Tehran's real 2022 DST abolition, re-deriving each year's own actual offset", () => {
@@ -161,7 +172,10 @@ describe("addCalendarYears — leap-day anniversaries (ADR-024 verification: pro
     // (Iran's last DST summer); 2023-07-15 is +03:30 (first post-abolition
     // summer). A naive implementation that reused the source offset instead
     // of re-resolving against the target date would get this wrong.
-    const summer2022 = zonedTimeToInstant({ year: 2022, month: 7, day: 15, hour: 10, minute: 0, second: 0, millisecond: 0 }, "Asia/Tehran");
+    const summer2022 = zonedTimeToInstant(
+      { year: 2022, month: 7, day: 15, hour: 10, minute: 0, second: 0, millisecond: 0 },
+      "Asia/Tehran",
+    );
     expect(summer2022.toISOString()).toBe("2022-07-15T05:30:00.000Z"); // 10:00 +04:30
     const summer2023 = addCalendarYears(summer2022, 1, "Asia/Tehran");
     expect(summer2023.toISOString()).toBe("2023-07-15T06:30:00.000Z"); // 10:00 +03:30, genuinely different offset
@@ -169,32 +183,50 @@ describe("addCalendarYears — leap-day anniversaries (ADR-024 verification: pro
 
   it("Asia/Tehran is +03:30 year-round today, but had seasonal DST historically — both eras produce correct wall clocks", () => {
     // 2021 (pre-abolition): winter +03:30, summer +04:30.
-    expect(zonedTimeToInstant({ year: 2021, month: 1, day: 15, hour: 12, minute: 0, second: 0, millisecond: 0 }, "Asia/Tehran").toISOString()).toBe(
-      "2021-01-15T08:30:00.000Z",
-    );
-    expect(zonedTimeToInstant({ year: 2021, month: 7, day: 15, hour: 12, minute: 0, second: 0, millisecond: 0 }, "Asia/Tehran").toISOString()).toBe(
-      "2021-07-15T07:30:00.000Z",
-    );
+    expect(
+      zonedTimeToInstant(
+        { year: 2021, month: 1, day: 15, hour: 12, minute: 0, second: 0, millisecond: 0 },
+        "Asia/Tehran",
+      ).toISOString(),
+    ).toBe("2021-01-15T08:30:00.000Z");
+    expect(
+      zonedTimeToInstant(
+        { year: 2021, month: 7, day: 15, hour: 12, minute: 0, second: 0, millisecond: 0 },
+        "Asia/Tehran",
+      ).toISOString(),
+    ).toBe("2021-07-15T07:30:00.000Z");
     // 2026 (post-abolition): fixed +03:30 in both seasons.
-    expect(zonedTimeToInstant({ year: 2026, month: 1, day: 15, hour: 12, minute: 0, second: 0, millisecond: 0 }, "Asia/Tehran").toISOString()).toBe(
-      "2026-01-15T08:30:00.000Z",
-    );
-    expect(zonedTimeToInstant({ year: 2026, month: 7, day: 15, hour: 12, minute: 0, second: 0, millisecond: 0 }, "Asia/Tehran").toISOString()).toBe(
-      "2026-07-15T08:30:00.000Z",
-    );
+    expect(
+      zonedTimeToInstant(
+        { year: 2026, month: 1, day: 15, hour: 12, minute: 0, second: 0, millisecond: 0 },
+        "Asia/Tehran",
+      ).toISOString(),
+    ).toBe("2026-01-15T08:30:00.000Z");
+    expect(
+      zonedTimeToInstant(
+        { year: 2026, month: 7, day: 15, hour: 12, minute: 0, second: 0, millisecond: 0 },
+        "Asia/Tehran",
+      ).toISOString(),
+    ).toBe("2026-07-15T08:30:00.000Z");
   });
 });
 
 describe("addCalendarDays — grace-period arithmetic (ADR-024 item 4, ADR-031 item 7)", () => {
   it("a 7-day grace period across a fall-back is a real 169 hours, not 168 — the extra hour is not lost", () => {
-    const expiry = zonedTimeToInstant({ year: 2026, month: 10, day: 29, hour: 0, minute: 0, second: 0, millisecond: 0 }, "America/New_York");
+    const expiry = zonedTimeToInstant(
+      { year: 2026, month: 10, day: 29, hour: 0, minute: 0, second: 0, millisecond: 0 },
+      "America/New_York",
+    );
     const graceEnd = addCalendarDays(expiry, 7, "America/New_York");
     expect(graceEnd.toISOString()).toBe("2026-11-05T05:00:00.000Z"); // Nov 5, 00:00 EST
     expect((graceEnd.getTime() - expiry.getTime()) / 3_600_000).toBe(169);
   });
 
   it("a 1-day grace period across a spring-forward is a real 23 hours, not 24 — the missing hour is not double-counted", () => {
-    const start = zonedTimeToInstant({ year: 2026, month: 3, day: 7, hour: 12, minute: 0, second: 0, millisecond: 0 }, "America/New_York");
+    const start = zonedTimeToInstant(
+      { year: 2026, month: 3, day: 7, hour: 12, minute: 0, second: 0, millisecond: 0 },
+      "America/New_York",
+    );
     expect(start.toISOString()).toBe("2026-03-07T17:00:00.000Z"); // Mar 7, 12:00 EST (transition is the next day)
     const next = addCalendarDays(start, 1, "America/New_York");
     expect(next.toISOString()).toBe("2026-03-08T16:00:00.000Z"); // Mar 8, 12:00 EDT
@@ -202,7 +234,10 @@ describe("addCalendarDays — grace-period arithmetic (ADR-024 item 4, ADR-031 i
   });
 
   it("in a zone with no DST at all (fixed offset), N days is exactly N*24 hours", () => {
-    const start = zonedTimeToInstant({ year: 2026, month: 6, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 }, "Asia/Tehran");
+    const start = zonedTimeToInstant(
+      { year: 2026, month: 6, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 },
+      "Asia/Tehran",
+    );
     const later = addCalendarDays(start, 10, "Asia/Tehran");
     expect((later.getTime() - start.getTime()) / 3_600_000).toBe(240);
   });
@@ -236,7 +271,10 @@ describe("startOfDay / dayBoundary (ADR-031 item 4: half-open periods)", () => {
   });
 
   it("dayBoundary produces a correct half-open [start, end) pair spanning exactly one calendar day", () => {
-    const instant = zonedTimeToInstant({ year: 2026, month: 6, day: 15, hour: 14, minute: 0, second: 0, millisecond: 0 }, "Asia/Tehran");
+    const instant = zonedTimeToInstant(
+      { year: 2026, month: 6, day: 15, hour: 14, minute: 0, second: 0, millisecond: 0 },
+      "Asia/Tehran",
+    );
     const { start, end } = dayBoundary(instant, "Asia/Tehran");
     expect(start.toISOString()).toBe("2026-06-14T20:30:00.000Z"); // 2026-06-15 00:00 +03:30
     expect(end.toISOString()).toBe("2026-06-15T20:30:00.000Z"); // 2026-06-16 00:00 +03:30
@@ -246,7 +284,10 @@ describe("startOfDay / dayBoundary (ADR-031 item 4: half-open periods)", () => {
   });
 
   it("a day boundary spanning a spring-forward is still exactly the calendar day, 23 real hours long", () => {
-    const instant = zonedTimeToInstant({ year: 2026, month: 3, day: 8, hour: 15, minute: 0, second: 0, millisecond: 0 }, "America/New_York");
+    const instant = zonedTimeToInstant(
+      { year: 2026, month: 3, day: 8, hour: 15, minute: 0, second: 0, millisecond: 0 },
+      "America/New_York",
+    );
     const { start, end } = dayBoundary(instant, "America/New_York");
     expect((end.getTime() - start.getTime()) / 3_600_000).toBe(23);
   });
@@ -254,9 +295,18 @@ describe("startOfDay / dayBoundary (ADR-031 item 4: half-open periods)", () => {
 
 describe("compareInstants / isWithinHalfOpenInterval", () => {
   it("orders instants correctly regardless of which zone produced them", () => {
-    const a = zonedTimeToInstant({ year: 2026, month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 }, "UTC");
-    const b = zonedTimeToInstant({ year: 2026, month: 1, day: 1, hour: 3, minute: 30, second: 0, millisecond: 0 }, "Asia/Tehran"); // = same instant as a
-    const c = zonedTimeToInstant({ year: 2026, month: 1, day: 2, hour: 0, minute: 0, second: 0, millisecond: 0 }, "UTC");
+    const a = zonedTimeToInstant(
+      { year: 2026, month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 },
+      "UTC",
+    );
+    const b = zonedTimeToInstant(
+      { year: 2026, month: 1, day: 1, hour: 3, minute: 30, second: 0, millisecond: 0 },
+      "Asia/Tehran",
+    ); // = same instant as a
+    const c = zonedTimeToInstant(
+      { year: 2026, month: 1, day: 2, hour: 0, minute: 0, second: 0, millisecond: 0 },
+      "UTC",
+    );
     expect(compareInstants(a, b)).toBe(0);
     expect(compareInstants(a, c)).toBe(-1);
     expect(compareInstants(c, a)).toBe(1);

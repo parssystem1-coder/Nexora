@@ -67,7 +67,11 @@ export class OrganizationAccessGuard implements CanActivate {
       );
     }
 
-    const organizationIdCandidate = resolvePathOrBodyValue("organizationId", request.params["organizationId"], request.body);
+    const organizationIdCandidate = resolvePathOrBodyValue(
+      "organizationId",
+      request.params["organizationId"],
+      request.body,
+    );
 
     const parsed = organizationScopeSchema.safeParse({ organizationId: organizationIdCandidate });
     if (!parsed.success) {
@@ -77,10 +81,8 @@ export class OrganizationAccessGuard implements CanActivate {
     }
     const { organizationId } = parsed.data;
 
-    const access = await withTenantContext(
-      this.db,
-      { tenantId: null, userId: identity.userId, storeId: null },
-      (trx) => new ResolveOrganizationAccessService(new MembershipRepositoryPg(trx)).execute(identity.userId, organizationId),
+    const access = await withTenantContext(this.db, { tenantId: null, userId: identity.userId, storeId: null }, (trx) =>
+      new ResolveOrganizationAccessService(new MembershipRepositoryPg(trx)).execute(identity.userId, organizationId),
     );
 
     request.tenantContext = {

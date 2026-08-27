@@ -45,14 +45,18 @@ const errorEnvelopeSchema = z
 function splitInput(capability: CapabilityDefinition): { params?: z.AnyZodObject; body?: z.AnyZodObject } {
   const schema = capability.inputSchema;
   if (!(schema instanceof z.ZodObject)) {
-    throw new Error(`Capability ${capability.id} has a non-object inputSchema, which cannot be split into path and body.`);
+    throw new Error(
+      `Capability ${capability.id} has a non-object inputSchema, which cannot be split into path and body.`,
+    );
   }
 
   const keys = Object.keys(schema.shape as Record<string, unknown>);
   const pathKeys = capability.route.pathParams;
   for (const key of pathKeys) {
     if (!keys.includes(key)) {
-      throw new Error(`Capability ${capability.id} declares path parameter "${key}", which its inputSchema does not define.`);
+      throw new Error(
+        `Capability ${capability.id} declares path parameter "${key}", which its inputSchema does not define.`,
+      );
     }
   }
 

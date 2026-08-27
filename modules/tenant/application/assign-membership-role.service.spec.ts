@@ -42,7 +42,13 @@ function fakes(options: { target?: Membership | null; onGrant?: () => never } = 
   const roleGrants: RoleGrantRepository = {
     grantRoleByKey: async (grant) => {
       if (options.onGrant) options.onGrant();
-      const result: RoleGrant = { id: grant.id, tenantId: grant.tenantId, membershipId: grant.membershipId, roleKey: grant.roleKey, createdAt: grant.createdAt };
+      const result: RoleGrant = {
+        id: grant.id,
+        tenantId: grant.tenantId,
+        membershipId: grant.membershipId,
+        roleKey: grant.roleKey,
+        createdAt: grant.createdAt,
+      };
       grants.push(result);
       return result;
     },
@@ -80,7 +86,12 @@ describe("AssignMembershipRoleService", () => {
     const dto = await service.execute(COMMAND);
 
     expect(grants).toHaveLength(1);
-    expect(grants[0]).toMatchObject({ id: GRANT_ID, tenantId: TENANT, membershipId: TARGET_MEMBERSHIP, roleKey: "admin" });
+    expect(grants[0]).toMatchObject({
+      id: GRANT_ID,
+      tenantId: TENANT,
+      membershipId: TARGET_MEMBERSHIP,
+      roleKey: "admin",
+    });
     expect(dto).toEqual({
       id: GRANT_ID,
       organizationId: TENANT,

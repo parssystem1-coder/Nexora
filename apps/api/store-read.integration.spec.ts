@@ -64,7 +64,9 @@ describe("GET /api/v1/stores/:storeId — golden path", () => {
   it("returns the store for a user with a valid session, active org membership, store membership, and store.read permission", async () => {
     const tenant = await createTenantFixture("happy");
 
-    const res = await request(app.getHttpServer()).get(`/api/v1/stores/${tenant.storeId}`).set("Cookie", `sid=${tenant.token}`);
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/stores/${tenant.storeId}`)
+      .set("Cookie", `sid=${tenant.token}`);
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
@@ -87,7 +89,9 @@ describe("GET /api/v1/stores/:storeId — golden path", () => {
     const tenant = await createTenantFixture("expired");
     const expiredToken = await seedSession(db, tenant.userId, { activeOrganizationId: tenant.orgId, expired: true });
 
-    const res = await request(app.getHttpServer()).get(`/api/v1/stores/${tenant.storeId}`).set("Cookie", `sid=${expiredToken}`);
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/stores/${tenant.storeId}`)
+      .set("Cookie", `sid=${expiredToken}`);
 
     expect(res.status).toBe(401);
     expect(res.body.code).toBe("AUTHENTICATION_REQUIRED");
@@ -97,7 +101,9 @@ describe("GET /api/v1/stores/:storeId — golden path", () => {
     const tenantA = await createTenantFixture("crossA");
     const tenantB = await createTenantFixture("crossB");
 
-    const res = await request(app.getHttpServer()).get(`/api/v1/stores/${tenantB.storeId}`).set("Cookie", `sid=${tenantA.token}`);
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/stores/${tenantB.storeId}`)
+      .set("Cookie", `sid=${tenantA.token}`);
 
     expect(res.status).toBe(403);
     expect(res.body.code).toBe("STORE_ACCESS_DENIED");
@@ -152,7 +158,9 @@ describe("GET /api/v1/stores/:storeId — golden path", () => {
   it("returns VALIDATION_ERROR for a malformed storeId", async () => {
     const tenant = await createTenantFixture("badid");
 
-    const res = await request(app.getHttpServer()).get(`/api/v1/stores/not-a-uuid`).set("Cookie", `sid=${tenant.token}`);
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/stores/not-a-uuid`)
+      .set("Cookie", `sid=${tenant.token}`);
 
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("VALIDATION_ERROR");

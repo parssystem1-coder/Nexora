@@ -45,7 +45,9 @@ function fakes(
     findById: async () => target,
     lockActiveForUpdate: async () => {
       if (target === null || target.tenantId !== COMMAND.tenantId) {
-        throw new Error("RevokeMembershipService must not lock anything once findById has already refused (not-found/wrong-tenant).");
+        throw new Error(
+          "RevokeMembershipService must not lock anything once findById has already refused (not-found/wrong-tenant).",
+        );
       }
       return lockedActive;
     },

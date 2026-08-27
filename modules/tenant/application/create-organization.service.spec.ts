@@ -53,7 +53,13 @@ function fakes(options: { onCreate?: () => never } = {}) {
   const roleGrants: RoleGrantRepository = {
     grantRoleByKey: async (grant) => {
       recorded.grants.push({ tenantId: grant.tenantId, membershipId: grant.membershipId, roleKey: grant.roleKey });
-      return { id: grant.id, tenantId: grant.tenantId, membershipId: grant.membershipId, roleKey: grant.roleKey, createdAt: grant.createdAt };
+      return {
+        id: grant.id,
+        tenantId: grant.tenantId,
+        membershipId: grant.membershipId,
+        roleKey: grant.roleKey,
+        createdAt: grant.createdAt,
+      };
     },
     hasRole: async () => {
       throw new Error("CreateOrganizationService must not check role membership.");

@@ -43,7 +43,9 @@ export class MembershipRepositoryPg implements MembershipRepository {
       .where("status", "=", "ACTIVE")
       .forUpdate()
       .execute();
-    return rows.map((row) => new Membership(row.id, row.tenant_id, row.user_id, row.status as "ACTIVE" | "REVOKED", row.created_at));
+    return rows.map(
+      (row) => new Membership(row.id, row.tenant_id, row.user_id, row.status as "ACTIVE" | "REVOKED", row.created_at),
+    );
   }
 
   async revoke(membershipId: string, revokedAt: Date): Promise<void> {

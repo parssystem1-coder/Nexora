@@ -79,7 +79,11 @@ export class OrganizationSwitchController {
     await runCapabilityAttempt(
       this.auditDb,
       rlsContext,
-      () => new SwitchOrganizationService(new SessionRepositoryPg(this.appDb)).execute({ sessionId: identity.sessionId, organizationId: tenantContext.tenantId }),
+      () =>
+        new SwitchOrganizationService(new SessionRepositoryPg(this.appDb)).execute({
+          sessionId: identity.sessionId,
+          organizationId: tenantContext.tenantId,
+        }),
       (outcome) =>
         new AuditEvent(
           tenantContext.tenantId,

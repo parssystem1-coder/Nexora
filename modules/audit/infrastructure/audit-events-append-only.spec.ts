@@ -25,7 +25,9 @@ beforeAll(async () => {
   try {
     await sql`select 1`.execute(db);
   } catch (err) {
-    throw new Error(`Could not reach Postgres for the audit append-only test. Run "docker compose up -d". ${describeDbError(err)}`);
+    throw new Error(
+      `Could not reach Postgres for the audit append-only test. Run "docker compose up -d". ${describeDbError(err)}`,
+    );
   }
 });
 
@@ -38,7 +40,17 @@ describe("audit_events is append-only for the app role", () => {
     await recordAuditEventDurable(
       db,
       { tenantId: TENANT, userId: null, storeId: null },
-      new AuditEvent(TENANT, null, "system", "test.append-only-update", "probe", "probe-1", "SUCCESS", "req-1", "corr-1"),
+      new AuditEvent(
+        TENANT,
+        null,
+        "system",
+        "test.append-only-update",
+        "probe",
+        "probe-1",
+        "SUCCESS",
+        "req-1",
+        "corr-1",
+      ),
     );
 
     await expect(
@@ -52,7 +64,17 @@ describe("audit_events is append-only for the app role", () => {
     await recordAuditEventDurable(
       db,
       { tenantId: TENANT, userId: null, storeId: null },
-      new AuditEvent(TENANT, null, "system", "test.append-only-delete", "probe", "probe-2", "SUCCESS", "req-2", "corr-2"),
+      new AuditEvent(
+        TENANT,
+        null,
+        "system",
+        "test.append-only-delete",
+        "probe",
+        "probe-2",
+        "SUCCESS",
+        "req-2",
+        "corr-2",
+      ),
     );
 
     await expect(
@@ -66,7 +88,17 @@ describe("audit_events is append-only for the app role", () => {
     await recordAuditEventDurable(
       db,
       { tenantId: TENANT, userId: null, storeId: null },
-      new AuditEvent(TENANT, null, "system", "test.append-only-insert", "probe", "probe-3", "SUCCESS", "req-3", "corr-3"),
+      new AuditEvent(
+        TENANT,
+        null,
+        "system",
+        "test.append-only-insert",
+        "probe",
+        "probe-3",
+        "SUCCESS",
+        "req-3",
+        "corr-3",
+      ),
     );
 
     const row = await withTenantContext(db, { tenantId: TENANT, userId: null, storeId: null }, (trx) =>

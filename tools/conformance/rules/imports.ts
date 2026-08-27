@@ -88,11 +88,7 @@ export function checkImports(root: string): Violation[] {
         }
 
         // Rule: application must not import interfaces/infrastructure.
-        if (
-          from.layer === "application" &&
-          to.layer &&
-          ["interfaces", "infrastructure"].includes(to.layer)
-        ) {
+        if (from.layer === "application" && to.layer && ["interfaces", "infrastructure"].includes(to.layer)) {
           violations.push({
             rule: "DEP-DIRECTION-APPLICATION",
             file,

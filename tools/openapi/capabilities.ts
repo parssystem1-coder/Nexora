@@ -8,7 +8,11 @@ import {
   organizationSwitchCapability,
   membershipRevokeCapability,
 } from "../../modules/tenant/contracts/index.js";
-import { authLoginCapability, authLogoutCapability, authLogoutAllCapability } from "../../modules/identity/contracts/index.js";
+import {
+  authLoginCapability,
+  authLogoutCapability,
+  authLogoutAllCapability,
+} from "../../modules/identity/contracts/index.js";
 
 /**
  * Every implemented capability, in a stable order.

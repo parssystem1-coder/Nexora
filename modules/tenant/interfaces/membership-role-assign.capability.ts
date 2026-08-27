@@ -1,5 +1,8 @@
 import type { CapabilityDefinition } from "../../capability/contracts/index.js";
-import { assignMembershipRoleInputSchema, membershipRoleOutputSchema } from "../application/assign-membership-role.input.js";
+import {
+  assignMembershipRoleInputSchema,
+  membershipRoleOutputSchema,
+} from "../application/assign-membership-role.input.js";
 
 /**
  * Matches 05_API_CAPABILITY_CONTRACTS.md §4.1's row for
@@ -41,5 +44,12 @@ export const membershipRoleAssignCapability: CapabilityDefinition = {
   },
   inputSchema: assignMembershipRoleInputSchema,
   outputSchema: membershipRoleOutputSchema,
-  errorCodes: ["AUTHENTICATION_REQUIRED", "VALIDATION_ERROR", "FORBIDDEN", "RESOURCE_NOT_FOUND", "CONFLICT", "INTERNAL_ERROR"],
+  errorCodes: [
+    "AUTHENTICATION_REQUIRED",
+    "VALIDATION_ERROR",
+    "FORBIDDEN",
+    "RESOURCE_NOT_FOUND",
+    "CONFLICT",
+    "INTERNAL_ERROR",
+  ],
 };

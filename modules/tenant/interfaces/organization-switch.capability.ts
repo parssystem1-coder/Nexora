@@ -1,5 +1,8 @@
 import type { CapabilityDefinition } from "../../capability/contracts/index.js";
-import { switchOrganizationInputSchema, switchOrganizationOutputSchema } from "../application/switch-organization.input.js";
+import {
+  switchOrganizationInputSchema,
+  switchOrganizationOutputSchema,
+} from "../application/switch-organization.input.js";
 
 /**
  * Matches 05_API_CAPABILITY_CONTRACTS.md §4.1's row for `organization.switch`

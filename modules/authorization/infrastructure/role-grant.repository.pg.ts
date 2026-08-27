@@ -37,7 +37,13 @@ export class RoleGrantRepositoryPg implements RoleGrantRepository {
       throw err;
     }
 
-    return { id: grant.id, tenantId: grant.tenantId, membershipId: grant.membershipId, roleKey: grant.roleKey, createdAt: grant.createdAt };
+    return {
+      id: grant.id,
+      tenantId: grant.tenantId,
+      membershipId: grant.membershipId,
+      roleKey: grant.roleKey,
+      createdAt: grant.createdAt,
+    };
   }
 
   async hasRole(membershipId: string, roleKey: string): Promise<boolean> {

@@ -17,7 +17,9 @@ export class CurrencyMismatchError extends Error {
     public readonly right: string,
     operation: string,
   ) {
-    super(`Cannot ${operation} money in ${left} and ${right}: cross-currency arithmetic is a domain error, not a conversion.`);
+    super(
+      `Cannot ${operation} money in ${left} and ${right}: cross-currency arithmetic is a domain error, not a conversion.`,
+    );
     this.name = "CurrencyMismatchError";
   }
 }

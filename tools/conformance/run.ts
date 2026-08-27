@@ -38,7 +38,9 @@ async function run() {
   if (invalidEntries.length > 0) {
     const noun = invalidEntries.length === 1 ? "entry" : "entries";
     const verb = invalidEntries.length === 1 ? "has" : "have";
-    console.error(`\n${invalidEntries.length} ${noun} in exceptions.json ${verb} no valid ADR reference (expected "ADR-###"):`);
+    console.error(
+      `\n${invalidEntries.length} ${noun} in exceptions.json ${verb} no valid ADR reference (expected "ADR-###"):`,
+    );
     for (const e of invalidEntries) {
       console.error(`  - ${e.rule} ${e.file}: adr="${e.adr ?? ""}"`);
     }

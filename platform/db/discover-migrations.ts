@@ -39,7 +39,5 @@ export function discoverModuleMigrations(modulesRoot: string): MigrationFile[] {
     }
   }
 
-  return entries
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .map((e) => ({ id: e.id, sql: readFileSync(e.path, "utf8") }));
+  return entries.sort((a, b) => a.id.localeCompare(b.id)).map((e) => ({ id: e.id, sql: readFileSync(e.path, "utf8") }));
 }

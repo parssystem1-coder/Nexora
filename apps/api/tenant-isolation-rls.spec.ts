@@ -5,7 +5,14 @@ import { createDb } from "../../platform/db/kysely.js";
 import { loadDbConfig } from "../../platform/config.js";
 import { describeDbError } from "../../platform/db/describe-error.js";
 import { withTenantContext } from "../../platform/db/tenant-context.js";
-import { seedUser, seedOrganization, seedMembership, seedStore, seedStoreMembership, grantRole } from "./test-support/seed.js";
+import {
+  seedUser,
+  seedOrganization,
+  seedMembership,
+  seedStore,
+  seedStoreMembership,
+  grantRole,
+} from "./test-support/seed.js";
 
 /**
  * DECISION_LOG.md 2026-08-24, "tenant-isolation-rls.spec.ts: where the
@@ -88,7 +95,9 @@ async function enumerateTenantOwnedTables(): Promise<TenantOwnedTable[]> {
       WHERE tc.table_schema = 'public' AND tc.table_name = ${relname} AND tc.constraint_type = 'PRIMARY KEY'
     `.execute(db);
     if (pk.rows.length !== 1) {
-      throw new Error(`RLS probe cannot determine a single-column primary key for '${relname}' (found ${pk.rows.length}); this table needs a real PK before it can be probed.`);
+      throw new Error(
+        `RLS probe cannot determine a single-column primary key for '${relname}' (found ${pk.rows.length}); this table needs a real PK before it can be probed.`,
+      );
     }
     result.push({ table: relname, pkColumn: pk.rows[0]!.column_name });
   }
@@ -138,7 +147,11 @@ const SEED_ROW: Record<string, SeedRow> = {
   membership_roles: async (f) => {
     await grantRole(db, f.orgId, f.membershipId, "member");
     const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
-      trx.selectFrom("membership_roles").select("id").where("membership_id", "=", f.membershipId).executeTakeFirstOrThrow(),
+      trx
+        .selectFrom("membership_roles")
+        .select("id")
+        .where("membership_id", "=", f.membershipId)
+        .executeTakeFirstOrThrow(),
     );
     return row.id;
   },
@@ -191,10 +204,18 @@ function deniedProbe(result: { rowCount: bigint }): boolean {
   return result.rowCount === 0n;
 }
 
-async function probeSelect(table: string, pkColumn: string, rowId: string, asTenantId: string, asUserId: string): Promise<Probe> {
+async function probeSelect(
+  table: string,
+  pkColumn: string,
+  rowId: string,
+  asTenantId: string,
+  asUserId: string,
+): Promise<Probe> {
   try {
     const result = await withTenantContext(db, { tenantId: asTenantId, userId: asUserId, storeId: null }, (trx) =>
-      sql<Record<string, unknown>>`select ${sql.ref(pkColumn)} from ${sql.table(table)} where ${sql.ref(pkColumn)} = ${rowId}`.execute(trx),
+      sql<
+        Record<string, unknown>
+      >`select ${sql.ref(pkColumn)} from ${sql.table(table)} where ${sql.ref(pkColumn)} = ${rowId}`.execute(trx),
     );
     return { threw: false, rowCount: BigInt(result.rows.length) };
   } catch {
@@ -202,11 +223,19 @@ async function probeSelect(table: string, pkColumn: string, rowId: string, asTen
   }
 }
 
-async function probeUpdate(table: string, pkColumn: string, rowId: string, asTenantId: string, asUserId: string): Promise<Probe> {
+async function probeUpdate(
+  table: string,
+  pkColumn: string,
+  rowId: string,
+  asTenantId: string,
+  asUserId: string,
+): Promise<Probe> {
   const touchColumn = TOUCH_COLUMN[table]!;
   try {
     const result = await withTenantContext(db, { tenantId: asTenantId, userId: asUserId, storeId: null }, (trx) =>
-      sql`update ${sql.table(table)} set ${sql.ref(touchColumn)} = ${sql.ref(touchColumn)} where ${sql.ref(pkColumn)} = ${rowId}`.execute(trx),
+      sql`update ${sql.table(table)} set ${sql.ref(touchColumn)} = ${sql.ref(touchColumn)} where ${sql.ref(pkColumn)} = ${rowId}`.execute(
+        trx,
+      ),
     );
     return { threw: false, rowCount: result.numAffectedRows ?? 0n };
   } catch {
@@ -214,7 +243,13 @@ async function probeUpdate(table: string, pkColumn: string, rowId: string, asTen
   }
 }
 
-async function probeDelete(table: string, pkColumn: string, rowId: string, asTenantId: string, asUserId: string): Promise<Probe> {
+async function probeDelete(
+  table: string,
+  pkColumn: string,
+  rowId: string,
+  asTenantId: string,
+  asUserId: string,
+): Promise<Probe> {
   try {
     const result = await withTenantContext(db, { tenantId: asTenantId, userId: asUserId, storeId: null }, (trx) =>
       sql`delete from ${sql.table(table)} where ${sql.ref(pkColumn)} = ${rowId}`.execute(trx),
@@ -239,12 +274,21 @@ let tenantOwnedTables: TenantOwnedTable[];
 try {
   tenantOwnedTables = await enumerateTenantOwnedTables();
 } catch (err) {
-  throw new Error(`Could not reach Postgres for the tenant-isolation RLS probe (or the live enumeration query itself failed). Run "docker compose up -d". ${describeDbError(err)}`);
+  throw new Error(
+    `Could not reach Postgres for the tenant-isolation RLS probe (or the live enumeration query itself failed). Run "docker compose up -d". ${describeDbError(err)}`,
+  );
 }
 
 describe("tenant isolation: every RLS-protected table, enumerated live, denies cross-tenant read/write/delete", () => {
   it("the live enumeration finds exactly today's six tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
-    expect(tenantOwnedTables.map((t) => t.table)).toEqual(["audit_events", "membership_roles", "memberships", "organizations", "store_memberships", "stores"]);
+    expect(tenantOwnedTables.map((t) => t.table)).toEqual([
+      "audit_events",
+      "membership_roles",
+      "memberships",
+      "organizations",
+      "store_memberships",
+      "stores",
+    ]);
     expect(tenantOwnedTables.every((t) => t.pkColumn === "id")).toBe(true);
   });
 
@@ -253,38 +297,52 @@ describe("tenant isolation: every RLS-protected table, enumerated live, denies c
     expect(missing).toEqual([]);
   });
 
-  it.each(tenantOwnedTables)("$table: a caller in a DIFFERENT tenant cannot read, write or delete this table's row", async ({ table, pkColumn }) => {
-    const seedRow = SEED_ROW[table];
-    if (!seedRow) {
-      expect.fail(`No SEED_ROW factory registered for tenant-owned table '${table}' - add one to apps/api/tenant-isolation-rls.spec.ts.`);
-      return;
-    }
+  it.each(tenantOwnedTables)(
+    "$table: a caller in a DIFFERENT tenant cannot read, write or delete this table's row",
+    async ({ table, pkColumn }) => {
+      const seedRow = SEED_ROW[table];
+      if (!seedRow) {
+        expect.fail(
+          `No SEED_ROW factory registered for tenant-owned table '${table}' - add one to apps/api/tenant-isolation-rls.spec.ts.`,
+        );
+        return;
+      }
 
-    const owner = await buildFixture(`iso-${table.slice(0, 8)}`);
-    const rowId = await seedRow(owner);
+      const owner = await buildFixture(`iso-${table.slice(0, 8)}`);
+      const rowId = await seedRow(owner);
 
-    // A different tenant, and a user id that matches neither the row's
-    // owner nor anyone real - the self-access OR clause R-003 introduces on
-    // `memberships`/`store_memberships` must not accidentally validate this
-    // probe.
-    const otherOrgId = await seedOrganization(db, "RLS Probe Other Org", `rls-probe-other-${randomUUID().slice(0, 8)}`);
-    const unrelatedUserId = randomUUID();
+      // A different tenant, and a user id that matches neither the row's
+      // owner nor anyone real - the self-access OR clause R-003 introduces on
+      // `memberships`/`store_memberships` must not accidentally validate this
+      // probe.
+      const otherOrgId = await seedOrganization(
+        db,
+        "RLS Probe Other Org",
+        `rls-probe-other-${randomUUID().slice(0, 8)}`,
+      );
+      const unrelatedUserId = randomUUID();
 
-    const [readResult, writeResult, deleteResult] = await Promise.all([
-      probeSelect(table, pkColumn, rowId, otherOrgId, unrelatedUserId),
-      probeUpdate(table, pkColumn, rowId, otherOrgId, unrelatedUserId),
-      probeDelete(table, pkColumn, rowId, otherOrgId, unrelatedUserId),
-    ]);
+      const [readResult, writeResult, deleteResult] = await Promise.all([
+        probeSelect(table, pkColumn, rowId, otherOrgId, unrelatedUserId),
+        probeUpdate(table, pkColumn, rowId, otherOrgId, unrelatedUserId),
+        probeDelete(table, pkColumn, rowId, otherOrgId, unrelatedUserId),
+      ]);
 
-    expect(readResult.rowCount, `cross-tenant SELECT on '${table}' must return zero rows`).toBe(0n);
-    expect(deniedProbe(writeResult), `cross-tenant UPDATE on '${table}' must not affect any row`).toBe(true);
-    expect(deniedProbe(deleteResult), `cross-tenant DELETE on '${table}' must not affect any row`).toBe(true);
+      expect(readResult.rowCount, `cross-tenant SELECT on '${table}' must return zero rows`).toBe(0n);
+      expect(deniedProbe(writeResult), `cross-tenant UPDATE on '${table}' must not affect any row`).toBe(true);
+      expect(deniedProbe(deleteResult), `cross-tenant DELETE on '${table}' must not affect any row`).toBe(true);
 
-    // The row must still exist, unharmed, from its own tenant's context -
-    // proves the probes above didn't succeed silently in some other way.
-    const stillThere = await withTenantContext(db, { tenantId: owner.orgId, userId: owner.userId, storeId: null }, (trx) =>
-      sql<{ n: string }>`select count(*) as n from ${sql.table(table)} where ${sql.ref(pkColumn)} = ${rowId}`.execute(trx),
-    );
-    expect(stillThere.rows[0]?.n).toBe("1");
-  });
+      // The row must still exist, unharmed, from its own tenant's context -
+      // proves the probes above didn't succeed silently in some other way.
+      const stillThere = await withTenantContext(
+        db,
+        { tenantId: owner.orgId, userId: owner.userId, storeId: null },
+        (trx) =>
+          sql<{
+            n: string;
+          }>`select count(*) as n from ${sql.table(table)} where ${sql.ref(pkColumn)} = ${rowId}`.execute(trx),
+      );
+      expect(stillThere.rows[0]?.n).toBe("1");
+    },
+  );
 });

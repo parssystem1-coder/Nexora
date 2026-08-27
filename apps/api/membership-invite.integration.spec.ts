@@ -269,8 +269,10 @@ describe("POST /api/v1/organizations/:organizationId/memberships - a body field 
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("VALIDATION_ERROR");
 
-    const membershipsInA = await withTenantContext(db, { tenantId: orgA.orgId, userId: orgA.userId, storeId: null }, (trx) =>
-      trx.selectFrom("memberships").select("id").where("tenant_id", "=", orgA.orgId).execute(),
+    const membershipsInA = await withTenantContext(
+      db,
+      { tenantId: orgA.orgId, userId: orgA.userId, storeId: null },
+      (trx) => trx.selectFrom("memberships").select("id").where("tenant_id", "=", orgA.orgId).execute(),
     );
     expect(membershipsInA).toHaveLength(1); // only the caller's own, from setup
     expect(await auditRowsFor(orgA.orgId, orgA.userId)).toEqual([]);

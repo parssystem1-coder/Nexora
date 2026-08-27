@@ -6,7 +6,11 @@ import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { systemClock } from "../../../platform/clock.js";
 import { CapabilityError, buildValidationInput, runCapabilityAttempt } from "../../capability/contracts/index.js";
 import { SessionGuard, SessionRevocationRepositoryPg } from "../../identity/contracts/index.js";
-import { CheckPermissionService, PermissionCheckRepositoryPg, RoleGrantRepositoryPg } from "../../authorization/contracts/index.js";
+import {
+  CheckPermissionService,
+  PermissionCheckRepositoryPg,
+  RoleGrantRepositoryPg,
+} from "../../authorization/contracts/index.js";
 import { AuditEvent } from "../../audit/contracts/index.js";
 import { OrganizationAccessGuard } from "./organization-access.guard.js";
 import type { RequestWithTenantContext } from "./tenant-context.js";

@@ -8,7 +8,11 @@ export class ReservedSubdomainRepositoryPg implements ReservedSubdomainRepositor
   constructor(private readonly conn: Kysely<Database> | Transaction<Database>) {}
 
   async isReserved(slug: string): Promise<boolean> {
-    const row = await this.conn.selectFrom("reserved_subdomains").select("name").where("name", "=", slug).executeTakeFirst();
+    const row = await this.conn
+      .selectFrom("reserved_subdomains")
+      .select("name")
+      .where("name", "=", slug)
+      .executeTakeFirst();
     return row !== undefined;
   }
 }

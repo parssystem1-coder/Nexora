@@ -56,7 +56,10 @@ export class AuthLogoutAllController {
   @Post("logout-all")
   @HttpCode(200)
   @UseGuards(SessionGuard)
-  async logoutAll(@Req() request: LogoutAllRequest, @Res({ passthrough: true }) response: Response): Promise<LogoutAllOutputDto> {
+  async logoutAll(
+    @Req() request: LogoutAllRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<LogoutAllOutputDto> {
     const identity = request.authenticatedIdentity!;
     const requestId = request.requestId ?? "";
     const correlationId = request.correlationId ?? "";

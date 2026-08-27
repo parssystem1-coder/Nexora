@@ -24,7 +24,9 @@ beforeAll(async () => {
   try {
     await sql`select 1`.execute(db);
   } catch (err) {
-    throw new Error(`Could not reach Postgres for the organizations RLS test. Run "docker compose up -d". ${describeDbError(err)}`);
+    throw new Error(
+      `Could not reach Postgres for the organizations RLS test. Run "docker compose up -d". ${describeDbError(err)}`,
+    );
   }
 });
 

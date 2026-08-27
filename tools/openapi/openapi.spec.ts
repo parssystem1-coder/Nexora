@@ -76,7 +76,10 @@ describe("OpenAPI artifact (ADR-033)", () => {
 
   it("documents every error code each capability can raise, under the status the HTTP boundary returns", () => {
     const document = buildDocument() as {
-      paths: Record<string, Record<string, { operationId: string; responses: Record<string, { description: string }> }>>;
+      paths: Record<
+        string,
+        Record<string, { operationId: string; responses: Record<string, { description: string }> }>
+      >;
     };
 
     for (const capability of CAPABILITIES) {

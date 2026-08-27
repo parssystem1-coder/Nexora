@@ -96,7 +96,11 @@ describe("POST .../memberships/:membershipId/roles - happy path", () => {
     const res = await assign(caller.orgId, target.membershipId, caller.token, { roleKey: "admin" });
 
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ organizationId: caller.orgId, membershipId: target.membershipId, roleKey: "admin" });
+    expect(res.body).toMatchObject({
+      organizationId: caller.orgId,
+      membershipId: target.membershipId,
+      roleKey: "admin",
+    });
     expect(res.body.id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
@@ -313,7 +317,8 @@ describe("POST .../memberships/:membershipId/roles - denial paths", () => {
     const grantedInWrongTenant = await withTenantContext(
       db,
       { tenantId: secondOrgId, userId: caller.userId, storeId: null },
-      (trx) => trx.selectFrom("membership_roles").select("id").where("membership_id", "=", secondMembershipId).execute(),
+      (trx) =>
+        trx.selectFrom("membership_roles").select("id").where("membership_id", "=", secondMembershipId).execute(),
     );
     expect(grantedInWrongTenant).toHaveLength(1); // only the owner grant from setup - nothing added
   });
@@ -356,11 +361,17 @@ describe("POST .../memberships/:membershipId/roles - a body field must not overr
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("VALIDATION_ERROR");
 
-    const pathTargetRoles = await withTenantContext(db, { tenantId: caller.orgId, userId: caller.userId, storeId: null }, (trx) =>
-      trx.selectFrom("membership_roles").select("id").where("membership_id", "=", pathTarget.membershipId).execute(),
+    const pathTargetRoles = await withTenantContext(
+      db,
+      { tenantId: caller.orgId, userId: caller.userId, storeId: null },
+      (trx) =>
+        trx.selectFrom("membership_roles").select("id").where("membership_id", "=", pathTarget.membershipId).execute(),
     );
-    const bodyTargetRoles = await withTenantContext(db, { tenantId: caller.orgId, userId: caller.userId, storeId: null }, (trx) =>
-      trx.selectFrom("membership_roles").select("id").where("membership_id", "=", bodyTarget.membershipId).execute(),
+    const bodyTargetRoles = await withTenantContext(
+      db,
+      { tenantId: caller.orgId, userId: caller.userId, storeId: null },
+      (trx) =>
+        trx.selectFrom("membership_roles").select("id").where("membership_id", "=", bodyTarget.membershipId).execute(),
     );
     expect(pathTargetRoles).toEqual([]);
     expect(bodyTargetRoles).toEqual([]);
@@ -383,8 +394,11 @@ describe("POST .../memberships/:membershipId/roles - a body field must not overr
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("VALIDATION_ERROR");
 
-    const targetRoles = await withTenantContext(db, { tenantId: orgA.orgId, userId: orgA.userId, storeId: null }, (trx) =>
-      trx.selectFrom("membership_roles").select("id").where("membership_id", "=", target.membershipId).execute(),
+    const targetRoles = await withTenantContext(
+      db,
+      { tenantId: orgA.orgId, userId: orgA.userId, storeId: null },
+      (trx) =>
+        trx.selectFrom("membership_roles").select("id").where("membership_id", "=", target.membershipId).execute(),
     );
     expect(targetRoles).toEqual([]);
     expect(await auditRowsFor(orgA.orgId, orgA.userId)).toEqual([]);
@@ -444,7 +458,10 @@ describe("POST .../memberships/:membershipId/roles - audit (ADR-034)", () => {
 
     const events = await auditRowsFor(caller.orgId, caller.userId);
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ outcome: "FAILURE", metadata: { targetMembershipId: ghostId, roleKey: "admin" } });
+    expect(events[0]).toMatchObject({
+      outcome: "FAILURE",
+      metadata: { targetMembershipId: ghostId, roleKey: "admin" },
+    });
   });
 
   it("writes NO audit event when the guard refuses before step 6 - the event covers steps 6-7, not the whole request", async () => {

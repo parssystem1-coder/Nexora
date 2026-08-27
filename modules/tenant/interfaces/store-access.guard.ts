@@ -37,10 +37,15 @@ export class StoreAccessGuard implements CanActivate {
   constructor(@Inject(APP_DB) private readonly db: Kysely<Database>) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<RequestWithStoreTenantContext & Request & { requestId?: string; correlationId?: string }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<RequestWithStoreTenantContext & Request & { requestId?: string; correlationId?: string }>();
     const identity = request.authenticatedIdentity;
     if (!identity) {
-      throw new CapabilityError("AUTHENTICATION_REQUIRED", "StoreAccessGuard ran before SessionGuard established an identity.");
+      throw new CapabilityError(
+        "AUTHENTICATION_REQUIRED",
+        "StoreAccessGuard ran before SessionGuard established an identity.",
+      );
     }
 
     const parsed = readStoreInputSchema.safeParse({ storeId: request.params["storeId"] });
@@ -51,10 +56,17 @@ export class StoreAccessGuard implements CanActivate {
     }
     const { storeId } = parsed.data;
 
-    const access = await withTenantContext(this.db, { tenantId: null, userId: identity.userId, storeId: null }, (trx) => {
-      const service = new ResolveStoreAccessService(new StoreMembershipRepositoryPg(trx), new MembershipRepositoryPg(trx));
-      return service.execute(identity.userId, storeId);
-    });
+    const access = await withTenantContext(
+      this.db,
+      { tenantId: null, userId: identity.userId, storeId: null },
+      (trx) => {
+        const service = new ResolveStoreAccessService(
+          new StoreMembershipRepositoryPg(trx),
+          new MembershipRepositoryPg(trx),
+        );
+        return service.execute(identity.userId, storeId);
+      },
+    );
 
     request.tenantContext = {
       tenantId: access.tenantId,

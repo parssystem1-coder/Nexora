@@ -31,6 +31,10 @@ export function createAuditEventRepository(conn: Kysely<Database> | Transaction<
  * whether the caller's own transaction subsequently commits or rolls back —
  * call it *before* that transaction's callback returns, not after.
  */
-export async function recordAuditEventDurable(db: Kysely<Database>, context: RlsContext, event: AuditEvent): Promise<void> {
+export async function recordAuditEventDurable(
+  db: Kysely<Database>,
+  context: RlsContext,
+  event: AuditEvent,
+): Promise<void> {
   await withTenantContext(db, context, (trx) => createAuditEventRepository(trx).record(event));
 }

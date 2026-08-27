@@ -15,8 +15,20 @@ const INVITEE = "33333333-3333-3333-3333-333333333333";
 
 const COMMAND = { membershipId: MEMBERSHIP, tenantId: TENANT, email: "Invitee@Example.test" };
 
-const activeUser: User = { id: INVITEE, email: "invitee@example.test", displayName: "Invitee", status: "ACTIVE", isActive: true };
-const suspendedUser: User = { id: INVITEE, email: "invitee@example.test", displayName: "Invitee", status: "SUSPENDED", isActive: false };
+const activeUser: User = {
+  id: INVITEE,
+  email: "invitee@example.test",
+  displayName: "Invitee",
+  status: "ACTIVE",
+  isActive: true,
+};
+const suspendedUser: User = {
+  id: INVITEE,
+  email: "invitee@example.test",
+  displayName: "Invitee",
+  status: "SUSPENDED",
+  isActive: false,
+};
 
 function fakes(options: { user?: User | null; onCreate?: () => never } = {}) {
   const created: Membership[] = [];

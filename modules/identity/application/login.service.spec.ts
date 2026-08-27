@@ -18,7 +18,11 @@ const USER_ID = "11111111-1111-1111-1111-111111111111";
 // value has no whitespace and is 8+ characters, the shape a real leaked
 // token or password would have. A multi-word fixture like this one falls
 // outside that shape by construction, correctly.
-const COMMAND = { sessionId: "22222222-2222-2222-2222-222222222222", email: "person@example.test", password: "correct horse battery staple" };
+const COMMAND = {
+  sessionId: "22222222-2222-2222-2222-222222222222",
+  email: "person@example.test",
+  password: "correct horse battery staple",
+};
 
 const activeUser = new User(USER_ID, "person@example.test", "Person", "ACTIVE");
 const suspendedUser = new User(USER_ID, "person@example.test", "Person", "SUSPENDED");
@@ -40,11 +44,7 @@ function fakeHasher(correctPairs: Array<{ hash: string; password: string }>): Pa
   };
 }
 
-function fakes(options: {
-  user?: User | null;
-  credential?: Credential | null;
-  passwordMatchesReal?: boolean;
-}) {
+function fakes(options: { user?: User | null; credential?: Credential | null; passwordMatchesReal?: boolean }) {
   const sessionsCreated: CreateSessionCommand[] = [];
 
   const users: UserRepository = {

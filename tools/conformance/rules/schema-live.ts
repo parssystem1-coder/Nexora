@@ -77,10 +77,10 @@ export async function checkSchemaLive(client: Client, schema = "public"): Promis
         `SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = $1::regclass`,
         [qualifiedIdent(schema, table)],
       );
-      const policyResult = await client.query(
-        `SELECT 1 FROM pg_policies WHERE schemaname = $1 AND tablename = $2`,
-        [schema, table],
-      );
+      const policyResult = await client.query(`SELECT 1 FROM pg_policies WHERE schemaname = $1 AND tablename = $2`, [
+        schema,
+        table,
+      ]);
       const relrowsecurity = rlsResult.rows[0]?.relrowsecurity === true;
       const hasPolicy = (policyResult.rowCount ?? 0) > 0;
 

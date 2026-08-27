@@ -31,5 +31,12 @@ export const membershipInviteCapability: CapabilityDefinition = {
   },
   inputSchema: inviteMemberInputSchema,
   outputSchema: membershipOutputSchema,
-  errorCodes: ["AUTHENTICATION_REQUIRED", "VALIDATION_ERROR", "FORBIDDEN", "RESOURCE_NOT_FOUND", "CONFLICT", "INTERNAL_ERROR"],
+  errorCodes: [
+    "AUTHENTICATION_REQUIRED",
+    "VALIDATION_ERROR",
+    "FORBIDDEN",
+    "RESOURCE_NOT_FOUND",
+    "CONFLICT",
+    "INTERNAL_ERROR",
+  ],
 };

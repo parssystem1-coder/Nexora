@@ -58,7 +58,10 @@ export class AuthLogoutController {
   @Post("logout")
   @HttpCode(200)
   @UseGuards(SessionGuard)
-  async logout(@Req() request: LogoutRequest, @Res({ passthrough: true }) response: Response): Promise<LogoutOutputDto> {
+  async logout(
+    @Req() request: LogoutRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<LogoutOutputDto> {
     const identity = request.authenticatedIdentity!;
     const requestId = request.requestId ?? "";
     const correlationId = request.correlationId ?? "";
@@ -71,7 +74,11 @@ export class AuthLogoutController {
     await runCapabilityAttempt(
       this.auditDb,
       rlsContext,
-      () => new LogoutService(new SessionRevocationRepositoryPg(this.appDb), systemClock).execute({ sessionId: identity.sessionId, userId: identity.userId }),
+      () =>
+        new LogoutService(new SessionRevocationRepositoryPg(this.appDb), systemClock).execute({
+          sessionId: identity.sessionId,
+          userId: identity.userId,
+        }),
       (outcome) =>
         new AuditEvent(
           PLATFORM_TENANT_ID,

@@ -81,7 +81,11 @@ describe("POST /api/v1/stores - happy path", () => {
   it("creates the store and returns 201 with the documented DTO, organizationId in the BODY per 05 §6.1", async () => {
     const caller = await orgWithMember("happy", "owner");
 
-    const res = await createStore(caller.token, { organizationId: caller.orgId, name: "Main Store", slug: `main-${caller.suffix}` });
+    const res = await createStore(caller.token, {
+      organizationId: caller.orgId,
+      name: "Main Store",
+      slug: `main-${caller.suffix}`,
+    });
 
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
@@ -96,19 +100,31 @@ describe("POST /api/v1/stores - happy path", () => {
   it("lets the creator immediately store.read the store they just created - proof that store_membership was written correctly", async () => {
     const caller = await orgWithMember("readback", "owner");
 
-    const created = await createStore(caller.token, { organizationId: caller.orgId, name: "Readback Store", slug: `readback-${caller.suffix}` });
+    const created = await createStore(caller.token, {
+      organizationId: caller.orgId,
+      name: "Readback Store",
+      slug: `readback-${caller.suffix}`,
+    });
     expect(created.status).toBe(201);
 
     const read = await readStore(created.body.id, caller.token);
 
     expect(read.status).toBe(200);
-    expect(read.body).toMatchObject({ id: created.body.id, organizationId: caller.orgId, slug: `readback-${caller.suffix}` });
+    expect(read.body).toMatchObject({
+      id: created.body.id,
+      organizationId: caller.orgId,
+      slug: `readback-${caller.suffix}`,
+    });
   });
 
   it("accepts an admin as well as an owner", async () => {
     const caller = await orgWithMember("admin", "admin");
 
-    const res = await createStore(caller.token, { organizationId: caller.orgId, name: "Admin Store", slug: `admin-${caller.suffix}` });
+    const res = await createStore(caller.token, {
+      organizationId: caller.orgId,
+      name: "Admin Store",
+      slug: `admin-${caller.suffix}`,
+    });
 
     expect(res.status).toBe(201);
   });
@@ -131,7 +147,11 @@ describe("POST /api/v1/stores - denial and failure paths", () => {
   it("returns AUTHENTICATION_REQUIRED with no session cookie", async () => {
     const caller = await orgWithMember("noauth", "owner");
 
-    const res = await createStore(undefined, { organizationId: caller.orgId, name: "No Auth", slug: `noauth-${caller.suffix}` });
+    const res = await createStore(undefined, {
+      organizationId: caller.orgId,
+      name: "No Auth",
+      slug: `noauth-${caller.suffix}`,
+    });
 
     expect(res.status).toBe(401);
     expect(res.body.code).toBe("AUTHENTICATION_REQUIRED");
@@ -141,7 +161,11 @@ describe("POST /api/v1/stores - denial and failure paths", () => {
     const mine = await orgWithMember("crossA", "owner");
     const theirs = await orgWithMember("crossB", "owner");
 
-    const res = await createStore(mine.token, { organizationId: theirs.orgId, name: "Cross", slug: `cross-${mine.suffix}` });
+    const res = await createStore(mine.token, {
+      organizationId: theirs.orgId,
+      name: "Cross",
+      slug: `cross-${mine.suffix}`,
+    });
 
     expect(res.status).toBe(403);
     expect(res.body.code).toBe("FORBIDDEN");
@@ -150,7 +174,11 @@ describe("POST /api/v1/stores - denial and failure paths", () => {
   it("returns FORBIDDEN for a plain MEMBER caller - store.create is owner+admin, not member", async () => {
     const caller = await orgWithMember("memberonly", "member");
 
-    const res = await createStore(caller.token, { organizationId: caller.orgId, name: "Member Store", slug: `member-${caller.suffix}` });
+    const res = await createStore(caller.token, {
+      organizationId: caller.orgId,
+      name: "Member Store",
+      slug: `member-${caller.suffix}`,
+    });
 
     expect(res.status).toBe(403);
     expect(res.body.code).toBe("FORBIDDEN");
@@ -159,7 +187,11 @@ describe("POST /api/v1/stores - denial and failure paths", () => {
   it("returns VALIDATION_ERROR for a malformed organizationId", async () => {
     const caller = await orgWithMember("badorg", "owner");
 
-    const res = await createStore(caller.token, { organizationId: "not-a-uuid", name: "Bad Org", slug: `badorg-${caller.suffix}` });
+    const res = await createStore(caller.token, {
+      organizationId: "not-a-uuid",
+      name: "Bad Org",
+      slug: `badorg-${caller.suffix}`,
+    });
 
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("VALIDATION_ERROR");
@@ -210,7 +242,11 @@ describe("POST /api/v1/stores - denial and failure paths", () => {
   it.each(["www", "api", "admin", "status"])("returns DOMAIN_RESERVED for the reserved slug %s", async (reserved) => {
     const caller = await orgWithMember("reserved", "owner");
 
-    const res = await createStore(caller.token, { organizationId: caller.orgId, name: "Reserved Attempt", slug: reserved });
+    const res = await createStore(caller.token, {
+      organizationId: caller.orgId,
+      name: "Reserved Attempt",
+      slug: reserved,
+    });
 
     expect(res.status).toBe(409);
     expect(res.body.code).toBe("DOMAIN_RESERVED");
@@ -219,7 +255,11 @@ describe("POST /api/v1/stores - denial and failure paths", () => {
   it("rejects a reserved slug even when supplied with different case/whitespace - the check runs after normalization", async () => {
     const caller = await orgWithMember("reservedcase", "owner");
 
-    const res = await createStore(caller.token, { organizationId: caller.orgId, name: "Reserved Case", slug: "  ADMIN  " });
+    const res = await createStore(caller.token, {
+      organizationId: caller.orgId,
+      name: "Reserved Case",
+      slug: "  ADMIN  ",
+    });
 
     expect(res.status).toBe(409);
     expect(res.body.code).toBe("DOMAIN_RESERVED");
@@ -261,7 +301,11 @@ describe("POST /api/v1/stores - audit (ADR-034)", () => {
   it("records a FAILURE event when the permission check refuses the caller", async () => {
     const caller = await orgWithMember("auditperm", "member");
 
-    await createStore(caller.token, { organizationId: caller.orgId, name: "No Perm", slug: `auditperm-${caller.suffix}` }).expect(403);
+    await createStore(caller.token, {
+      organizationId: caller.orgId,
+      name: "No Perm",
+      slug: `auditperm-${caller.suffix}`,
+    }).expect(403);
 
     const events = await auditRowsFor(caller.orgId, caller.userId);
     expect(events).toHaveLength(1);
@@ -277,8 +321,10 @@ describe("POST /api/v1/stores - audit (ADR-034)", () => {
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ outcome: "FAILURE", metadata: { slug: "www" } });
 
-    const stores = await withTenantContext(db, { tenantId: caller.orgId, userId: caller.userId, storeId: null }, (trx) =>
-      trx.selectFrom("stores").select("id").where("tenant_id", "=", caller.orgId).execute(),
+    const stores = await withTenantContext(
+      db,
+      { tenantId: caller.orgId, userId: caller.userId, storeId: null },
+      (trx) => trx.selectFrom("stores").select("id").where("tenant_id", "=", caller.orgId).execute(),
     );
     expect(stores).toEqual([]);
   });
@@ -287,7 +333,11 @@ describe("POST /api/v1/stores - audit (ADR-034)", () => {
     const mine = await orgWithMember("auditguard", "owner");
     const theirs = await orgWithMember("auditguardB", "owner");
 
-    await createStore(mine.token, { organizationId: theirs.orgId, name: "Cross", slug: `auditguard-${mine.suffix}` }).expect(403);
+    await createStore(mine.token, {
+      organizationId: theirs.orgId,
+      name: "Cross",
+      slug: `auditguard-${mine.suffix}`,
+    }).expect(403);
 
     expect(await auditRowsFor(theirs.orgId, theirs.userId)).toEqual([]);
     expect(await auditRowsFor(mine.orgId, mine.userId)).toEqual([]);
@@ -298,7 +348,11 @@ describe("POST /api/v1/stores - RLS and logging", () => {
   it("the new store is invisible to a query issued without tenant context", async () => {
     const caller = await orgWithMember("rls", "owner");
 
-    const res = await createStore(caller.token, { organizationId: caller.orgId, name: "Hidden", slug: `hidden-${caller.suffix}` });
+    const res = await createStore(caller.token, {
+      organizationId: caller.orgId,
+      name: "Hidden",
+      slug: `hidden-${caller.suffix}`,
+    });
     expect(res.status).toBe(201);
 
     const rows = await withTenantContext(db, { tenantId: null, userId: null, storeId: null }, (trx) =>
@@ -311,7 +365,11 @@ describe("POST /api/v1/stores - RLS and logging", () => {
     const caller = await orgWithMember("rlsMine", "owner");
     const other = await orgWithMember("rlsOther", "owner");
 
-    const res = await createStore(caller.token, { organizationId: caller.orgId, name: "Mine", slug: `mine-${caller.suffix}` });
+    const res = await createStore(caller.token, {
+      organizationId: caller.orgId,
+      name: "Mine",
+      slug: `mine-${caller.suffix}`,
+    });
     expect(res.status).toBe(201);
 
     const rows = await withTenantContext(db, { tenantId: other.orgId, userId: other.userId, storeId: null }, (trx) =>
@@ -329,7 +387,11 @@ describe("POST /api/v1/stores - RLS and logging", () => {
       captured.push(String(args[0]));
     };
     try {
-      await createStore(caller.token, { organizationId: caller.orgId, name: "Logged", slug: `logged-${caller.suffix}` }).expect(201);
+      await createStore(caller.token, {
+        organizationId: caller.orgId,
+        name: "Logged",
+        slug: `logged-${caller.suffix}`,
+      }).expect(201);
     } finally {
       console.log = originalLog;
     }

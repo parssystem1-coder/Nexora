@@ -186,7 +186,10 @@ describe("POST /api/v1/auth/login - failure indistinguishability", () => {
     const known = await seedLoginableUser("known");
     const suspended = await seedLoginableUser("suspended", { status: "SUSPENDED" });
 
-    const unknownEmailRes = await login({ email: `nobody-${randomUUID().slice(0, 8)}@example.test`, password: PASSWORD });
+    const unknownEmailRes = await login({
+      email: `nobody-${randomUUID().slice(0, 8)}@example.test`,
+      password: PASSWORD,
+    });
     const wrongPasswordRes = await login({ email: known.email, password: "not the password" });
     const suspendedRes = await login({ email: suspended.email, password: PASSWORD });
 
@@ -363,13 +366,23 @@ describe("POST /api/v1/auth/login - audit (ADR-034, ADR-035)", () => {
 
   it("writes no audit event for a malformed request (VALIDATION_ERROR) - the event covers a real attempt, not a request that never resolved one", async () => {
     const before = await withTenantContext(db, { tenantId: PLATFORM_TENANT_ID, userId: null, storeId: null }, (trx) =>
-      trx.selectFrom("audit_events").select("id").where("tenant_id", "=", PLATFORM_TENANT_ID).where("capability", "=", "auth.login").execute(),
+      trx
+        .selectFrom("audit_events")
+        .select("id")
+        .where("tenant_id", "=", PLATFORM_TENANT_ID)
+        .where("capability", "=", "auth.login")
+        .execute(),
     );
 
     await login({ email: "not-an-email" }).expect(400);
 
     const after = await withTenantContext(db, { tenantId: PLATFORM_TENANT_ID, userId: null, storeId: null }, (trx) =>
-      trx.selectFrom("audit_events").select("id").where("tenant_id", "=", PLATFORM_TENANT_ID).where("capability", "=", "auth.login").execute(),
+      trx
+        .selectFrom("audit_events")
+        .select("id")
+        .where("tenant_id", "=", PLATFORM_TENANT_ID)
+        .where("capability", "=", "auth.login")
+        .execute(),
     );
     expect(after.length).toBe(before.length);
   });
@@ -385,7 +398,12 @@ describe("POST /api/v1/auth/login - audit (ADR-034, ADR-035)", () => {
     // fail-closed guarantee every other tenant-scoped table has.
     const orgId = await seedOrganization(db, "Unrelated Org", `unrelated-${userId.slice(0, 8)}`);
     const fromUnrelatedTenant = await withTenantContext(db, { tenantId: orgId, userId: null, storeId: null }, (trx) =>
-      trx.selectFrom("audit_events").select("id").where("capability", "=", "auth.login").where("actor_user_id", "=", userId).execute(),
+      trx
+        .selectFrom("audit_events")
+        .select("id")
+        .where("capability", "=", "auth.login")
+        .where("actor_user_id", "=", userId)
+        .execute(),
     );
     expect(fromUnrelatedTenant).toEqual([]);
   });

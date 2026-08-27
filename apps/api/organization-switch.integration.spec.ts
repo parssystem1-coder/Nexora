@@ -9,7 +9,15 @@ import { loadDbConfig } from "../../platform/config.js";
 import { describeDbError } from "../../platform/db/describe-error.js";
 import { withTenantContext } from "../../platform/db/tenant-context.js";
 import { hashSessionToken } from "../../modules/identity/domain/session-token.vo.js";
-import { seedUser, seedSession, seedOrganization, seedMembership, seedStore, seedStoreMembership, grantRole } from "./test-support/seed.js";
+import {
+  seedUser,
+  seedSession,
+  seedOrganization,
+  seedMembership,
+  seedStore,
+  seedStoreMembership,
+  grantRole,
+} from "./test-support/seed.js";
 
 /**
  * `POST /api/v1/organizations/{organizationId}/switch` end to end, against
@@ -27,7 +35,9 @@ let app: INestApplication;
 const db = createDb(loadDbConfig());
 
 function switchTo(token: string, organizationId: string) {
-  return request(app.getHttpServer()).post(`/api/v1/organizations/${organizationId}/switch`).set("Cookie", `sid=${token}`);
+  return request(app.getHttpServer())
+    .post(`/api/v1/organizations/${organizationId}/switch`)
+    .set("Cookie", `sid=${token}`);
 }
 
 function readStore(token: string, storeId: string) {
@@ -159,7 +169,9 @@ describe("POST /api/v1/organizations/{organizationId}/switch", () => {
     const userId = await seedUser(db, `switch-badid-${suffix}@example.test`);
     const token = await seedSession(db, userId, {});
 
-    const res = await request(app.getHttpServer()).post("/api/v1/organizations/not-a-uuid/switch").set("Cookie", `sid=${token}`);
+    const res = await request(app.getHttpServer())
+      .post("/api/v1/organizations/not-a-uuid/switch")
+      .set("Cookie", `sid=${token}`);
 
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("VALIDATION_ERROR");

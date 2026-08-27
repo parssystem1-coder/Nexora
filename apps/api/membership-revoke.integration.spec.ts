@@ -83,7 +83,11 @@ async function membershipStatus(tenantId: string, membershipId: string): Promise
 }
 
 async function sessionStatus(token: string): Promise<string | undefined> {
-  const row = await db.selectFrom("sessions").select("status").where("token_hash", "=", hashSessionToken(token)).executeTakeFirst();
+  const row = await db
+    .selectFrom("sessions")
+    .select("status")
+    .where("token_hash", "=", hashSessionToken(token))
+    .executeTakeFirst();
   return row?.status;
 }
 
@@ -323,7 +327,11 @@ describe("POST /api/v1/organizations/{organizationId}/memberships/{membershipId}
 
     const events = await auditRowsFor(member.orgId);
     expect(events).toEqual([
-      expect.objectContaining({ capability: "membership.revoke", outcome: "FAILURE", resource_id: target.membershipId }),
+      expect.objectContaining({
+        capability: "membership.revoke",
+        outcome: "FAILURE",
+        resource_id: target.membershipId,
+      }),
     ]);
   });
 
@@ -334,7 +342,11 @@ describe("POST /api/v1/organizations/{organizationId}/memberships/{membershipId}
 
     const events = await auditRowsFor(caller.orgId);
     expect(events).toEqual([
-      expect.objectContaining({ capability: "membership.revoke", outcome: "FAILURE", resource_id: caller.membershipId }),
+      expect.objectContaining({
+        capability: "membership.revoke",
+        outcome: "FAILURE",
+        resource_id: caller.membershipId,
+      }),
     ]);
   });
 

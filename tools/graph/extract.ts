@@ -255,10 +255,7 @@ function extractModules(): ModuleNode[] {
 // ------------------------------------------------------------------- tables
 
 function extractTables(): TableNode[] {
-  const sqlFiles = [
-    ...listFiles(join(ROOT, "modules"), [".sql"]),
-    ...listFiles(join(ROOT, "platform"), [".sql"]),
-  ];
+  const sqlFiles = [...listFiles(join(ROOT, "modules"), [".sql"]), ...listFiles(join(ROOT, "platform"), [".sql"])];
 
   const tables: TableNode[] = [];
 
@@ -290,9 +287,7 @@ function extractTables(): TableNode[] {
       const body = sql.slice(open, end);
 
       const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const policies = [
-        ...sql.matchAll(new RegExp(`CREATE\\s+POLICY\\s+([a-z0-9_]+)\\s+ON\\s+"?${esc}"?`, "gi")),
-      ]
+      const policies = [...sql.matchAll(new RegExp(`CREATE\\s+POLICY\\s+([a-z0-9_]+)\\s+ON\\s+"?${esc}"?`, "gi"))]
         .map((p) => p[1])
         .filter((p): p is string => Boolean(p));
 
@@ -315,10 +310,9 @@ function extractTables(): TableNode[] {
 
 function extractRoutes(): { method: string; path: string; file: string }[] {
   const out: { method: string; path: string; file: string }[] = [];
-  const files = [
-    ...listFiles(join(ROOT, "modules"), [".ts"]),
-    ...listFiles(join(ROOT, "apps"), [".ts"]),
-  ].filter((f) => f.includes("controller") && !f.endsWith(".spec.ts"));
+  const files = [...listFiles(join(ROOT, "modules"), [".ts"]), ...listFiles(join(ROOT, "apps"), [".ts"])].filter(
+    (f) => f.includes("controller") && !f.endsWith(".spec.ts"),
+  );
 
   for (const file of files) {
     const src = read(file);
@@ -532,7 +526,9 @@ function render(g: Graph): string {
 
   L.push("## Tables");
   L.push("");
-  L.push("`tenant_id` + RLS + FORCE is required for every tenant-owned table. Exemptions are named in the phase brief §5 — an absent mark here is a fact, not a verdict.");
+  L.push(
+    "`tenant_id` + RLS + FORCE is required for every tenant-owned table. Exemptions are named in the phase brief §5 — an absent mark here is a fact, not a verdict.",
+  );
   L.push("");
   L.push("| table | module | tenant_id | RLS | FORCE | policies | migration |");
   L.push("|---|---|---|---|---|---|---|");
@@ -580,7 +576,8 @@ function render(g: Graph): string {
   }
   L.push("| layer | files | cases |");
   L.push("|---|---|---|");
-  for (const [layer, e] of [...byLayer].sort((a, b) => cmp(a[0], b[0]))) L.push(`| ${layer} | ${e.files} | ${e.cases} |`);
+  for (const [layer, e] of [...byLayer].sort((a, b) => cmp(a[0], b[0])))
+    L.push(`| ${layer} | ${e.files} | ${e.cases} |`);
   L.push("");
   L.push("<details><summary>Per file</summary>");
   L.push("");
@@ -666,7 +663,10 @@ function diffAgainst(ref: string, current: Graph): string {
     return `No graph snapshot found at ${ref}:${JSON_REL} — nothing to compare against.\n`;
   }
 
-  const lines: string[] = [`Changes since ${ref} (${previous.generatedFrom.commit} → ${current.generatedFrom.commit}):`, ""];
+  const lines: string[] = [
+    `Changes since ${ref} (${previous.generatedFrom.commit} → ${current.generatedFrom.commit}):`,
+    "",
+  ];
 
   const setDiff = (label: string, before: string[], after: string[]) => {
     const added = after.filter((x) => !before.includes(x));
@@ -675,11 +675,31 @@ function diffAgainst(ref: string, current: Graph): string {
     for (const r of removed) lines.push(`  - ${label}: ${r}`);
   };
 
-  setDiff("module", previous.modules.map((m) => m.name), current.modules.map((m) => m.name));
-  setDiff("table", previous.tables.map((t) => t.name), current.tables.map((t) => t.name));
-  setDiff("capability", previous.capabilities.map((x) => x.id), current.capabilities.map((x) => x.id));
-  setDiff("route", previous.routes.map((r) => `${r.method} ${r.path}`), current.routes.map((r) => `${r.method} ${r.path}`));
-  setDiff("ADR", previous.adrs.map((a) => `${a.id} (${a.status})`), current.adrs.map((a) => `${a.id} (${a.status})`));
+  setDiff(
+    "module",
+    previous.modules.map((m) => m.name),
+    current.modules.map((m) => m.name),
+  );
+  setDiff(
+    "table",
+    previous.tables.map((t) => t.name),
+    current.tables.map((t) => t.name),
+  );
+  setDiff(
+    "capability",
+    previous.capabilities.map((x) => x.id),
+    current.capabilities.map((x) => x.id),
+  );
+  setDiff(
+    "route",
+    previous.routes.map((r) => `${r.method} ${r.path}`),
+    current.routes.map((r) => `${r.method} ${r.path}`),
+  );
+  setDiff(
+    "ADR",
+    previous.adrs.map((a) => `${a.id} (${a.status})`),
+    current.adrs.map((a) => `${a.id} (${a.status})`),
+  );
   setDiff(
     "singleton",
     previous.singletons.map((s) => `${s.role} → ${s.file}`),
@@ -694,7 +714,8 @@ function diffAgainst(ref: string, current: Graph): string {
   for (const t of current.tables) {
     const before = previous.tables.find((p) => p.name === t.name);
     if (!before) continue;
-    if (before.rlsEnabled !== t.rlsEnabled) lines.push(`  ! table ${t.name}: RLS ${before.rlsEnabled} → ${t.rlsEnabled}`);
+    if (before.rlsEnabled !== t.rlsEnabled)
+      lines.push(`  ! table ${t.name}: RLS ${before.rlsEnabled} → ${t.rlsEnabled}`);
     if (before.rlsForced !== t.rlsForced) lines.push(`  ! table ${t.name}: FORCE ${before.rlsForced} → ${t.rlsForced}`);
     if (before.policies.length !== t.policies.length)
       lines.push(`  ! table ${t.name}: policies ${before.policies.length} → ${t.policies.length}`);
@@ -724,12 +745,18 @@ function main(): void {
     // drift instead of flagging every commit as stale by construction.
     const expectedMd = render(graph);
     const actualMd = existsSync(MD_OUT) ? readFileSync(MD_OUT, "utf8") : "";
-    const stripGeneratedLine = (s: string) => s.split("\n").filter((l) => !l.startsWith("**Generated**")).join("\n");
+    const stripGeneratedLine = (s: string) =>
+      s
+        .split("\n")
+        .filter((l) => !l.startsWith("**Generated**"))
+        .join("\n");
     const expectedMdStripped = stripGeneratedLine(expectedMd);
     const actualMdStripped = stripGeneratedLine(actualMd);
     if (expectedMdStripped !== actualMdStripped) {
       console.error(`PROJECT_GRAPH.md is stale:\n`);
-      console.error(unifiedDiff("committed PROJECT_GRAPH.md", actualMdStripped, "freshly generated", expectedMdStripped));
+      console.error(
+        unifiedDiff("committed PROJECT_GRAPH.md", actualMdStripped, "freshly generated", expectedMdStripped),
+      );
       console.error("");
       stale = true;
     }

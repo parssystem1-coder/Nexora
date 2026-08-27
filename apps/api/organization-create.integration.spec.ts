@@ -293,16 +293,19 @@ describe("POST /api/v1/organizations - audit (ADR-034)", () => {
           .where("tenant_id", "=", failedTenantId as string)
           .execute(),
     );
-    expect(events).toEqual([
-      { capability: "organization.create", outcome: "FAILURE", resource_id: failedTenantId },
-    ]);
+    expect(events).toEqual([{ capability: "organization.create", outcome: "FAILURE", resource_id: failedTenantId }]);
 
     // ...and the domain effect really did roll back: nothing exists under
     // that tenant id, even from its own context.
     const organizations = await withTenantContext(
       db,
       { tenantId: failedTenantId as string, userId: second.userId, storeId: null },
-      (trx) => trx.selectFrom("organizations").select("id").where("id", "=", failedTenantId as string).execute(),
+      (trx) =>
+        trx
+          .selectFrom("organizations")
+          .select("id")
+          .where("id", "=", failedTenantId as string)
+          .execute(),
     );
     expect(organizations).toEqual([]);
   });

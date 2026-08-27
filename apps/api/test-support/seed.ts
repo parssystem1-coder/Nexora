@@ -100,13 +100,26 @@ export async function seedStore(db: Kysely<Database>, orgId: string, name: strin
   });
 }
 
-export async function seedStoreMembership(db: Kysely<Database>, orgId: string, storeId: string, userId: string): Promise<void> {
+export async function seedStoreMembership(
+  db: Kysely<Database>,
+  orgId: string,
+  storeId: string,
+  userId: string,
+): Promise<void> {
   await withTenantContext(db, { tenantId: orgId, userId: null, storeId: null }, async (trx) => {
-    await trx.insertInto("store_memberships").values({ tenant_id: orgId, store_id: storeId, user_id: userId }).execute();
+    await trx
+      .insertInto("store_memberships")
+      .values({ tenant_id: orgId, store_id: storeId, user_id: userId })
+      .execute();
   });
 }
 
-export async function grantRole(db: Kysely<Database>, orgId: string, membershipId: string, roleKey: string): Promise<void> {
+export async function grantRole(
+  db: Kysely<Database>,
+  orgId: string,
+  membershipId: string,
+  roleKey: string,
+): Promise<void> {
   await withTenantContext(db, { tenantId: orgId, userId: null, storeId: null }, async (trx) => {
     const role = await trx.selectFrom("roles").select("id").where("key", "=", roleKey).executeTakeFirstOrThrow();
     await trx

@@ -44,13 +44,7 @@ export class InviteMemberService {
       throw new CapabilityError("RESOURCE_NOT_FOUND", "No platform user exists with that email address.");
     }
 
-    const membership = new Membership(
-      command.membershipId,
-      command.tenantId,
-      invitee.id,
-      "ACTIVE",
-      this.clock.now(),
-    );
+    const membership = new Membership(command.membershipId, command.tenantId, invitee.id, "ACTIVE", this.clock.now());
 
     try {
       await this.memberships.create(membership);

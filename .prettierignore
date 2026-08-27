@@ -1,0 +1,31 @@
+# Mechanically generated — each has its own generator and its own drift
+# check (npm run graph -- --check, npm run openapi -- --check). Formatting
+# them here would just create a second source of truth for their byte
+# layout and fight the generator on every regeneration.
+PROJECT_GRAPH.md
+tools/graph/project-graph.json
+openapi.json
+
+# Deliberately-invalid-by-design fixtures for the conformance harness's own
+# self-tests (tsconfig.json already excludes them from type checking, for
+# the same reason). Not real source; reformatting serves no purpose here.
+tools/conformance/fixtures/**
+
+# Lockfile — never hand-formatted, and reformatting it would fight npm's own
+# writer on every install.
+package-lock.json
+
+node_modules
+
+# 06_IMPLEMENTATION_PLAN.md Phase 0 item 2 groups "linter, formatter" with
+# the TypeScript/NestJS/query-builder toolchain — this is source-code
+# tooling, not a documentation formatter. Markdown is excluded entirely,
+# not merely the dated records: this repository's dated records
+# (DECISION_LOG.md, RISK_REGISTER.md, every PHASE_1_GATE_*.md) must never
+# be rewritten, per this project's own standing convention, and even a
+# cosmetic reflow (list-marker style, blank-line normalization) would be
+# indistinguishable in a diff from an actual edit to one. Excluding the
+# whole extension removes the risk rather than trusting a per-file list to
+# stay complete as new dated records are added.
+*.md
+

@@ -43,7 +43,11 @@ export function fromMoneyDto(dto: MoneyDto, currency: Currency): Money {
     throw new CurrencyMismatchError(dto.currency, currency.code, "deserialize");
   }
   if (dto.minorUnits !== currency.minorUnits) {
-    throw new CurrencyMismatchError(dto.currency, currency.code, "deserialize with a mismatched minor-unit exponent for");
+    throw new CurrencyMismatchError(
+      dto.currency,
+      currency.code,
+      "deserialize with a mismatched minor-unit exponent for",
+    );
   }
   return Money.of(BigInt(dto.amount), dto.currency);
 }

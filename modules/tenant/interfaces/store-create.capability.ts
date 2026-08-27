@@ -47,5 +47,12 @@ export const storeCreateCapability: CapabilityDefinition = {
   },
   inputSchema: createStoreInputSchema,
   outputSchema: storeOutputSchema,
-  errorCodes: ["AUTHENTICATION_REQUIRED", "VALIDATION_ERROR", "FORBIDDEN", "CONFLICT", "DOMAIN_RESERVED", "INTERNAL_ERROR"],
+  errorCodes: [
+    "AUTHENTICATION_REQUIRED",
+    "VALIDATION_ERROR",
+    "FORBIDDEN",
+    "CONFLICT",
+    "DOMAIN_RESERVED",
+    "INTERNAL_ERROR",
+  ],
 };

@@ -244,10 +244,7 @@ export function addCalendarMonths(instant: Date, months: number, timeZone: strin
   const targetYear = Math.floor(totalMonths / 12);
   const targetMonth = (((totalMonths % 12) + 12) % 12) + 1;
   const targetDay = Math.min(parts.day, daysInMonth(targetYear, targetMonth));
-  return zonedTimeToInstant(
-    { ...parts, year: targetYear, month: targetMonth, day: targetDay },
-    timeZone,
-  );
+  return zonedTimeToInstant({ ...parts, year: targetYear, month: targetMonth, day: targetDay }, timeZone);
 }
 
 /**

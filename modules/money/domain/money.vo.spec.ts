@@ -154,7 +154,10 @@ describe("Money.allocate — randomized property", () => {
       // figures past 2^53 where a number-backed implementation would drift.
       const magnitudeExponent = Math.floor(rng() * 18);
       const sign = rng() < 0.25 ? -1n : 1n;
-      const amountMinor = sign * BigInt(Math.floor(rng() * 10 ** Math.min(magnitudeExponent, 15))) * (magnitudeExponent > 15 ? 1000n : 1n);
+      const amountMinor =
+        sign *
+        BigInt(Math.floor(rng() * 10 ** Math.min(magnitudeExponent, 15))) *
+        (magnitudeExponent > 15 ? 1000n : 1n);
       const total = Money.of(amountMinor, currency);
 
       // 1..8 weights, occasionally including zero-weight lines.
