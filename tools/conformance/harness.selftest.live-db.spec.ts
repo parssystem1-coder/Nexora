@@ -32,6 +32,7 @@ beforeAll(async () => {
       `Could not reach Postgres at ${config.connectionString}. ` +
         `Run "docker compose up -d" (or point MIGRATE_DATABASE_URL at a running Postgres) ` +
         `before running the live-DB schema tests. Original error: ${describeDbError(err)}`,
+      { cause: err },
     );
   }
 });

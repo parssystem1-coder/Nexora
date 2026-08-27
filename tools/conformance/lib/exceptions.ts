@@ -19,7 +19,7 @@ export interface ExceptionsOutcome {
 
 export function loadExceptions(path: string): Exception[] {
   if (!existsSync(path)) return [];
-  const raw = JSON.parse(readFileSync(path, "utf8"));
+  const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
   if (!Array.isArray(raw)) throw new Error(`${path} must be a JSON array`);
   return raw as Exception[];
 }

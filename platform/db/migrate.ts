@@ -46,7 +46,7 @@ export async function migrate(client: Client, schema: string, files: MigrationFi
       applied.push(file.id);
     } catch (err) {
       await client.query("ROLLBACK");
-      throw new Error(`migration '${file.id}' failed: ${(err as Error).message}`);
+      throw new Error(`migration '${file.id}' failed: ${(err as Error).message}`, { cause: err });
     }
   }
 

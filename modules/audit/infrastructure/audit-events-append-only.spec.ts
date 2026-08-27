@@ -27,6 +27,7 @@ beforeAll(async () => {
   } catch (err) {
     throw new Error(
       `Could not reach Postgres for the audit append-only test. Run "docker compose up -d". ${describeDbError(err)}`,
+      { cause: err },
     );
   }
 });

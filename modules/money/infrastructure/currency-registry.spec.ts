@@ -20,6 +20,7 @@ beforeAll(async () => {
   } catch (err) {
     throw new Error(
       `Could not reach Postgres for the currency registry test. Run "docker compose up -d". ${describeDbError(err)}`,
+      { cause: err },
     );
   }
 });

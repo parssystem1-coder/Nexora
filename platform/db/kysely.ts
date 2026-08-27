@@ -11,6 +11,7 @@ import type { DbConfig } from "../config.js";
  * a plain empty interface (not an index signature) so a later module's
  * declaration merge (adding a real table key) type-checks cleanly against it.
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- deliberate declaration-merging target, see the doc comment above.
 export interface Database {}
 
 export function createDb(config: DbConfig): Kysely<Database> {

@@ -276,6 +276,7 @@ try {
 } catch (err) {
   throw new Error(
     `Could not reach Postgres for the tenant-isolation RLS probe (or the live enumeration query itself failed). Run "docker compose up -d". ${describeDbError(err)}`,
+    { cause: err },
   );
 }
 

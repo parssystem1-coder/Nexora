@@ -97,6 +97,7 @@ beforeAll(async () => {
   } catch (err) {
     throw new Error(
       `Could not reach Postgres for the membership.revoke integration test. Run "docker compose up -d". Original error: ${describeDbError(err)}`,
+      { cause: err },
     );
   }
   app = await createTestApp();

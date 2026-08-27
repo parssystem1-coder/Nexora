@@ -101,6 +101,12 @@ export async function runCapabilityAttempt<T>(
     );
   }
 
+  // `thrown` is a faithful passthrough of whatever `work()` itself threw, not
+  // a new value being thrown here — this codebase's own convention is to
+  // only ever throw real Error subclasses (CapabilityError, etc.), but
+  // TypeScript types a catch clause's binding as `unknown`, which is exactly
+  // what flows into `thrown`, so the rule cannot see that convention holds.
+  // eslint-disable-next-line @typescript-eslint/only-throw-error
   if (thrown) throw thrown;
   return result!;
 }

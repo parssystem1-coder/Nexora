@@ -658,7 +658,7 @@ function stripGeneratedFrom(g: Graph): Omit<Graph, "generatedFrom"> {
 function diffAgainst(ref: string, current: Graph): string {
   let previous: Graph;
   try {
-    previous = JSON.parse(execFileSync("git", ["show", `${ref}:${JSON_REL}`], { cwd: ROOT }).toString());
+    previous = JSON.parse(execFileSync("git", ["show", `${ref}:${JSON_REL}`], { cwd: ROOT }).toString()) as Graph;
   } catch {
     return `No graph snapshot found at ${ref}:${JSON_REL} — nothing to compare against.\n`;
   }
@@ -771,7 +771,7 @@ function main(): void {
     // to filter in JSON the way there is in the Markdown).
     const expectedJson = JSON.stringify(stripGeneratedFrom(graph), null, 2);
     const actualJsonRaw = existsSync(JSON_OUT) ? readFileSync(JSON_OUT, "utf8") : "";
-    let actualJson = "";
+    let actualJson: string;
     try {
       actualJson = actualJsonRaw ? JSON.stringify(stripGeneratedFrom(JSON.parse(actualJsonRaw) as Graph), null, 2) : "";
     } catch {

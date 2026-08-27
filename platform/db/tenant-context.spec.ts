@@ -41,6 +41,7 @@ beforeAll(async () => {
       `Could not reach Postgres for the tenant-context self-test (migrate or app role). ` +
         `Run "docker compose up -d" or point DATABASE_URL/MIGRATE_DATABASE_URL at a running Postgres. ` +
         `Original error: ${describeDbError(err)}`,
+      { cause: err },
     );
   }
 
