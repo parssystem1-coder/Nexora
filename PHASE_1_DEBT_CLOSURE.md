@@ -8,7 +8,7 @@ Every claim below was verified directly against the repository for this document
 
 | ID | Item | Status |
 |---|---|---|
-| D-1 | Calendar/timezone helpers | PENDING |
+| D-1 | Calendar/timezone helpers | CLOSED |
 | D-2 | Redis + BullMQ | PENDING |
 | D-3 | Shared capability pipeline | PENDING |
 | D-4 | Linter and formatter | PENDING |
@@ -23,6 +23,8 @@ Every claim below was verified directly against the repository for this document
 **Verified:** `06_IMPLEMENTATION_PLAN.md` line 36, Phase 1 item 5: *"clock abstraction **and timezone helpers** (ADR-031)."* `08_PHASE_1_BRIEF.md` §0's Time row: *"UTC `timestamptz`, injected clock, **calendar arithmetic**"* (ADR-031). Read `platform/clock.ts` in full: it contains exactly the `Clock` interface and `systemClock`, nothing else — no timezone conversion, no calendar-boundary arithmetic, no date-library dependency. A repository-wide search for `timezone|calendar|Temporal|luxon|date-fns|moment` across `platform/` and `modules/` found nothing (one incidental match was the English word "moment" in a comment, not a library). The clock half of item 5 was built (Task 1); the timezone/calendar half was not, and nothing in `DECISION_LOG.md` records a decision to defer it.
 
 **Why it matters now, not later:** Phase 2 (`06` line 36's own sibling work) needs exactly this — a subscription term's calendar-boundary expiry cannot be correctly proven without it, and retrofitting it after `subscription_periods` exists risks the same "data migration plus a rounding-bug hunt" `08_PHASE_1_BRIEF.md` §4 already warns about for money.
+
+**CLOSED, 2026-08-29.** `modules/calendar/domain/business-calendar.ts` (+ `.errors.ts`, `.spec.ts`, `contracts/index.ts`) — `addCalendarMonths`, `addCalendarYears` (ADR-031 item 3's end-of-month/leap-day clamping), `addCalendarDays` and `startOfDay`/`dayBoundary` (ADR-031 item 4's half-open convention), `compareInstants`/`isWithinHalfOpenInterval`, all pure functions over explicit instants + IANA zone strings, zero new runtime dependencies (`Intl.DateTimeFormat`, confirmed sufficient — Node's global `Temporal` does not exist yet). 26 new domain unit tests, including month-end rollover, leap-year anniversaries, DST transitions in both directions (America/New_York), a fixed-offset zone, and Asia/Tehran's real 2022 DST abolition crossed both correctly and incorrectly-assumed-then-corrected (see `DECISION_LOG.md`). Five decisions taken and logged, not picked silently: module placement (`modules/calendar/`, not `platform/`), the Gregorian-arithmetic/Jalali-rendering split (decided by the user, recorded normatively, not built), the resulting invariant plus a candidate future conformance rule, the zero-dependency choice, and the DST gap/overlap disambiguation policy ADR-031 leaves silent — see `DECISION_LOG.md` 2026-08-29 for all five, including a real algorithm bug (iteration-parity-dependent gap resolution) this slice's own test-writing caught before it shipped. No table, no migration (`db:migrate` still reports 20), no subscription/period/billing logic, no Jalali formatter — all explicitly out of scope and not built. `npm run graph` regenerated and committed alongside (new module, +26 tests).
 
 ---
 
