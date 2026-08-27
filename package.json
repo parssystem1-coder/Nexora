@@ -6,16 +6,18 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "conformance": "tsx tools/conformance/run.ts",
+    "conformance": "tsx --env-file-if-exists=.env tools/conformance/run.ts",
     "graph": "tsx tools/graph/extract.ts",
     "openapi": "tsx tools/openapi/generate.ts",
-    "test": "vitest run",
+    "test": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run",
     "test:watch": "vitest",
-    "db:migrate": "tsx platform/db/migrate-cli.ts",
-    "start:dev": "tsx watch apps/api/main.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env platform/db/migrate-cli.ts",
+    "start:dev": "tsx watch --env-file-if-exists=.env apps/api/main.ts",
+    "start": "node --env-file-if-exists=.env dist/apps/api/main.js"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "7.3.4",
