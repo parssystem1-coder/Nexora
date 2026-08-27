@@ -10,9 +10,11 @@
 
 `PHASE_1_GATE_CONFIRMATION_2026-08-26.md` §7: *"The gate does not fully open on this commit today, for exactly one reason: CI has not run on `fd13c1e`... What stands between here and open: a successful CI run on `fd13c1e` (or a subsequent commit, re-checked the same way)."* Every other check in that report was verified locally and independently; only the CI-run condition was outstanding.
 
-## 2. Root cause of the stuck run
+## 2. Cause of the stuck run
 
-The repository had been switched to **private** on 2026-08-26, which blocked GitHub Actions from scheduling the queued run (`32985409838`) — consistent with its `updated_at` being byte-identical to its `created_at` for over 30 minutes, and with every run before and after it starting and completing normally. The repository has since been switched back to **public**, and Actions runs again.
+**Established correlation, not a diagnosed mechanism:** the repository had been switched to **private** on 2026-08-26; the queued run (`32985409838`) never scheduled a job — consistent with its `updated_at` being byte-identical to its `created_at` for over 30 minutes, against every run before and after it starting and completing normally. The repository has since been switched back to **public**, and Actions runs again (§4).
+
+**Correction, 2026-08-28: the actual cause is UNKNOWN, not the "Actions quota/plan" explanation first assumed here.** Settings → Billing and licensing → Usage was checked: month-to-date gross metered usage is ~$7 with **$0.00 billed** (fully offset by discount — no spending threshold crossed), and its usage curve rises well before this repository even had a git remote (added 2026-08-23), so most of that $7 isn't this repository's CI. Against GitHub Free's ~2,000 included private-repo Actions minutes (a derived estimate, not a page reading), ~$7 of mostly-unattributed usage does not look like an exhausted allowance. The quota/plan theory is withdrawn; no replacement cause is asserted. Open, unperformed checks (full detail in `DECISION_LOG.md` 2026-08-27): a budget/alert that blocks rather than bills usage; the Usage page broken down by product; this repository's own Actions permissions setting. **The warning that returning to private may break CI again stands regardless of cause, and matters more now that the mechanism isn't understood.**
 
 ## 3. Proof the reviewed code tree is unchanged
 
