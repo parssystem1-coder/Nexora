@@ -15,6 +15,9 @@ import { OrganizationAccessGuard } from "../../modules/tenant/interfaces/organiz
 import { SessionGuard } from "../../modules/identity/interfaces/session.guard.js";
 import { HttpExceptionFilter } from "../../modules/capability/interfaces/http-exception.filter.js";
 import { APP_DB, AUDIT_DB, createAppDb, createAuditDb } from "../../platform/db/connections.js";
+import { RATE_LIMIT_STORE } from "../../platform/rate-limit/store.js";
+import { InProcessRateLimitStore } from "../../platform/rate-limit/in-process-store.js";
+import { systemClock } from "../../platform/clock.js";
 import { DatabaseLifecycle } from "./database-lifecycle.provider.js";
 import { HealthController } from "./health.controller.js";
 
@@ -41,6 +44,13 @@ import { HealthController } from "./health.controller.js";
   providers: [
     { provide: APP_DB, useFactory: createAppDb },
     { provide: AUDIT_DB, useFactory: createAuditDb },
+    // One instance per running app (per createApp()/createTestApp() call) -
+    // in-process, per RISK_REGISTER.md R-005 (see platform/rate-limit/
+    // in-process-store.ts's own doc comment for what that does and does not
+    // guarantee). Not a bare module-level singleton: DI-scoping it this way
+    // is what keeps each test file's own app instance isolated from every
+    // other's rate-limit state.
+    { provide: RATE_LIMIT_STORE, useFactory: () => new InProcessRateLimitStore(systemClock) },
     DatabaseLifecycle,
     SessionGuard,
     StoreAccessGuard,

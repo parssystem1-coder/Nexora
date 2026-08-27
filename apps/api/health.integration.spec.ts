@@ -50,6 +50,12 @@ describe("GET /health", () => {
     expect(res.body).toEqual({ status: "ok" });
   });
 
+  it("never sends X-Powered-By (Express's default, disabled in create-app.ts's applyMiddleware)", async () => {
+    const res = await request(app.getHttpServer()).get("/health");
+
+    expect(res.headers["x-powered-by"]).toBeUndefined();
+  });
+
   it("returns 503 with no internal detail when the database is unreachable", async () => {
     // A real, unreachable connection (port 1 refuses immediately) rather than
     // a mocked Kysely — this is a live DB failure, not a simulated one, the

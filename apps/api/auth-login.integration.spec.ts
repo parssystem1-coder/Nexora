@@ -219,8 +219,6 @@ describe("POST /api/v1/auth/login - failure indistinguishability", () => {
   });
 
   it("timing: an unknown email is not measurably faster than a wrong password for a real account (both perform one Argon2 verify)", async () => {
-    const known = await seedLoginableUser("timing");
-
     const SAMPLES = 8;
     const unknownTimes: number[] = [];
     const wrongTimes: number[] = [];
@@ -230,6 +228,13 @@ describe("POST /api/v1/auth/login - failure indistinguishability", () => {
       await login({ email: `nobody-${randomUUID().slice(0, 8)}@example.test`, password: PASSWORD });
       unknownTimes.push(Date.now() - t0);
 
+      // A freshly seeded user per iteration, not one shared "known" user
+      // reused 8 times: the identifier-level rate limit (RISK_REGISTER.md
+      // R-005) would otherwise start throttling repeat failures against the
+      // SAME identifier partway through this loop, replacing genuine
+      // Argon2-verify timing with fast pre-Argon2 429s and corrupting
+      // exactly the comparison this test exists to make.
+      const known = await seedLoginableUser("timing");
       const t1 = Date.now();
       await login({ email: known.email, password: "wrong" });
       wrongTimes.push(Date.now() - t1);

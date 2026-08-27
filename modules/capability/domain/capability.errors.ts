@@ -9,6 +9,7 @@ export type CapabilityErrorCode =
   | "FORBIDDEN"
   | "TENANT_CONTEXT_REQUIRED"
   | "STORE_ACCESS_DENIED"
+  | "RATE_LIMITED"
   | "VALIDATION_ERROR"
   | "RESOURCE_NOT_FOUND"
   | "CONFLICT"
@@ -21,6 +22,11 @@ const STATUS_BY_CODE: Record<CapabilityErrorCode, number> = {
   FORBIDDEN: 403,
   TENANT_CONTEXT_REQUIRED: 400,
   STORE_ACCESS_DENIED: 403,
+  // 429, RISK_REGISTER.md R-005 / decisions/2026-08.md this date: auth.login's
+  // per-identifier/per-IP throttle (platform/rate-limit/). First user of this
+  // code; documented in 05_API_CAPABILITY_CONTRACTS.md §7 the same way
+  // DOMAIN_RESERVED was added for store.create.
+  RATE_LIMITED: 429,
   VALIDATION_ERROR: 400,
   RESOURCE_NOT_FOUND: 404,
   CONFLICT: 409,

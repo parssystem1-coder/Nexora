@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "283e036",
+    "commit": "a192e78",
     "dirty": true
   },
   "modules": [
@@ -707,6 +707,16 @@
       "cases": 5
     },
     {
+      "file": "platform/rate-limit/in-process-store.spec.ts",
+      "layer": "platform",
+      "cases": 9
+    },
+    {
+      "file": "apps/api/auth-login-rate-limit.integration.spec.ts",
+      "layer": "integration",
+      "cases": 4
+    },
+    {
       "file": "apps/api/auth-login.integration.spec.ts",
       "layer": "integration",
       "cases": 19
@@ -724,7 +734,7 @@
     {
       "file": "apps/api/health.integration.spec.ts",
       "layer": "integration",
-      "cases": 2
+      "cases": 3
     },
     {
       "file": "apps/api/membership-invite.integration.spec.ts",
@@ -850,8 +860,8 @@
     "tablesWithRls": 6,
     "capabilities": 10,
     "routes": 11,
-    "testFiles": 38,
-    "testCases": 365,
+    "testFiles": 40,
+    "testCases": 379,
     "adrs": 38,
     "adrsAccepted": 30
   }

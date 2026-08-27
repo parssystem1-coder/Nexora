@@ -42,5 +42,5 @@ export const authLoginCapability: CapabilityDefinition = {
   },
   inputSchema: loginInputSchema,
   outputSchema: loginOutputSchema,
-  errorCodes: ["VALIDATION_ERROR", "AUTHENTICATION_REQUIRED", "INTERNAL_ERROR"],
+  errorCodes: ["VALIDATION_ERROR", "AUTHENTICATION_REQUIRED", "RATE_LIMITED", "INTERNAL_ERROR"],
 };

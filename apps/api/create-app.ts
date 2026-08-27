@@ -42,6 +42,14 @@ import { securityHeadersMiddleware } from "./security-headers.middleware.js";
  * construction moved.
  */
 export function applyMiddleware(app: INestApplication): void {
+  // Express sets this on every response by default; NestJS does not disable
+  // it. Missed by the previous session, which only thought in terms of
+  // headers to ADD — confirmed present with `curl -i` before this fix
+  // existed (decisions/2026-08.md, this date). Disabling it here, not just
+  // adding a header to remove it downstream, is the actual fix: this stops
+  // Express from ever setting it in the first place.
+  const expressInstance = app.getHttpAdapter().getInstance() as { disable(name: string): void };
+  expressInstance.disable("x-powered-by");
   app.enableCors({ origin: false });
   app.use(securityHeadersMiddleware);
   app.use(cookieParser());
