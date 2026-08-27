@@ -1,0 +1,71 @@
+# Phase 1 Debt Closure
+
+**The Phase 1 gate stays OPEN** (`PHASE_1_GATE_OPEN_2026-08-27.md`). This document does not reopen it and is not a fourth gate review. `06_IMPLEMENTATION_PLAN.md` was checked against the repository and found deliverables from Phases 0 and 1 that were planned, never built, and never closed out by an explicit decision covering the fact that they *stayed* unbuilt through the end of Phase 1. They are recorded here, before Phase 2 opens, rather than carried invisibly forward.
+
+**This is a live tracker, not a dated record.** Update items in place as they close; do not leave a stale PENDING standing once the underlying work lands.
+
+Every claim below was verified directly against the repository for this document — file contents, `package.json`, migrations, `06`/`08`/`REPOSITORY_AUDIT_REPORT.md` text, and `DECISION_LOG.md` — not copied from the request that prompted it. One item (D-5) required a correction to how it was originally framed; that correction is recorded in place rather than silently adopting the cleaner claim.
+
+| ID | Item | Status |
+|---|---|---|
+| D-1 | Calendar/timezone helpers | PENDING |
+| D-2 | Redis + BullMQ | PENDING |
+| D-3 | Shared capability pipeline | PENDING |
+| D-4 | Linter and formatter | PENDING |
+| D-5 | `outbox_events` and `identity_providers` | PENDING |
+
+---
+
+## D-1 — Calendar/timezone helpers
+
+**Exit criterion:** a duration or boundary computation (e.g. "a one-year term expires at its calendar boundary after grace") can be expressed and tested using a shared helper, not ad hoc `Date` arithmetic in each call site.
+
+**Verified:** `06_IMPLEMENTATION_PLAN.md` line 36, Phase 1 item 5: *"clock abstraction **and timezone helpers** (ADR-031)."* `08_PHASE_1_BRIEF.md` §0's Time row: *"UTC `timestamptz`, injected clock, **calendar arithmetic**"* (ADR-031). Read `platform/clock.ts` in full: it contains exactly the `Clock` interface and `systemClock`, nothing else — no timezone conversion, no calendar-boundary arithmetic, no date-library dependency. A repository-wide search for `timezone|calendar|Temporal|luxon|date-fns|moment` across `platform/` and `modules/` found nothing (one incidental match was the English word "moment" in a comment, not a library). The clock half of item 5 was built (Task 1); the timezone/calendar half was not, and nothing in `DECISION_LOG.md` records a decision to defer it.
+
+**Why it matters now, not later:** Phase 2 (`06` line 36's own sibling work) needs exactly this — a subscription term's calendar-boundary expiry cannot be correctly proven without it, and retrofitting it after `subscription_periods` exists risks the same "data migration plus a rounding-bug hunt" `08_PHASE_1_BRIEF.md` §4 already warns about for money.
+
+---
+
+## D-2 — Redis + BullMQ
+
+**Exit criterion:** `docker-compose.yml` runs a `redis` service and `package.json` carries a queue dependency (or an explicit, dated decision records why Phase 1 does not need either yet).
+
+**Verified:** `06_IMPLEMENTATION_PLAN.md` line 17, Phase 0 item 2: *"Docker compose for PostgreSQL and Redis."* Read `docker-compose.yml` in full: one service, `postgres`. Read `package.json` in full: no `redis`, `bullmq`, `ioredis`, or any queue package in `dependencies` or `devDependencies`. `REPOSITORY_AUDIT_REPORT.md` §7 open item 4 (line 210): *"Whether/when to add a `redis` service to `docker-compose.yml` — currently omitted as out of scope for this session's minimal-scaffold instruction"* — dated 2026-08-22, never struck through or revisited (items 1, 3, and 6 in that same list were later resolved and struck through; item 4 was not). `DECISION_LOG.md`'s own 2026-08-22 entry: *"Status: OPEN — add the `redis` service to `docker-compose.yml` when Task 1 needs it (sessions, idempotency service)."* Task 1 and Task 2 are both now complete; sessions exist (`auth.login`), the idempotency service does not (D-5's sibling gap, ADR-009, still unbuilt) — so the stated trigger condition never actually fired, and nothing revisited the OPEN status once that became clear.
+
+**Why it matters now, not later:** `06_IMPLEMENTATION_PLAN.md` Phase 2 item 14 (line 70, "renewal lifecycle jobs: notice, reminders, rollover, expire, deprovision, trial expiry") is a set of scheduled jobs that need a queue. Entering Phase 2 without this decided means it gets made under Phase 2 feature pressure instead of deliberately.
+
+---
+
+## D-3 — Shared capability pipeline
+
+**Exit criterion:** the controller-level composition (guard → transaction → permission → service → audit) exists in one shared place, not copied into every controller file.
+
+**Verified against `RISK_REGISTER.md` R-009** (recorded 2026-08-28, in the prior debt-tracking pass on this same repository): all ten controllers under `apps/api`/`modules/*/interfaces/*.controller.ts` were read directly and confirmed to repeat the same composition shape the golden path (`store.controller.ts`) established — including the specific defect R-009 tracks, `recordAuditEventDurable` sitting outside the domain transaction's `try/catch` in all ten. `store.controller.ts`'s own doc comment already names the fix: *"Generalizing this wiring into a reusable policy pipeline is Phase 5's 'capability registry and policy pipeline', deliberately not built ahead of having more than one capability to generalize from."*
+
+**Why it matters now, not later:** every Phase 2 capability that mirrors the golden path (`AGENTS.md` §2 requires this) adds an eleventh, twelfth, thirteenth copy of the same ~10-line composition — and of R-009's defect inside it — before Phase 5 is scheduled to ever generalize it. The cost of extracting this grows with every slice added in the meantime, and Phase 2 is large (`06`'s 16-item Commercial Core list).
+
+---
+
+## D-4 — Linter and formatter
+
+**Exit criterion:** `package.json` runs a linter and a formatter (or an equivalent, e.g. Biome), with a passing CI step for each, or a decision record explains why Phase 0 shipped without them.
+
+**Verified:** `06_IMPLEMENTATION_PLAN.md` line 17, Phase 0 item 2 (the same line as D-2's Redis clause): *"TypeScript, NestJS, Next.js, the query builder chosen in ADR-021, test runner, **linter, formatter**, Docker compose for PostgreSQL and Redis."* Read `package.json` in full: `devDependencies` lists `@nestjs/testing`, type packages, `supertest`, `tsx`, `typescript`, `vitest` — no `eslint`, `prettier`, `biome`, or equivalent. No `lint` or `format` script exists (`scripts` lists `typecheck`, `conformance`, `graph`, `openapi`, `test`, `test:watch`, `db:migrate`, `start:dev` only). No `.eslintrc*`, `eslint.config.*`, or `.prettierrc*` file exists at the repository root. **Phase 0's exit was never actually met** — this was never recorded as a deliberate deferral anywhere searched (`DECISION_LOG.md`, `RISK_REGISTER.md`, `REPOSITORY_AUDIT_REPORT.md`).
+
+**Why three independent gate reviews missed it, confirmed rather than assumed:** `PHASE_1_GATE_REVIEW_2026-08-24.md`, `PHASE_1_GATE_REVIEW_2026-08-24-II.md`, and `PHASE_1_GATE_CONFIRMATION_2026-08-26.md` were each grepped for `linter|formatter|eslint|prettier|Phase 0` — zero matches in all three. All three audited `08_PHASE_1_BRIEF.md` §6's nine Phase 1 exit criteria exclusively; none of the three checked Phase 0's own seven-item deliverable list from `06`, so a Phase 0 gap had no review positioned to catch it.
+
+---
+
+## D-5 — `outbox_events` and `identity_providers`
+
+**Exit criterion:** both tables exist, or a decision record explicitly accepts closing Phase 1 without them and states what (if anything) depends on that.
+
+**Verified, with a correction to how this item was first framed:** `08_PHASE_1_BRIEF.md` §4's "Tables in scope" list (*"Only these. Creating anything else is out of scope"*) names both `identity_providers` and `outbox_events`. Neither table exists — confirmed by searching every migration file under `modules/*/migrations/` for `CREATE TABLE outbox_events` / `CREATE TABLE identity_providers`: no match. No `eventing` module exists at all (`modules/` contains only `audit`, `authorization`, `capability`, `identity`, `money`, `tenant`) — `outbox_events`' own intended owner, per `DECISION_LOG.md`'s 2026-08-22 module-mapping note, was never scaffolded either.
+
+**The correction:** the claim that "no decision record defers either" is not accurate as stated. `DECISION_LOG.md`'s 2026-08-22 migration-scope entry explicitly defers both: *"Deferred to whichever later Task 2 slice first needs them: `credentials`, `identity_providers` (needed by `auth.login`, not by validating an existing session)... `outbox_events` (needed once eventing starts)... All five remain inside the §4 ceiling and will be added in their own migration when that slice starts."* For `identity_providers` specifically, a follow-up decision exists too, made when `auth.login` actually shipped (2026-08-23): *"`identity_providers` is NOT created — this capability (password-only login) does not need it... its tenancy stays undecided."*
+
+**What is genuinely missing, and is the real gap this item tracks:** both deferrals were conditional — "when that slice starts" / "once eventing starts." Task 2 is now complete, all seven of its capabilities shipped, and the condition never fired for either table: no Phase 1 slice ever needed `identity_providers` (no SSO/OAuth capability was built) and none ever needed `outbox_events` (no eventing capability was built). Nothing revisited either deferral once that became knowable — there is no decision record stating "Phase 1 is closing and these remain deliberately absent, here is what that means for Phase 2," only the original, now-lapsed conditional deferrals. `08_PHASE_1_BRIEF.md` §4's framing ("Only these... out of scope" for anything else) reads as an expectation these would exist by phase end, not a list some members of which could silently carry past it. That gap — a closing decision, not an opening one — is what needs to be made, not the original deferral, which was reasonable and already made.
+
+---
+
+**Closure protocol for this document:** when an item's underlying work lands, update its Status cell to CLOSED, add a one-line pointer to the commit/PR or the decision record that closed it, and leave the verification paragraph above it untouched (it is what was true when the gap was found, not a running commentary). Do not delete a closed item — a debt that was paid is still worth knowing was once owed.
