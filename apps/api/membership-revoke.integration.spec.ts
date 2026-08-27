@@ -448,6 +448,22 @@ describe("POST /api/v1/organizations/{organizationId}/memberships/{membershipId}
    * regardless of which of the two lands is the actual invariant this test
    * exists to prove: exactly one request succeeds, and the organization
    * never ends with zero active owners.
+   *
+   * KNOWN ISSUE, not resolved by the above: this test has failed
+   * intermittently in CI three times (`RISK_REGISTER.md` R-008,
+   * `DECISION_LOG.md` 2026-09-02 for the full investigation) with `successes`
+   * reporting length 0 — i.e. NEITHER response read as 200 — which the
+   * reasoning above does not anticipate at all (it explains a 401 in place
+   * of 409, not a world with no 200). Investigated deliberately: the
+   * Postgres-deadlock hypothesis this project's own risk register once
+   * proposed is now REFUTED, not just unconfirmed — `pg_stat_database
+   * .deadlocks` showed zero increase across 150 local reproduction attempts
+   * of this exact scenario, and none of the three real CI failures show a
+   * 5xx status anywhere in either request. The failure could not be
+   * reproduced locally after 165 total executions (150 isolated + 15 full
+   * local-suite runs). Root cause remains genuinely UNDETERMINED. The
+   * diagnostic dump below exists because of this — the next occurrence
+   * should not be another dead end.
    */
   it("two concurrent revokes of an organization's only two owners, each targeting the other: exactly one succeeds, and the organization never reaches zero owners", async () => {
     const ownerA = await orgWithMember("race", "owner");
@@ -459,16 +475,50 @@ describe("POST /api/v1/organizations/{organizationId}/memberships/{membershipId}
     ]);
 
     const statuses = [resAtoB.status, resBtoA.status];
-    const successes = statuses.filter((s) => s === 200);
-    const losses = statuses.filter((s) => s === 409 || s === 401);
-    expect(successes).toHaveLength(1);
-    expect(losses).toHaveLength(1);
 
-    const [statusA, statusB] = await Promise.all([
+    // RISK_REGISTER.md R-008 / DECISION_LOG.md 2026-09-02: captured
+    // UNCONDITIONALLY, before any assertion that could throw — every
+    // occurrence of this test's own intermittent CI failure so far has left
+    // the actual end state unrecorded, because it happened at the
+    // `successes` assertion below, before this state was ever read. That is
+    // exactly why three real failures produced so little diagnostic
+    // information. Moving the read here, and logging it whenever the
+    // outcome is not the expected shape, means the next occurrence — found
+    // or not — leaves an actual trail.
+    const [finalStatusA, finalStatusB] = await Promise.all([
       membershipStatus(ownerA.orgId, ownerA.membershipId),
       membershipStatus(ownerA.orgId, ownerB.membershipId),
     ]);
-    const activeOwners = [statusA, statusB].filter((s) => s === "ACTIVE");
+
+    const successes = statuses.filter((s) => s === 200);
+    const losses = statuses.filter((s) => s === 409 || s === 401);
+    if (successes.length !== 1 || losses.length !== 1) {
+      console.error(
+        "two-concurrent-owners: unexpected status shape — full diagnostic dump (R-008):",
+        JSON.stringify(
+          {
+            statuses,
+            typeofStatuses: statuses.map((s) => typeof s),
+            bodyAtoB: resAtoB.body,
+            bodyBtoA: resBtoA.body,
+            headersAtoB: resAtoB.headers,
+            headersBtoA: resBtoA.headers,
+            finalStatusA,
+            finalStatusB,
+            orgId: ownerA.orgId,
+            ownerAMembershipId: ownerA.membershipId,
+            ownerBMembershipId: ownerB.membershipId,
+          },
+          null,
+          2,
+        ),
+      );
+    }
+
+    expect(successes).toHaveLength(1);
+    expect(losses).toHaveLength(1);
+
+    const activeOwners = [finalStatusA, finalStatusB].filter((s) => s === "ACTIVE");
     expect(activeOwners).toHaveLength(1);
   });
 });
