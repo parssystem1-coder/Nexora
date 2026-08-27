@@ -41,6 +41,8 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
+      - name: No devDependency import in dist
+        run: npm run check:dist-deps
       - name: Lint
         run: npm run lint
       - name: Format check

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { sql } from "kysely";
-import { createTestApp } from "./create-app.js";
+import { createTestApp } from "./test-support/create-test-app.js";
 import { createDb } from "../../platform/db/kysely.js";
 import { loadDbConfig } from "../../platform/config.js";
 import { describeDbError } from "../../platform/db/describe-error.js";
