@@ -1,0 +1,8 @@
+# Commits listed here are ignored by `git blame` (git blame --ignore-revs-file
+# .git-blame-ignore-revs, or `git config blame.ignoreRevsFile
+# .git-blame-ignore-revs` to make it the default). Each entry is a pure
+# reformatting commit with no logic change - see its own commit message for
+# what verified that.
+
+# format: add Prettier, reformat the codebase (D-4, commit 1 of 3)
+311d18495778a8c60133d1fbf4dab1e081f8ac9c
