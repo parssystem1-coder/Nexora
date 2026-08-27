@@ -73,7 +73,7 @@ These are the failures that hide behind a green build.
 
 **CI.** A workflow file that has never executed does not satisfy "proven by a test in CI". Check whether it has actually run.
 
-**Open risks and decisions.** Read `RISK_REGISTER.md` and the open items in `DECISION_LOG.md`. An open risk that a criterion depends on is a blocker, not a footnote.
+**Open risks and decisions.** Read `RISK_REGISTER.md` and the open items in the decision log — `DECISION_LOG.md` is now an index over `decisions/YYYY-MM.md` files; check the recent period files it names, not just the index itself. An open risk that a criterion depends on is a blocker, not a footnote.
 
 **Next-phase prerequisites.** Read the next phase's ordered steps in `06_IMPLEMENTATION_PLAN.md` and check its first three or four steps against the repository. A phase whose own criteria are met can still be blocked by infrastructure the next phase assumes exists — the money/currency model, the shared idempotency service, the queue, the outbox table, calendar arithmetic. Name each missing prerequisite and which step needs it.
 

@@ -79,7 +79,7 @@ Open these in order. They are the template, not just an example.
 - [ ] affected ADRs
 - [ ] whether a new ADR is required
 
-If any line is uncertain, that is a documentation defect. Write it into `DECISION_LOG.md` with options and a recommendation, then stop and report — per `AGENTS.md` §5.
+If any line is uncertain, that is a documentation defect. Write it into the decision log with options and a recommendation, then stop and report — per `AGENTS.md` §5. `DECISION_LOG.md` is an index; it names the `decisions/YYYY-MM.md` file the current month's entries go in.
 
 ## Step 3 — Module layout
 
@@ -190,7 +190,7 @@ If the harness flags something, **do not weaken the rule and do not add an excep
 
 ## Step 8 — Report and stop
 
-- Append any decision you had to make to `DECISION_LOG.md`.
+- Append any decision you had to make to the decision log (`DECISION_LOG.md`'s index names the current month's `decisions/YYYY-MM.md` file).
 - One commit naming the owning module and affected ADRs.
 - Report: what was built, which test proves each rule, what you deliberately did not do.
 - **Stop.** Do not start the next slice in the same run.

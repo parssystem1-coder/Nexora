@@ -82,7 +82,9 @@ Before changing code, state in the PR description:
 
 ## 5. When You Are Uncertain
 
-Stop. Write the ambiguity into `DECISION_LOG.md` with options and a recommendation. Do not invent a competing architecture, and do not pick silently because a decision was inconvenient.
+Stop. Write the ambiguity into the decision log with options and a recommendation. Do not invent a competing architecture, and do not pick silently because a decision was inconvenient.
+
+`DECISION_LOG.md` is an index (split 2026-08-27 to cut context cost) — it names which `decisions/YYYY-MM.md` file entries for the current month go in, creating that file if needed. Every entry still uses the one template and the one newest-first convention; only the file it lives in changed.
 
 Ambiguity that blocks you is a documentation defect. Report it as one.
 

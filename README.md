@@ -29,10 +29,10 @@ Fixed in `08_PHASE_1_BRIEF.md` §0 — not decided here.
 ## Running it locally
 
 ```
-npm run typecheck && npm test && npm run conformance && npm run db:migrate
+npm run typecheck && npm run lint && npm run format:check && npm test && npm run conformance && npm run db:migrate
 ```
 
-Needs PostgreSQL up (`docker compose up -d --wait`) with the roles `platform/db/init/001_roles.sql` creates.
+Needs PostgreSQL up with the roles `platform/db/init/001_roles.sql` creates. CI runs `docker compose up -d --wait` (`docker-compose.yml`, port 5433); a machine without Docker needs a native PostgreSQL 17 instead — see `CLAUDE.md`'s "Local database note" for the connection strings that case needs.
 
 ## What exists right now
 
