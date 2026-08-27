@@ -158,6 +158,19 @@ function partsEqual(a: ZonedDateTimeParts, b: ZonedDateTimeParts): boolean {
  *     the first correction already (proven by that same test), so this
  *     branch exists as an explicit, tested fallback rather than something
  *     any known zone's data actually reaches.
+ *
+ * This is exactly ECMAScript Temporal's `disambiguation: "compatible"`
+ * default — confirmed against the actual behavior documented for
+ * `Temporal.ZonedDateTime.from` (MDN, 2026-08-29 check), not assumed: "for
+ * non-existent times, 'compatible' is equivalent to 'later'"; "for
+ * ambiguous times, 'compatible' is equivalent to 'earlier'". The match
+ * matters beyond validating the choice: it means the future migration this
+ * file's dependency decision (DECISION_LOG.md 2026-08-29) anticipates —
+ * swapping this hand-rolled conversion for a native `Temporal` once Node
+ * exposes one — is behavior-preserving by default, not a silent semantic
+ * change a migrator would need to special-case. Whoever performs that
+ * migration should still re-verify this claim against whatever Temporal
+ * implementation actually ships, rather than trust this comment indefinitely.
  */
 export function zonedTimeToInstant(desired: ZonedDateTimeParts, timeZone: string): Date {
   // Validate the zone up front so a bad identifier fails here, not on some
@@ -172,6 +185,31 @@ export function zonedTimeToInstant(desired: ZonedDateTimeParts, timeZone: string
   const observedB = getZonedDateTimeParts(new Date(candidateA), timeZone);
   const candidateB = candidateA + (desiredMs - asIfUtcMs(observedB));
 
+  // Provably safe to return candidateA here without the partsEqual check
+  // every other branch below performs, FOR EVERY CALL SITE IN THIS FILE:
+  // `candidateA === candidateB` holds iff `asIfUtcMs(observedB) ===
+  // desiredMs` (by construction of candidateB above), and `asIfUtcMs`
+  // (`Date.UTC`) is injective over canonical, in-range calendar tuples — so
+  // that equality implies `observedB` and `desired` are the same tuple,
+  // i.e. exactly what `partsEqual` would have checked. This requires
+  // `desired` itself to be canonical (year/month/day/hour/etc. each within
+  // their normal range), which holds for every call in this file:
+  // `getZonedDateTimeParts`'s own output is always canonical (Intl
+  // guarantees it), and `addCalendarMonths`/`addCalendarDays`/`startOfDay`
+  // each construct `desired` from canonical, explicitly-clamped fields —
+  // never from an unvalidated caller input. It would NOT hold for a
+  // hypothetical direct external caller of this exported function passing
+  // an out-of-range tuple (e.g. `day: 32`), since `Date.UTC` silently
+  // normalizes such input rather than rejecting it, which could coincide
+  // with a canonical `observedB` under `asIfUtcMs` while still differing
+  // from `desired` field-by-field. Not guarded against here, deliberately:
+  // this codebase validates a caller-supplied STRING shape at a boundary
+  // (`InvalidTimeZoneError`, above) the same way `Money` validates its
+  // currency code, but — also like `Money`, which does not range-check
+  // `amountMinor` — trusts a caller-supplied NUMBER to already be a sane
+  // domain value rather than defensively re-validating it, per this
+  // project's "trust internal code" boundary convention. No caller passes
+  // a non-canonical tuple today.
   if (candidateA === candidateB) return new Date(candidateA);
 
   const validA = partsEqual(getZonedDateTimeParts(new Date(candidateA), timeZone), desired);
@@ -248,7 +286,19 @@ export function addCalendarDays(instant: Date, days: number, timeZone: string): 
   );
 }
 
-/** The instant that reads as `00:00:00.000` on `instant`'s own calendar day in `timeZone`. */
+/**
+ * The instant that reads as `00:00:00.000` on `instant`'s own calendar day
+ * in `timeZone` — EXCEPT in a zone whose DST transition falls exactly at
+ * midnight, where `00:00:00.000` on that specific day does not exist
+ * (confirmed against real data: America/Santiago's spring-forward jumps
+ * directly from `23:59:59.999` the previous day to `01:00:00.000`, skipping
+ * its transition day's midnight entirely). On that one day, this correctly
+ * returns `zonedTimeToInstant`'s gap-policy answer instead — the same
+ * "later candidate" resolution every other caller of a nonexistent
+ * wall-clock time gets, not a special case carved out here. Covered by a
+ * dedicated test using America/Santiago's actual 2026 transition, not just
+ * asserted from this comment.
+ */
 export function startOfDay(instant: Date, timeZone: string): Date {
   const parts = getZonedDateTimeParts(instant, timeZone);
   return zonedTimeToInstant(

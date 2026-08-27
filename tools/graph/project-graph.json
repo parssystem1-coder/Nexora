@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "eeae38b",
+    "commit": "0d449ca",
     "dirty": true
   },
   "modules": [
@@ -612,7 +612,7 @@
     {
       "file": "modules/calendar/domain/business-calendar.spec.ts",
       "layer": "domain",
-      "cases": 26
+      "cases": 27
     },
     {
       "file": "modules/identity/application/login.service.spec.ts",
@@ -834,7 +834,7 @@
     "capabilities": 10,
     "routes": 10,
     "testFiles": 36,
-    "testCases": 360,
+    "testCases": 361,
     "adrs": 38,
     "adrsAccepted": 30
   }

@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `eeae38b` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `0d449ca` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 10 routes · 360 test cases in 36 files · 38 ADRs (30 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 10 routes · 361 test cases in 36 files · 38 ADRs (30 accepted)
 
 ## Modules
 
@@ -69,7 +69,7 @@ Roles ADR-030 requires exactly one implementation of.
 |---|---|---|
 | application | 13 | 72 |
 | conformance | 2 | 29 |
-| domain | 3 | 47 |
+| domain | 3 | 48 |
 | infrastructure | 4 | 15 |
 | integration | 11 | 180 |
 | other | 2 | 12 |
@@ -82,7 +82,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/audit/infrastructure/audit-events-append-only.spec.ts` | infrastructure | 3 |
 | `modules/authorization/application/check-permission.service.spec.ts` | application | 2 |
 | `modules/authorization/infrastructure/role-catalog-agreement.spec.ts` | infrastructure | 1 |
-| `modules/calendar/domain/business-calendar.spec.ts` | domain | 26 |
+| `modules/calendar/domain/business-calendar.spec.ts` | domain | 27 |
 | `modules/identity/application/login.service.spec.ts` | application | 10 |
 | `modules/identity/application/logout-all.service.spec.ts` | application | 4 |
 | `modules/identity/application/logout.service.spec.ts` | application | 3 |

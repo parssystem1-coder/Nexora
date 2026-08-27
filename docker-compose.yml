@@ -23,5 +23,27 @@ services:
       timeout: 2s
       retries: 30
 
+  redis:
+    # `01_ARCHITECTURE_BASELINE_RFC.md` §37/38, `08_PHASE_1_BRIEF.md` §0:
+    # "Cache / queue | Redis + BullMQ". The SERVICE lands now
+    # (PHASE_1_DEBT_CLOSURE.md D-2) so the compose/CI plumbing is proven
+    # working before Phase 2 needs it under feature pressure — R-001's own
+    # history is the lesson that compose plumbing nobody has ever actually
+    # run is not proven, just assumed. Nothing in this codebase connects to
+    # it yet: no BullMQ, no Redis client dependency, no code reads
+    # REDIS_URL. See DECISION_LOG.md 2026-08-29 for why the service and the
+    # client dependency are two different decisions, not one.
+    image: redis:7-alpine
+    ports:
+      # Host port 6380, not 6379 (Redis's default): same reasoning as
+      # Postgres's 5433 above — avoids colliding with a developer's own
+      # local Redis install.
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
 volumes:
   postgres_data:

@@ -222,6 +222,19 @@ describe("startOfDay / dayBoundary (ADR-031 item 4: half-open periods)", () => {
     expect(startOfDay(instant, "Asia/Tehran").toISOString()).toBe("2026-06-14T20:30:00.000Z");
   });
 
+  it("resolves to the gap-policy instant when the zone's own midnight does not exist that day", () => {
+    // America/Santiago's 2026 spring-forward is confirmed (via direct Intl
+    // probing) to land exactly at local midnight: 2026-09-06T03:59:59Z is
+    // 2026-09-05 23:59:59 local, and 2026-09-06T04:00:00Z is already
+    // 2026-09-06 01:00:00 local — the entire 00:00-00:59 hour of Sept 6
+    // does not exist. `startOfDay` for any instant on that calendar day
+    // must therefore return the same "later candidate" resolution every
+    // other nonexistent wall-clock time gets, not a literal 00:00:00.000.
+    const instant = new Date("2026-09-06T20:00:00.000Z"); // 17:00 local that day
+    const result = startOfDay(instant, "America/Santiago");
+    expect(result.toISOString()).toBe("2026-09-06T04:00:00.000Z"); // 01:00 local — not 00:00, which never happened
+  });
+
   it("dayBoundary produces a correct half-open [start, end) pair spanning exactly one calendar day", () => {
     const instant = zonedTimeToInstant({ year: 2026, month: 6, day: 15, hour: 14, minute: 0, second: 0, millisecond: 0 }, "Asia/Tehran");
     const { start, end } = dayBoundary(instant, "Asia/Tehran");

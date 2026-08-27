@@ -25,7 +25,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Start PostgreSQL (docker-compose.yml)
+      - name: Start PostgreSQL and Redis (docker-compose.yml)
         run: docker compose up -d --wait
       # The compose container above starts with no schema at all - it is a
       # brand-new volume on every run. This step is therefore also the
@@ -50,7 +50,7 @@ jobs:
       - name: OpenAPI artifact up to date (ADR-033)
         if: always()
         run: npm run openapi -- --check
-      - name: Stop PostgreSQL
+      - name: Stop PostgreSQL and Redis
         if: always()
         run: docker compose down -v
       - name: Upload exceptions report
