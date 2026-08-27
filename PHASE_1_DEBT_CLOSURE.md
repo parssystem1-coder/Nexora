@@ -10,7 +10,7 @@ Every claim below was verified directly against the repository for this document
 |---|---|---|
 | D-1 | Calendar/timezone helpers | CLOSED |
 | D-2 | Redis + BullMQ | PARTIALLY CLOSED |
-| D-3 | Shared capability pipeline | PENDING |
+| D-3 | Shared capability pipeline | CLOSED |
 | D-4 | Linter and formatter | PENDING |
 | D-5 | `outbox_events` and `identity_providers` | PENDING |
 
@@ -47,6 +47,8 @@ Every claim below was verified directly against the repository for this document
 **Verified against `RISK_REGISTER.md` R-009** (recorded 2026-08-28, in the prior debt-tracking pass on this same repository): all ten controllers under `apps/api`/`modules/*/interfaces/*.controller.ts` were read directly and confirmed to repeat the same composition shape the golden path (`store.controller.ts`) established — including the specific defect R-009 tracks, `recordAuditEventDurable` sitting outside the domain transaction's `try/catch` in all ten. `store.controller.ts`'s own doc comment already names the fix: *"Generalizing this wiring into a reusable policy pipeline is Phase 5's 'capability registry and policy pipeline', deliberately not built ahead of having more than one capability to generalize from."*
 
 **Why it matters now, not later:** every Phase 2 capability that mirrors the golden path (`AGENTS.md` §2 requires this) adds an eleventh, twelfth, thirteenth copy of the same ~10-line composition — and of R-009's defect inside it — before Phase 5 is scheduled to ever generalize it. The cost of extracting this grows with every slice added in the meantime, and Phase 2 is large (`06`'s 16-item Commercial Core list).
+
+**CLOSED, 2026-08-31, in two separate commits per `DECISION_LOG.md`'s two 2026-08-31 entries.** Commit 1: pure extraction, zero behavior change. All ten controllers now call `runCapabilityAttempt` (`modules/capability/interfaces/capability-attempt.ts`, exported via `modules/capability/contracts/`) instead of hand-rolling the outcome-tracking + audit-write + rethrow tail. Read all ten controllers fresh before extracting anything, and kept every genuine difference exactly where it was — which guard chain runs, whether/how a transaction opens (`auth.login`/`auth.logout`/`auth.logout_all` open none), which tenant a capability's audit event is attributed to (a real tenant, or ADR-035's platform sentinel), and each capability's own `AuditEvent` fields — none of this became a flag or a branch in the shared helper; it all stays a parameter or stays in the controller. Proof of zero behavior change: **all 378 pre-existing tests pass with zero test files edited.** Commit 2: fixed R-009 in this one now-shared place — the audit write is wrapped in its own `try/catch`; its failure is logged and swallowed, never allowed to override the already-decided domain outcome. Proven by two new tests (`capability-attempt.spec.ts`) independently confirmed to fail against commit 1's code and pass against commit 2's, checked directly rather than merely asserted (380 tests total). `RISK_REGISTER.md` R-009 closed. **This is explicitly not Phase 5's "capability registry and policy pipeline"** — `store.controller.ts`'s own doc comment, `AGENTS.md` §2, and `.claude/skills/new-slice/SKILL.md` are all updated to say so and to teach the shared helper. A conformance rule forbidding hand-rolling the old skeleton again was assessed and deliberately not built (no evidence yet anyone would). `db:migrate` still reports 20; `openapi.json` unchanged — no route, contract, or migration touched.
 
 ---
 

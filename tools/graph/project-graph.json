@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "ad3e774",
+    "commit": "30be5bd",
     "dirty": true
   },
   "modules": [
@@ -48,7 +48,7 @@
         "domain",
         "interfaces"
       ],
-      "files": 7,
+      "files": 8,
       "dependsOn": [
         "audit"
       ],
@@ -617,6 +617,11 @@
       "cases": 27
     },
     {
+      "file": "modules/capability/interfaces/capability-attempt.spec.ts",
+      "layer": "interfaces",
+      "cases": 2
+    },
+    {
       "file": "modules/identity/application/login.service.spec.ts",
       "layer": "application",
       "cases": 10
@@ -835,8 +840,8 @@
     "tablesWithRls": 6,
     "capabilities": 10,
     "routes": 10,
-    "testFiles": 36,
-    "testCases": 361,
+    "testFiles": 37,
+    "testCases": 363,
     "adrs": 38,
     "adrsAccepted": 30
   }
