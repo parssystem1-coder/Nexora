@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `32169b3` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `283e036` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 10 routes · 363 test cases in 37 files · 38 ADRs (30 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 365 test cases in 38 files · 38 ADRs (30 accepted)
 
 ## Modules
 
@@ -71,7 +71,7 @@ Roles ADR-030 requires exactly one implementation of.
 | conformance | 2 | 29 |
 | domain | 3 | 48 |
 | infrastructure | 4 | 15 |
-| integration | 11 | 180 |
+| integration | 12 | 182 |
 | interfaces | 1 | 2 |
 | other | 2 | 12 |
 | platform | 1 | 5 |
@@ -105,6 +105,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `apps/api/auth-login.integration.spec.ts` | integration | 19 |
 | `apps/api/auth-logout.integration.spec.ts` | integration | 13 |
 | `apps/api/error-contract.integration.spec.ts` | integration | 3 |
+| `apps/api/health.integration.spec.ts` | integration | 2 |
 | `apps/api/membership-invite.integration.spec.ts` | integration | 24 |
 | `apps/api/membership-revoke.integration.spec.ts` | integration | 24 |
 | `apps/api/membership-role-assign.integration.spec.ts` | integration | 30 |

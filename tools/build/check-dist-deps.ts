@@ -47,14 +47,26 @@ function toBarePackageName(specifier: string): string {
   return specifier.startsWith("@") ? segments.slice(0, 2).join("/") : (segments[0] ?? specifier);
 }
 
+/**
+ * `import "x"` (a bare side-effect import, no binding and no `from` on a
+ * separate keyword) is a fourth, real import shape this must catch —
+ * confirmed missing by direct testing, not assumed: `main.ts`'s own
+ * `import "reflect-metadata";` compiles straight through to identical
+ * ESM output and did not match any of the first three alternatives below.
+ * Ordered last and anchored on `import` directly (not just `["']`) so it
+ * cannot accidentally consume the quote inside `import(`, `import type`, or
+ * `import { x } from "y"` — none of those have a quote immediately after
+ * `import` plus whitespace, so this alternative only ever fires on the bare
+ * form.
+ */
 const IMPORT_SPECIFIER_PATTERN =
-  /(?:from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)|require\(\s*["']([^"']+)["']\s*\))/g;
+  /(?:from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)|require\(\s*["']([^"']+)["']\s*\)|import\s+["']([^"']+)["'])/g;
 
 function findDevDependencyImports(file: string, devDependencyNames: ReadonlySet<string>): string[] {
   const source = readFileSync(file, "utf8");
   const violations: string[] = [];
   for (const match of source.matchAll(IMPORT_SPECIFIER_PATTERN)) {
-    const specifier = match[1] ?? match[2] ?? match[3];
+    const specifier = match[1] ?? match[2] ?? match[3] ?? match[4];
     if (specifier === undefined) continue;
     if (devDependencyNames.has(toBarePackageName(specifier))) {
       violations.push(specifier);

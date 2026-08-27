@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module.js";
 import { requestContextMiddleware } from "./request-context.middleware.js";
 import { loggingMiddleware } from "./logging.middleware.js";
+import { securityHeadersMiddleware } from "./security-headers.middleware.js";
 
 /**
  * The single definition of how the API is assembled. Both the real entry point
@@ -15,7 +16,21 @@ import { loggingMiddleware } from "./logging.middleware.js";
  *
  * Middleware order is load-bearing: requestContext must precede logging (which
  * reads the ids it assigns) and both must precede the guards, so that even an
- * AUTHENTICATION_REQUIRED response carries a requestId.
+ * AUTHENTICATION_REQUIRED response carries a requestId. CORS and the security
+ * headers run first, ahead of both: a cross-origin preflight or a response to
+ * a request a guard will go on to reject should still carry the standard
+ * headers, and CORS in particular needs to run before anything else can
+ * short-circuit a preflight OPTIONS request.
+ *
+ * CORS is explicitly disabled (`origin: false`), not merely left unconfigured
+ * — verified directly, not assumed, that this is what "deny by default" needs:
+ * `cors`'s own README describes `origin: false` as "disable CORS", but its
+ * source only honors that when `corsOptions.origin` is truthy for building an
+ * `originCallback` at all (`node_modules/cors/lib/index.js`) — `false` skips
+ * that entirely and the middleware calls `next()` with zero CORS headers set,
+ * for both a preflight and an actual request. No allowlist exists yet because
+ * nothing sets one; when one is needed it is real config, not an invented env
+ * var (decisions/2026-08.md, this date).
  *
  * The test-side assembly, `createTestApp`, lives in
  * `test-support/create-test-app.ts`, not here — it needs NestJS's testing
@@ -27,6 +42,8 @@ import { loggingMiddleware } from "./logging.middleware.js";
  * construction moved.
  */
 export function applyMiddleware(app: INestApplication): void {
+  app.enableCors({ origin: false });
+  app.use(securityHeadersMiddleware);
   app.use(cookieParser());
   app.use(requestContextMiddleware);
   app.use(loggingMiddleware);

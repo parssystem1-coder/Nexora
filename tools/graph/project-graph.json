@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "32169b3",
+    "commit": "283e036",
     "dirty": true
   },
   "modules": [
@@ -722,6 +722,11 @@
       "cases": 3
     },
     {
+      "file": "apps/api/health.integration.spec.ts",
+      "layer": "integration",
+      "cases": 2
+    },
+    {
       "file": "apps/api/membership-invite.integration.spec.ts",
       "layer": "integration",
       "cases": 24
@@ -832,6 +837,11 @@
       "method": "GET",
       "path": "/api/v1/stores/:storeId",
       "file": "modules/tenant/interfaces/store.controller.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "file": "apps/api/health.controller.ts"
     }
   ],
   "counts": {
@@ -839,9 +849,9 @@
     "tables": 14,
     "tablesWithRls": 6,
     "capabilities": 10,
-    "routes": 10,
-    "testFiles": 37,
-    "testCases": 363,
+    "routes": 11,
+    "testFiles": 38,
+    "testCases": 365,
     "adrs": 38,
     "adrsAccepted": 30
   }

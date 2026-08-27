@@ -16,6 +16,7 @@ import { SessionGuard } from "../../modules/identity/interfaces/session.guard.js
 import { HttpExceptionFilter } from "../../modules/capability/interfaces/http-exception.filter.js";
 import { APP_DB, AUDIT_DB, createAppDb, createAuditDb } from "../../platform/db/connections.js";
 import { DatabaseLifecycle } from "./database-lifecycle.provider.js";
+import { HealthController } from "./health.controller.js";
 
 /**
  * The one place every module's controllers and guards get wired together
@@ -25,6 +26,7 @@ import { DatabaseLifecycle } from "./database-lifecycle.provider.js";
  */
 @Module({
   controllers: [
+    HealthController,
     StoreController,
     OrganizationController,
     MembershipController,
