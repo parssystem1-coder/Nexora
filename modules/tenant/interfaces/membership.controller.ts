@@ -5,10 +5,10 @@ import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { systemClock } from "../../../platform/clock.js";
-import { CapabilityError, buildValidationInput } from "../../capability/contracts/index.js";
+import { CapabilityError, buildValidationInput, runCapabilityAttempt } from "../../capability/contracts/index.js";
 import { SessionGuard, UserRepositoryPg } from "../../identity/contracts/index.js";
 import { CheckPermissionService, PermissionCheckRepositoryPg } from "../../authorization/contracts/index.js";
-import { AuditEvent, recordAuditEventDurable, type AuditOutcome } from "../../audit/contracts/index.js";
+import { AuditEvent } from "../../audit/contracts/index.js";
 import { OrganizationAccessGuard } from "./organization-access.guard.js";
 import type { RequestWithTenantContext } from "./tenant-context.js";
 import { membershipInviteCapability } from "./membership-invite.capability.js";
@@ -88,55 +88,42 @@ export class MembershipController {
     const rlsContext = { tenantId: tenantContext.tenantId, userId: tenantContext.userId, storeId: null };
     const newMembershipId = randomUUID();
 
-    let outcome: AuditOutcome = "SUCCESS";
-    let result: MembershipDto | undefined;
-    let thrown: unknown;
-
-    try {
-      result = await withTenantContext(this.appDb, rlsContext, async (trx) => {
-        // step 6 - permission authorization
-        const permissions = new CheckPermissionService(new PermissionCheckRepositoryPg(trx));
-        for (const permission of membershipInviteCapability.requiredPermissions) {
-          await permissions.assert(tenantContext.tenantId, callerMembershipId, permission);
-        }
-
-        // step 7 - application service execution + domain mapping
-        const service = new InviteMemberService(
-          new UserRepositoryPg(trx),
-          new MembershipRepositoryPg(trx),
-          systemClock,
-        );
-        return service.execute({
-          membershipId: newMembershipId,
-          tenantId: tenantContext.tenantId,
-          email: parsed.data.email,
-        });
-      });
-    } catch (err) {
-      outcome = "FAILURE";
-      thrown = err;
-    }
-
-    // step 8 - durable audit, on the dedicated connection, before this
-    // handler resolves either way (ADR-034).
-    await recordAuditEventDurable(
+    return runCapabilityAttempt(
       this.auditDb,
       rlsContext,
-      new AuditEvent(
-        tenantContext.tenantId,
-        tenantContext.userId,
-        "user",
-        membershipInviteCapability.id,
-        "membership",
-        newMembershipId,
-        outcome,
-        tenantContext.requestId,
-        tenantContext.correlationId,
-        { inviteeEmail: parsed.data.email },
-      ),
-    );
+      () =>
+        withTenantContext(this.appDb, rlsContext, async (trx) => {
+          // step 6 - permission authorization
+          const permissions = new CheckPermissionService(new PermissionCheckRepositoryPg(trx));
+          for (const permission of membershipInviteCapability.requiredPermissions) {
+            await permissions.assert(tenantContext.tenantId, callerMembershipId, permission);
+          }
 
-    if (thrown) throw thrown;
-    return result!;
+          // step 7 - application service execution + domain mapping
+          const service = new InviteMemberService(
+            new UserRepositoryPg(trx),
+            new MembershipRepositoryPg(trx),
+            systemClock,
+          );
+          return service.execute({
+            membershipId: newMembershipId,
+            tenantId: tenantContext.tenantId,
+            email: parsed.data.email,
+          });
+        }),
+      (outcome) =>
+        new AuditEvent(
+          tenantContext.tenantId,
+          tenantContext.userId,
+          "user",
+          membershipInviteCapability.id,
+          "membership",
+          newMembershipId,
+          outcome,
+          tenantContext.requestId,
+          tenantContext.correlationId,
+          { inviteeEmail: parsed.data.email },
+        ),
+    );
   }
 }

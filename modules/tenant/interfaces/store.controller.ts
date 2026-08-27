@@ -5,7 +5,8 @@ import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { SessionGuard } from "../../identity/contracts/index.js";
 import { CheckPermissionService, PermissionCheckRepositoryPg } from "../../authorization/contracts/index.js";
-import { AuditEvent, recordAuditEventDurable, type AuditOutcome } from "../../audit/contracts/index.js";
+import { runCapabilityAttempt } from "../../capability/contracts/index.js";
+import { AuditEvent } from "../../audit/contracts/index.js";
 import { StoreAccessGuard } from "./store-access.guard.js";
 import type { RequestWithStoreTenantContext } from "./store-access.guard.js";
 import { storeReadCapability } from "./store-read.capability.js";
@@ -41,12 +42,19 @@ import type { StoreDto } from "../contracts/index.js";
  *   (step 7) never even runs, so there is exactly one outcome to record,
  *   not two.
  *
- * The body is composition (build repositories bound to `trx`, run them in
- * order, record one outcome), not business logic: no branch here decides a
- * business outcome, only observes one already decided by step 6 or step 7.
- * Generalizing this wiring into a reusable policy pipeline is Phase 5's
- * "capability registry and policy pipeline", deliberately not built ahead of
- * having more than one capability to generalize from — see DECISION_LOG.md.
+ * `runCapabilityAttempt` (`modules/capability/interfaces/capability-attempt.ts`)
+ * is the outcome-tracking + audit-write + rethrow tail every one of Phase
+ * 1's ten controllers shared byte-for-byte — extracted once, in
+ * `PHASE_1_DEBT_CLOSURE.md` D-3, not deferred any further. **This is not
+ * Phase 5's "capability registry and policy pipeline"** — that generalized
+ * pipeline (resolving a `CapabilityDefinition`, choosing a guard chain,
+ * choosing whether a transaction opens at all) remains Phase 5's scope,
+ * deliberately; this extraction only pulled forward the one piece that was
+ * already, provably, identical everywhere. What still lives here, not in
+ * the shared helper, is exactly what differs by capability: which guards
+ * ran, whether/how a transaction opens, and what the audit event's own
+ * fields are — see DECISION_LOG.md 2026-08-30 for the full boundary
+ * reasoning and what was deliberately left alone.
  */
 @Controller("api/v1/stores")
 export class StoreController {
@@ -70,45 +78,32 @@ export class StoreController {
       storeId: tenantContext.storeId,
     };
 
-    let outcome: AuditOutcome = "SUCCESS";
-    let result: StoreDto | undefined;
-    let thrown: unknown;
-
-    try {
-      result = await withTenantContext(this.appDb, rlsContext, async (trx) => {
-        // step 6 — permission authorization
-        const permissions = new CheckPermissionService(new PermissionCheckRepositoryPg(trx));
-        for (const permission of storeReadCapability.requiredPermissions) {
-          await permissions.assert(tenantContext.tenantId, tenantContext.membershipId, permission);
-        }
-
-        // step 7 — application service execution + domain mapping
-        return new ReadStoreService(new StoreRepositoryPg(trx)).execute({ storeId: tenantContext.storeId });
-      });
-    } catch (err) {
-      outcome = "FAILURE";
-      thrown = err;
-    }
-
-    // step 8 — durable audit, on the dedicated connection, before this
-    // handler resolves either way (option B).
-    await recordAuditEventDurable(
+    return runCapabilityAttempt(
       this.auditDb,
       rlsContext,
-      new AuditEvent(
-        tenantContext.tenantId,
-        tenantContext.userId,
-        "user",
-        storeReadCapability.id,
-        "store",
-        tenantContext.storeId,
-        outcome,
-        tenantContext.requestId,
-        tenantContext.correlationId,
-      ),
-    );
+      () =>
+        withTenantContext(this.appDb, rlsContext, async (trx) => {
+          // step 6 — permission authorization
+          const permissions = new CheckPermissionService(new PermissionCheckRepositoryPg(trx));
+          for (const permission of storeReadCapability.requiredPermissions) {
+            await permissions.assert(tenantContext.tenantId, tenantContext.membershipId, permission);
+          }
 
-    if (thrown) throw thrown;
-    return result!;
+          // step 7 — application service execution + domain mapping
+          return new ReadStoreService(new StoreRepositoryPg(trx)).execute({ storeId: tenantContext.storeId });
+        }),
+      (outcome) =>
+        new AuditEvent(
+          tenantContext.tenantId,
+          tenantContext.userId,
+          "user",
+          storeReadCapability.id,
+          "store",
+          tenantContext.storeId,
+          outcome,
+          tenantContext.requestId,
+          tenantContext.correlationId,
+        ),
+    );
   }
 }

@@ -36,6 +36,8 @@ Exactly one vertical slice in this codebase is the **golden path**: `store.read`
 
 It is hand-reviewed and it is the canonical example of module layout, file naming, transaction handling, tenant context, authorization, error mapping, audit and tests.
 
+**"Mirror the golden path" means using its shared pieces, not copying its composition by hand.** `PHASE_1_DEBT_CLOSURE.md` D-3 extracted the outcome-tracking + audit-write + rethrow tail every one of Phase 1's ten capabilities had copied identically into `runCapabilityAttempt` (`modules/capability/contracts/index.ts`) once real duplication existed to extract from. Mirroring the golden path now means calling that shared helper the way `store.controller.ts` itself does, not hand-rolling its `try { ... } catch { outcome = "FAILURE" } ...` skeleton again in a new controller. This is not a second structure — it is the same structure, with one genuinely-identical piece factored out. It is also not Phase 5's "capability registry and policy pipeline": guard selection, transaction strategy, and a capability's own audit fields still vary by capability and still live in each controller — see `DECISION_LOG.md` 2026-08-30 for exactly where that line sits.
+
 When implementing anything new:
 
 1. Open the golden path first.

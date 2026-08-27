@@ -5,11 +5,11 @@ import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { systemClock } from "../../../platform/clock.js";
-import { CapabilityError } from "../../capability/contracts/index.js";
+import { CapabilityError, runCapabilityAttempt } from "../../capability/contracts/index.js";
 import { SessionGuard } from "../../identity/contracts/index.js";
 import type { RequestWithTenantContext } from "./tenant-context.js";
 import { RoleGrantRepositoryPg } from "../../authorization/contracts/index.js";
-import { AuditEvent, recordAuditEventDurable, type AuditOutcome } from "../../audit/contracts/index.js";
+import { AuditEvent } from "../../audit/contracts/index.js";
 import { organizationCreateCapability } from "./organization-create.capability.js";
 import { createOrganizationInputSchema } from "../application/create-organization.input.js";
 import { CreateOrganizationService } from "../application/create-organization.service.js";
@@ -105,50 +105,37 @@ export class OrganizationController {
 
     const rlsContext = { tenantId: organizationId, userId: identity.userId, storeId: null };
 
-    let outcome: AuditOutcome = "SUCCESS";
-    let result: OrganizationDto | undefined;
-    let thrown: unknown;
-
-    try {
-      result = await withTenantContext(this.appDb, rlsContext, async (trx) => {
-        // step 7 - application service execution + domain mapping
-        const service = new CreateOrganizationService(
-          new OrganizationRepositoryPg(trx),
-          new MembershipRepositoryPg(trx),
-          new RoleGrantRepositoryPg(trx),
-          systemClock,
-        );
-        return service.execute({
-          organizationId,
-          creatorUserId: identity.userId,
-          name: parsed.data.name,
-          slug: parsed.data.slug,
-        });
-      });
-    } catch (err) {
-      outcome = "FAILURE";
-      thrown = err;
-    }
-
-    // step 8 - durable audit, on the dedicated connection, before this
-    // handler resolves either way (ADR-034).
-    await recordAuditEventDurable(
+    return runCapabilityAttempt(
       this.auditDb,
       rlsContext,
-      new AuditEvent(
-        organizationId,
-        identity.userId,
-        "user",
-        organizationCreateCapability.id,
-        "organization",
-        organizationId,
-        outcome,
-        tenantContext.requestId,
-        tenantContext.correlationId,
-      ),
+      () =>
+        withTenantContext(this.appDb, rlsContext, async (trx) => {
+          // step 7 - application service execution + domain mapping
+          const service = new CreateOrganizationService(
+            new OrganizationRepositoryPg(trx),
+            new MembershipRepositoryPg(trx),
+            new RoleGrantRepositoryPg(trx),
+            systemClock,
+          );
+          return service.execute({
+            organizationId,
+            creatorUserId: identity.userId,
+            name: parsed.data.name,
+            slug: parsed.data.slug,
+          });
+        }),
+      (outcome) =>
+        new AuditEvent(
+          organizationId,
+          identity.userId,
+          "user",
+          organizationCreateCapability.id,
+          "organization",
+          organizationId,
+          outcome,
+          tenantContext.requestId,
+          tenantContext.correlationId,
+        ),
     );
-
-    if (thrown) throw thrown;
-    return result!;
   }
 }

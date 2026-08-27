@@ -5,3 +5,4 @@ export type {
   CapabilityRoute,
 } from "../domain/capability-definition.js";
 export { resolvePathOrBodyValue, buildValidationInput } from "../interfaces/path-body-conflict.js";
+export { runCapabilityAttempt } from "../interfaces/capability-attempt.js";

@@ -5,8 +5,8 @@ import type { Kysely } from "kysely";
 import type { Database } from "../../../platform/db/kysely.js";
 import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { systemClock } from "../../../platform/clock.js";
-import { CapabilityError } from "../../capability/contracts/index.js";
-import { AuditEvent, recordAuditEventDurable, PLATFORM_TENANT_ID, type AuditOutcome } from "../../audit/contracts/index.js";
+import { CapabilityError, runCapabilityAttempt } from "../../capability/contracts/index.js";
+import { AuditEvent, PLATFORM_TENANT_ID } from "../../audit/contracts/index.js";
 import { authLoginCapability } from "./auth-login.capability.js";
 import { loginInputSchema } from "../application/login.input.js";
 import type { LoginOutputDto } from "../application/login.input.js";
@@ -73,56 +73,45 @@ export class AuthLoginController {
     const sessionId = randomUUID();
     const requestId = request.requestId ?? "";
     const correlationId = request.correlationId ?? "";
+    const rlsContext = { tenantId: PLATFORM_TENANT_ID, userId: null, storeId: null };
 
-    let outcome: AuditOutcome = "SUCCESS";
     let actorUserId: string | null = null;
-    let successDto: LoginOutputDto | undefined;
-    let rawToken: string | undefined;
-    let thrown: unknown;
-
-    try {
-      const service = new LoginService(
-        new UserRepositoryPg(this.appDb),
-        new CredentialRepositoryPg(this.appDb),
-        new SessionRepositoryPg(this.appDb),
-        new Argon2PasswordHasher(),
-        systemClock,
-      );
-      const result = await service.execute({ sessionId, email: parsed.data.email, password: parsed.data.password });
-      actorUserId = result.userId;
-
-      if (result.kind === "INVALID_CREDENTIALS") {
-        outcome = "FAILURE";
-        thrown = new CapabilityError("AUTHENTICATION_REQUIRED", "Invalid email or password.");
-      } else {
-        successDto = result.dto;
-        rawToken = result.rawToken;
-      }
-    } catch (err) {
-      outcome = "FAILURE";
-      thrown = err;
-    }
 
     // step 8 - durable audit, on the dedicated connection, before this
     // handler resolves either way (ADR-034), under the platform-scope
     // sentinel tenant (ADR-035) since auth.login is 05 §4.1's global scope.
-    await recordAuditEventDurable(
+    const { dto, rawToken } = await runCapabilityAttempt(
       this.auditDb,
-      { tenantId: PLATFORM_TENANT_ID, userId: null, storeId: null },
-      new AuditEvent(
-        PLATFORM_TENANT_ID,
-        actorUserId,
-        "user",
-        authLoginCapability.id,
-        "session",
-        sessionId,
-        outcome,
-        requestId,
-        correlationId,
-      ),
-    );
+      rlsContext,
+      async () => {
+        const service = new LoginService(
+          new UserRepositoryPg(this.appDb),
+          new CredentialRepositoryPg(this.appDb),
+          new SessionRepositoryPg(this.appDb),
+          new Argon2PasswordHasher(),
+          systemClock,
+        );
+        const result = await service.execute({ sessionId, email: parsed.data.email, password: parsed.data.password });
+        actorUserId = result.userId;
 
-    if (thrown) throw thrown;
+        if (result.kind === "INVALID_CREDENTIALS") {
+          throw new CapabilityError("AUTHENTICATION_REQUIRED", "Invalid email or password.");
+        }
+        return { dto: result.dto, rawToken: result.rawToken };
+      },
+      (outcome) =>
+        new AuditEvent(
+          PLATFORM_TENANT_ID,
+          actorUserId,
+          "user",
+          authLoginCapability.id,
+          "session",
+          sessionId,
+          outcome,
+          requestId,
+          correlationId,
+        ),
+    );
 
     // ADR-029 item 3: opaque, httpOnly, Secure, SameSite=Lax. `secure: true`
     // unconditionally — every existing test authenticates by copying the
@@ -131,7 +120,7 @@ export class AuthLoginController {
     // single test; a real browser only ever sends it back over HTTPS, which
     // production termination provides. `maxAge` tracks the session's real
     // server-side lifetime so the cookie cannot silently outlive it.
-    response.cookie("sid", rawToken!, {
+    response.cookie("sid", rawToken, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
@@ -139,6 +128,6 @@ export class AuthLoginController {
       maxAge: SESSION_LIFETIME_MS,
     });
 
-    return successDto!;
+    return dto;
   }
 }

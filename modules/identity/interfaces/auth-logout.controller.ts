@@ -6,7 +6,8 @@ import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { systemClock } from "../../../platform/clock.js";
 import { SessionGuard } from "./session.guard.js";
 import type { RequestWithIdentity } from "./session.guard.js";
-import { AuditEvent, recordAuditEventDurable, PLATFORM_TENANT_ID, type AuditOutcome } from "../../audit/contracts/index.js";
+import { runCapabilityAttempt } from "../../capability/contracts/index.js";
+import { AuditEvent, PLATFORM_TENANT_ID } from "../../audit/contracts/index.js";
 import { authLogoutCapability } from "./auth-logout.capability.js";
 import type { LogoutOutputDto } from "../application/logout.input.js";
 import { LogoutService } from "../application/logout.service.js";
@@ -61,39 +62,29 @@ export class AuthLogoutController {
     const identity = request.authenticatedIdentity!;
     const requestId = request.requestId ?? "";
     const correlationId = request.correlationId ?? "";
-
-    let outcome: AuditOutcome = "SUCCESS";
-    let thrown: unknown;
-
-    try {
-      const service = new LogoutService(new SessionRevocationRepositoryPg(this.appDb), systemClock);
-      await service.execute({ sessionId: identity.sessionId, userId: identity.userId });
-    } catch (err) {
-      outcome = "FAILURE";
-      thrown = err;
-    }
+    const rlsContext = { tenantId: PLATFORM_TENANT_ID, userId: null, storeId: null };
 
     // step 8 - durable audit, on the dedicated connection, before this
     // handler resolves either way (ADR-034), under the platform-scope
     // sentinel tenant (ADR-035) since auth.logout is 05 §4.1's user scope,
     // not a tenant.
-    await recordAuditEventDurable(
+    await runCapabilityAttempt(
       this.auditDb,
-      { tenantId: PLATFORM_TENANT_ID, userId: null, storeId: null },
-      new AuditEvent(
-        PLATFORM_TENANT_ID,
-        identity.userId,
-        "user",
-        authLogoutCapability.id,
-        "session",
-        identity.sessionId,
-        outcome,
-        requestId,
-        correlationId,
-      ),
+      rlsContext,
+      () => new LogoutService(new SessionRevocationRepositoryPg(this.appDb), systemClock).execute({ sessionId: identity.sessionId, userId: identity.userId }),
+      (outcome) =>
+        new AuditEvent(
+          PLATFORM_TENANT_ID,
+          identity.userId,
+          "user",
+          authLogoutCapability.id,
+          "session",
+          identity.sessionId,
+          outcome,
+          requestId,
+          correlationId,
+        ),
     );
-
-    if (thrown) throw thrown;
 
     // The clearing response must repeat login's cookie attributes, or the
     // browser treats it as a different cookie and never actually clears the

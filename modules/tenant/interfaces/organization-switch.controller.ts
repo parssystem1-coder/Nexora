@@ -3,7 +3,8 @@ import type { Kysely } from "kysely";
 import type { Database } from "../../../platform/db/kysely.js";
 import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { SessionGuard, SessionRepositoryPg } from "../../identity/contracts/index.js";
-import { AuditEvent, recordAuditEventDurable, type AuditOutcome } from "../../audit/contracts/index.js";
+import { runCapabilityAttempt } from "../../capability/contracts/index.js";
+import { AuditEvent } from "../../audit/contracts/index.js";
 import { OrganizationAccessGuard } from "./organization-access.guard.js";
 import type { RequestWithTenantContext } from "./tenant-context.js";
 import { organizationSwitchCapability } from "./organization-switch.capability.js";
@@ -69,40 +70,31 @@ export class OrganizationSwitchController {
       throw new Error("OrganizationSwitchController.switchOrganization invoked without a resolved TenantContext.");
     }
     const identity = request.authenticatedIdentity!;
-
-    let outcome: AuditOutcome = "SUCCESS";
-    let thrown: unknown;
-
-    try {
-      const service = new SwitchOrganizationService(new SessionRepositoryPg(this.appDb));
-      await service.execute({ sessionId: identity.sessionId, organizationId: tenantContext.tenantId });
-    } catch (err) {
-      outcome = "FAILURE";
-      thrown = err;
-    }
+    const rlsContext = { tenantId: tenantContext.tenantId, userId: tenantContext.userId, storeId: null };
 
     // step 8 - durable audit, on the dedicated connection, before this
     // handler resolves either way (ADR-034), under the REAL organization's
     // tenant id (ADR-035 decision 4 — this capability has one, unlike
     // auth.login/auth.logout).
-    await recordAuditEventDurable(
+    await runCapabilityAttempt(
       this.auditDb,
-      { tenantId: tenantContext.tenantId, userId: tenantContext.userId, storeId: null },
-      new AuditEvent(
-        tenantContext.tenantId,
-        tenantContext.userId,
-        "user",
-        organizationSwitchCapability.id,
-        "session",
-        identity.sessionId,
-        outcome,
-        tenantContext.requestId,
-        tenantContext.correlationId,
-        { organizationId: tenantContext.tenantId },
-      ),
+      rlsContext,
+      () => new SwitchOrganizationService(new SessionRepositoryPg(this.appDb)).execute({ sessionId: identity.sessionId, organizationId: tenantContext.tenantId }),
+      (outcome) =>
+        new AuditEvent(
+          tenantContext.tenantId,
+          tenantContext.userId,
+          "user",
+          organizationSwitchCapability.id,
+          "session",
+          identity.sessionId,
+          outcome,
+          tenantContext.requestId,
+          tenantContext.correlationId,
+          { organizationId: tenantContext.tenantId },
+        ),
     );
 
-    if (thrown) throw thrown;
     return { activeOrganizationId: tenantContext.tenantId };
   }
 }

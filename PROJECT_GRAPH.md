@@ -1,6 +1,6 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `0d449ca` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `ad3e774` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
@@ -13,7 +13,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `audit` | contracts, domain, infrastructure, migrations | 10 | — | yes |
 | `authorization` | application, contracts, domain, infrastructure, migrations | 17 | `capability` | yes |
 | `calendar` | contracts, domain | 4 | — | — |
-| `capability` | contracts, domain, interfaces | 6 | — | — |
+| `capability` | contracts, domain, interfaces | 7 | `audit` | yes |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 40 | `audit`, `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
 | `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 67 | `audit`, `authorization`, `capability`, `identity` | yes |

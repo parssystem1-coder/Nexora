@@ -5,10 +5,10 @@ import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { systemClock } from "../../../platform/clock.js";
-import { CapabilityError, buildValidationInput } from "../../capability/contracts/index.js";
+import { CapabilityError, buildValidationInput, runCapabilityAttempt } from "../../capability/contracts/index.js";
 import { SessionGuard, SessionRevocationRepositoryPg } from "../../identity/contracts/index.js";
 import { CheckPermissionService, PermissionCheckRepositoryPg, RoleGrantRepositoryPg } from "../../authorization/contracts/index.js";
-import { AuditEvent, recordAuditEventDurable, type AuditOutcome } from "../../audit/contracts/index.js";
+import { AuditEvent } from "../../audit/contracts/index.js";
 import { OrganizationAccessGuard } from "./organization-access.guard.js";
 import type { RequestWithTenantContext } from "./tenant-context.js";
 import { membershipRoleAssignCapability } from "./membership-role-assign.capability.js";
@@ -98,57 +98,44 @@ export class MembershipRoleController {
     const rlsContext = { tenantId: tenantContext.tenantId, userId: tenantContext.userId, storeId: null };
     const grantId = randomUUID();
 
-    let outcome: AuditOutcome = "SUCCESS";
-    let result: MembershipRoleDto | undefined;
-    let thrown: unknown;
-
-    try {
-      result = await withTenantContext(this.appDb, rlsContext, async (trx) => {
-        // step 6 - permission authorization
-        const permissions = new CheckPermissionService(new PermissionCheckRepositoryPg(trx));
-        for (const permission of membershipRoleAssignCapability.requiredPermissions) {
-          await permissions.assert(tenantContext.tenantId, callerMembershipId, permission);
-        }
-
-        // step 7 - application service execution + domain mapping
-        const service = new AssignMembershipRoleService(
-          new MembershipRepositoryPg(trx),
-          new RoleGrantRepositoryPg(trx),
-          new SessionRevocationRepositoryPg(trx),
-          systemClock,
-        );
-        return service.execute({
-          grantId,
-          tenantId: tenantContext.tenantId,
-          targetMembershipId: parsed.data.membershipId,
-          roleKey: parsed.data.roleKey,
-        });
-      });
-    } catch (err) {
-      outcome = "FAILURE";
-      thrown = err;
-    }
-
-    // step 8 - durable audit, on the dedicated connection, before this
-    // handler resolves either way (ADR-034).
-    await recordAuditEventDurable(
+    return runCapabilityAttempt(
       this.auditDb,
       rlsContext,
-      new AuditEvent(
-        tenantContext.tenantId,
-        tenantContext.userId,
-        "user",
-        membershipRoleAssignCapability.id,
-        "membership_role",
-        grantId,
-        outcome,
-        tenantContext.requestId,
-        tenantContext.correlationId,
-        { targetMembershipId: parsed.data.membershipId, roleKey: parsed.data.roleKey },
-      ),
-    );
+      () =>
+        withTenantContext(this.appDb, rlsContext, async (trx) => {
+          // step 6 - permission authorization
+          const permissions = new CheckPermissionService(new PermissionCheckRepositoryPg(trx));
+          for (const permission of membershipRoleAssignCapability.requiredPermissions) {
+            await permissions.assert(tenantContext.tenantId, callerMembershipId, permission);
+          }
 
-    if (thrown) throw thrown;
-    return result!;
+          // step 7 - application service execution + domain mapping
+          const service = new AssignMembershipRoleService(
+            new MembershipRepositoryPg(trx),
+            new RoleGrantRepositoryPg(trx),
+            new SessionRevocationRepositoryPg(trx),
+            systemClock,
+          );
+          return service.execute({
+            grantId,
+            tenantId: tenantContext.tenantId,
+            targetMembershipId: parsed.data.membershipId,
+            roleKey: parsed.data.roleKey,
+          });
+        }),
+      (outcome) =>
+        new AuditEvent(
+          tenantContext.tenantId,
+          tenantContext.userId,
+          "user",
+          membershipRoleAssignCapability.id,
+          "membership_role",
+          grantId,
+          outcome,
+          tenantContext.requestId,
+          tenantContext.correlationId,
+          { targetMembershipId: parsed.data.membershipId, roleKey: parsed.data.roleKey },
+        ),
+    );
   }
 }

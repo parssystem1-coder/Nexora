@@ -47,7 +47,8 @@ Open these in order. They are the template, not just an example.
 |---|---|
 | 1 · authenticate against a server-side session | `modules/identity/interfaces/session.guard.ts` |
 | 2–4 · resolve membership, explicit resource id, access check, build `TenantContext` | `modules/tenant/interfaces/store-access.guard.ts` |
-| 5–8 · transaction + RLS, authorize, execute, audit | `modules/tenant/interfaces/store.controller.ts` |
+| 5–7 · transaction + RLS, authorize, execute | `modules/tenant/interfaces/store.controller.ts` |
+| 8 · outcome tracking + one durable audit event + rethrow-or-return, shared by every capability | `modules/capability/interfaces/capability-attempt.ts` (`runCapabilityAttempt`) |
 | capability definition | `modules/tenant/interfaces/store-read.capability.ts` |
 | 7 · application service | `modules/tenant/application/read-store.service.ts` |
 | input validation (Zod) | `modules/tenant/application/read-store.input.ts` |
@@ -135,11 +136,26 @@ Two more traps the golden path already hit:
 
 ## Step 5 — Wire the pipeline in the same order
 
-Guards do steps 1–4, before any transaction — they establish *which* tenant may be trusted, so they cannot already run inside that tenant's context. Steps 5–8 run inside **one** transaction opened by `withTenantContext`.
+Guards do steps 1–4, before any transaction — they establish *which* tenant may be trusted, so they cannot already run inside that tenant's context. Steps 5–7 (transaction, permission, application service) run inside **one** transaction opened by `withTenantContext` — but only if the capability needs one at all: `auth.login`/`auth.logout`/`auth.logout_all` open none, because every table they touch is RLS-exempt (see their own controllers' doc comments before assuming every capability needs a transaction).
+
+**Step 8 (outcome tracking, one durable audit event, rethrow-or-return) is not something you hand-write.** `PHASE_1_DEBT_CLOSURE.md` D-3 extracted it, because all ten of Phase 1's capabilities did it identically and R-009 gave a correctness reason to have exactly one copy. Call `runCapabilityAttempt` (`modules/capability/contracts/index.ts`) with:
+
+```ts
+return runCapabilityAttempt(
+  this.auditDb,
+  rlsContext,
+  () => withTenantContext(this.appDb, rlsContext, async (trx) => { /* steps 6–7 */ }),
+  (outcome) => new AuditEvent(/* this capability's own resource type/id/metadata */, outcome, /* ... */),
+);
+```
+
+`work` is whatever steps 5–7 actually are for this capability — it may or may not open a transaction, exactly as your capability needs; `runCapabilityAttempt` neither knows nor cares. `buildEvent` receives the outcome (and the successful result, if any) *after* `work` has resolved or thrown, so it can build the right `AuditEvent` for either path — most capabilities only need fields already known before `work` even ran (a minted id, the caller's own identity) and can ignore the `result` argument entirely; a capability whose audit metadata genuinely depends on a successful result (e.g. `auth.logout_all`'s `sessionsRevoked`) sets a local variable inside `work` as a side effect and reads it from the closure inside `buildEvent` — see `auth-logout-all.controller.ts` for the pattern. **Do not hand-roll the `try { ... } catch { outcome = "FAILURE" } ...; if (thrown) throw thrown;` skeleton again** — if `runCapabilityAttempt`'s shape genuinely does not fit your capability, that is `AGENTS.md` §2's "stop and document the mismatch," not silent permission to copy the old pattern back in.
 
 The resource id is **always an explicit input** — a path parameter or request body field, validated with Zod. Never derive it from the session token, and never trust a `Host` header (ADR-002).
 
 Errors: throw `CapabilityError` with a code that already exists in `capability.errors.ts` and is documented in `05_API_CAPABILITY_CONTRACTS.md` §7. If the slice genuinely needs a new code, add it to the union *and* confirm it is in §7 — do not invent one.
+
+**This is not Phase 5.** `runCapabilityAttempt` is the one genuinely-identical piece pulled forward from Phase 5's "capability registry and policy pipeline" (`store.controller.ts`'s own doc comment names that scope). It does not resolve guards, does not read a `CapabilityDefinition`, and does not choose whether a transaction opens — those stay hand-wired per capability, exactly as before. See `DECISION_LOG.md` 2026-08-30 for the full boundary reasoning if a future slice seems like it wants more generalization than this — that is a Phase 5 conversation, not a reason to extend this helper.
 
 ## Step 6 — Test at the layer where the rule lives
 

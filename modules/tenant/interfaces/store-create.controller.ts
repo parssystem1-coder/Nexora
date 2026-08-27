@@ -5,10 +5,10 @@ import type { Database } from "../../../platform/db/kysely.js";
 import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { systemClock } from "../../../platform/clock.js";
-import { CapabilityError } from "../../capability/contracts/index.js";
+import { CapabilityError, runCapabilityAttempt } from "../../capability/contracts/index.js";
 import { SessionGuard } from "../../identity/contracts/index.js";
 import { CheckPermissionService, PermissionCheckRepositoryPg } from "../../authorization/contracts/index.js";
-import { AuditEvent, recordAuditEventDurable, type AuditOutcome } from "../../audit/contracts/index.js";
+import { AuditEvent } from "../../audit/contracts/index.js";
 import { OrganizationAccessGuard } from "./organization-access.guard.js";
 import type { RequestWithTenantContext } from "./tenant-context.js";
 import { storeCreateCapability } from "./store-create.capability.js";
@@ -90,58 +90,45 @@ export class StoreCreateController {
     const rlsContext = { tenantId: tenantContext.tenantId, userId: tenantContext.userId, storeId: null };
     const storeId = randomUUID();
 
-    let outcome: AuditOutcome = "SUCCESS";
-    let result: StoreDto | undefined;
-    let thrown: unknown;
-
-    try {
-      result = await withTenantContext(this.appDb, rlsContext, async (trx) => {
-        // step 6 - permission authorization
-        const permissions = new CheckPermissionService(new PermissionCheckRepositoryPg(trx));
-        for (const permission of storeCreateCapability.requiredPermissions) {
-          await permissions.assert(tenantContext.tenantId, callerMembershipId, permission);
-        }
-
-        // step 7 - application service execution + domain mapping
-        const service = new CreateStoreService(
-          new StoreRepositoryPg(trx),
-          new StoreMembershipRepositoryPg(trx),
-          new ReservedSubdomainRepositoryPg(trx),
-          systemClock,
-        );
-        return service.execute({
-          storeId,
-          tenantId: tenantContext.tenantId,
-          creatorUserId: tenantContext.userId,
-          name: parsed.data.name,
-          slug: parsed.data.slug,
-        });
-      });
-    } catch (err) {
-      outcome = "FAILURE";
-      thrown = err;
-    }
-
-    // step 8 - durable audit, on the dedicated connection, before this
-    // handler resolves either way (ADR-034).
-    await recordAuditEventDurable(
+    return runCapabilityAttempt(
       this.auditDb,
       rlsContext,
-      new AuditEvent(
-        tenantContext.tenantId,
-        tenantContext.userId,
-        "user",
-        storeCreateCapability.id,
-        "store",
-        storeId,
-        outcome,
-        tenantContext.requestId,
-        tenantContext.correlationId,
-        { slug: parsed.data.slug },
-      ),
-    );
+      () =>
+        withTenantContext(this.appDb, rlsContext, async (trx) => {
+          // step 6 - permission authorization
+          const permissions = new CheckPermissionService(new PermissionCheckRepositoryPg(trx));
+          for (const permission of storeCreateCapability.requiredPermissions) {
+            await permissions.assert(tenantContext.tenantId, callerMembershipId, permission);
+          }
 
-    if (thrown) throw thrown;
-    return result!;
+          // step 7 - application service execution + domain mapping
+          const service = new CreateStoreService(
+            new StoreRepositoryPg(trx),
+            new StoreMembershipRepositoryPg(trx),
+            new ReservedSubdomainRepositoryPg(trx),
+            systemClock,
+          );
+          return service.execute({
+            storeId,
+            tenantId: tenantContext.tenantId,
+            creatorUserId: tenantContext.userId,
+            name: parsed.data.name,
+            slug: parsed.data.slug,
+          });
+        }),
+      (outcome) =>
+        new AuditEvent(
+          tenantContext.tenantId,
+          tenantContext.userId,
+          "user",
+          storeCreateCapability.id,
+          "store",
+          storeId,
+          outcome,
+          tenantContext.requestId,
+          tenantContext.correlationId,
+          { slug: parsed.data.slug },
+        ),
+    );
   }
 }

@@ -6,7 +6,8 @@ import { APP_DB, AUDIT_DB } from "../../../platform/db/connections.js";
 import { systemClock } from "../../../platform/clock.js";
 import { SessionGuard } from "./session.guard.js";
 import type { RequestWithIdentity } from "./session.guard.js";
-import { AuditEvent, recordAuditEventDurable, PLATFORM_TENANT_ID, type AuditOutcome } from "../../audit/contracts/index.js";
+import { runCapabilityAttempt } from "../../capability/contracts/index.js";
+import { AuditEvent, PLATFORM_TENANT_ID } from "../../audit/contracts/index.js";
 import { authLogoutAllCapability } from "./auth-logout-all.capability.js";
 import type { LogoutAllOutputDto } from "../application/logout-all.input.js";
 import { LogoutAllService } from "../application/logout-all.service.js";
@@ -59,43 +60,38 @@ export class AuthLogoutAllController {
     const identity = request.authenticatedIdentity!;
     const requestId = request.requestId ?? "";
     const correlationId = request.correlationId ?? "";
+    const rlsContext = { tenantId: PLATFORM_TENANT_ID, userId: null, storeId: null };
 
-    let outcome: AuditOutcome = "SUCCESS";
-    let thrown: unknown;
     let sessionsRevoked = 0;
-
-    try {
-      const service = new LogoutAllService(new SessionRevocationRepositoryPg(this.appDb), systemClock);
-      const result = await service.execute({ userId: identity.userId });
-      sessionsRevoked = result.sessionsRevoked;
-    } catch (err) {
-      outcome = "FAILURE";
-      thrown = err;
-    }
 
     // step 8 - durable audit, on the dedicated connection, before this
     // handler resolves either way (ADR-034), under the platform-scope
     // sentinel tenant (ADR-035) - this capability's second, independent user
     // besides auth.logout, the first real evidence the sentinel generalizes
     // rather than being a one-off built for auth.login alone.
-    await recordAuditEventDurable(
+    await runCapabilityAttempt(
       this.auditDb,
-      { tenantId: PLATFORM_TENANT_ID, userId: null, storeId: null },
-      new AuditEvent(
-        PLATFORM_TENANT_ID,
-        identity.userId,
-        "user",
-        authLogoutAllCapability.id,
-        "user",
-        identity.userId,
-        outcome,
-        requestId,
-        correlationId,
-        { sessionsRevoked },
-      ),
+      rlsContext,
+      async () => {
+        const service = new LogoutAllService(new SessionRevocationRepositoryPg(this.appDb), systemClock);
+        const result = await service.execute({ userId: identity.userId });
+        sessionsRevoked = result.sessionsRevoked;
+        return result;
+      },
+      (outcome) =>
+        new AuditEvent(
+          PLATFORM_TENANT_ID,
+          identity.userId,
+          "user",
+          authLogoutAllCapability.id,
+          "user",
+          identity.userId,
+          outcome,
+          requestId,
+          correlationId,
+          { sessionsRevoked },
+        ),
     );
-
-    if (thrown) throw thrown;
 
     // Same attributes as login set and auth.logout clears with - see
     // AuthLogoutController's comment.
