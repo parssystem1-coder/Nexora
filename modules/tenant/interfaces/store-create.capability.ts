@@ -53,6 +53,7 @@ export const storeCreateCapability: CapabilityDefinition = {
     "FORBIDDEN",
     "CONFLICT",
     "DOMAIN_RESERVED",
+    "CONCURRENCY_CONFLICT",
     "INTERNAL_ERROR",
   ],
 };

@@ -12,14 +12,16 @@ When documents disagree: **ADR Index > Architecture RFC > Technical/Database/Con
 
 ## Current state
 
-See `PROJECT_STATUS.md` for the full per-slice narrative (moved out of this file 2026-08-27 to keep this an entry point, not a changelog — `decisions/2026-08.md` 2026-08-27, "Cutting per-session context cost"). In short:
+See `PROJECT_STATUS.md` for the full per-slice narrative. In short, as of 2026-08-28:
 
-- Phase 0 and Phase 1 (all seven capabilities: `organization.create`, `membership.invite`, `membership.role.assign`, `store.create`, `auth.login`/`logout`/`logout_all`, `organization.switch`, `membership.revoke`) are implemented and repaired.
-- **The Phase 1 gate is OPEN** (`PHASE_1_GATE_OPEN_2026-08-27.md`). CI is live and green on GitHub Actions.
-- `PHASE_1_DEBT_CLOSURE.md`: D-1 (calendar/timezone), D-3 (shared capability pipeline), D-4 (lint/format), D-6 (R-008 investigation) CLOSED; D-2 (Redis/BullMQ) PARTIALLY CLOSED; D-5 (`outbox_events`/`identity_providers`) PENDING.
-- `RISK_REGISTER.md` carries the open risks (R-003 ACCEPTED, R-005/R-006/R-008 OPEN, others CLOSED) — read it before assuming a gap is unknown.
-- Test counts, by what they measure: `npm test` reports **380 test cases passing across 37 files** (the authoritative runtime count). `PROJECT_GRAPH.md`'s mechanically-extracted "test cases" figure is lower (363) because its static parser counts one `it.each([...])` call site as one case, not one per generated case — 5 files use `it.each`. Both numbers are correct for what they measure; neither is stale.
-- 10 capabilities, 10 routes, 7 modules, 14 tables (6 with RLS), 20 migrations, conformance 0 violations.
+- Phase 0 and Phase 1 (all seven capabilities) are implemented and repaired. **The Phase 1 gate is OPEN** (`PHASE_1_GATE_OPEN_2026-08-27.md`). CI is live and green.
+- A real production build exists (`npm run build`/`npm start`, proven booted under `npm ci --omit=dev`) and `.env` actually works (`cp .env.example .env` is sufficient, zero manual `export`). `npm run check:dist-deps` (in CI) fails the build if a devDependency ever leaks into `dist/` again.
+- HTTP hardening: security headers, CORS denied by default, `X-Powered-By` disabled, `GET /health` (liveness + DB readiness, not a capability).
+- `PHASE_1_DEBT_CLOSURE.md`: D-1, D-3, D-4, D-5, D-6 CLOSED (D-5 on the closing *decision*, not on either table being built); D-2 (Redis/BullMQ) PARTIALLY CLOSED.
+- `RISK_REGISTER.md` roll-call (13 rows): **CLOSED** R-001, R-007, R-009 · **RESOLVED** R-002 · **ACCEPTED** R-003 · **PARTIALLY CLOSED** R-005 (rate limiter, single-instance only) · **OPEN** R-004, R-006, R-008 (root cause UNDETERMINED, unchanged), R-010 (audit-failure detectability exists, alerting does not), R-011 (413-vs-500 body-size edge), R-012 (`TRUST_PROXY` unset is correct only until a real proxy exists), R-013 (rate-limit sweep is O(n)/write, UNMEASURED). Read the row before assuming a gap is unknown or already fixed.
+- A PostgreSQL deadlock/serialization failure now reaches the client as `CONCURRENCY_CONFLICT`/409 (R-008's candidate mitigation, done independently of R-008's own root cause), not `INTERNAL_ERROR`/500.
+- Test counts, by what they measure: `npm test` reports **401 test cases passing across 42 files** (`npm test` 2>&1, authoritative runtime count). `PROJECT_GRAPH.md`'s mechanically-extracted figure is lower (384, `npm run graph`) because its static parser counts one `it.each([...])` call site as one case, not one per generated case. Both are correct for what they measure.
+- 10 capabilities, 11 routes (one is `/health`, not a capability), 7 modules, 14 tables (6 with RLS), 20 migrations, conformance 0 violations.
 
 Update this section, and `PROJECT_STATUS.md`, when that changes — new slice narrative goes in `PROJECT_STATUS.md`, not here.
 
@@ -43,11 +45,4 @@ Never weaken a conformance rule or add an `exceptions.json` entry to reach green
 
 This machine has **no Docker**. A native PostgreSQL 17 runs on **port 5432** (not `docker-compose.yml`'s `5433`), carrying the `nexora` database and both roles. `docker compose up` is the CI path only — CI runs `docker-compose.yml` (`postgres:17-alpine`, port 5433) on a real GitHub Actions runner; this machine never runs it.
 
-Before tests, conformance, or migrations, export:
-
-```
-DATABASE_URL=postgresql://nexora_app:nexora_app_dev_only@localhost:5432/nexora
-MIGRATE_DATABASE_URL=postgresql://nexora_migrate:nexora_migrate_dev_only@localhost:5432/nexora
-```
-
-`platform/config.ts`'s defaults point at compose's `5433` — always override for local work. `nexora_migrate` has no `CREATEDB`, so a from-empty migration run needs a database created by a superuser first.
+No manual `export` is needed: `cp .env.example .env` once, and Node 24's `--env-file-if-exists=.env` (wired into `start:dev`, `start`, `db:migrate`, `conformance`, `test`) reads `DATABASE_URL`/`MIGRATE_DATABASE_URL` from it automatically. `platform/config.ts`'s own hard-coded fallback still points at compose's `5433` (CI depends on that default; `.env.example`'s committed values are `5432` for this machine) — `AUDIT_DATABASE_URL` also lives here, commented out, defaulting to `DATABASE_URL`. `nexora_migrate` has no `CREATEDB`, so a from-empty migration run needs a database created by a superuser first.

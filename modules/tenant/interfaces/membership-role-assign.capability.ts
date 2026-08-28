@@ -50,6 +50,7 @@ export const membershipRoleAssignCapability: CapabilityDefinition = {
     "FORBIDDEN",
     "RESOURCE_NOT_FOUND",
     "CONFLICT",
+    "CONCURRENCY_CONFLICT",
     "INTERNAL_ERROR",
   ],
 };

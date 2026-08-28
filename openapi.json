@@ -395,7 +395,7 @@
             }
           },
           "409": {
-            "description": "CONFLICT",
+            "description": "CONFLICT | CONCURRENCY_CONFLICT",
             "content": {
               "application/json": {
                 "schema": {
@@ -531,7 +531,7 @@
             }
           },
           "409": {
-            "description": "CONFLICT",
+            "description": "CONFLICT | CONCURRENCY_CONFLICT",
             "content": {
               "application/json": {
                 "schema": {
@@ -691,7 +691,7 @@
             }
           },
           "409": {
-            "description": "CONFLICT",
+            "description": "CONFLICT | CONCURRENCY_CONFLICT",
             "content": {
               "application/json": {
                 "schema": {
@@ -812,7 +812,7 @@
             }
           },
           "409": {
-            "description": "CONFLICT",
+            "description": "CONFLICT | CONCURRENCY_CONFLICT",
             "content": {
               "application/json": {
                 "schema": {
@@ -897,6 +897,16 @@
           },
           "403": {
             "description": "FORBIDDEN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONCURRENCY_CONFLICT",
             "content": {
               "application/json": {
                 "schema": {
@@ -1037,7 +1047,7 @@
             }
           },
           "409": {
-            "description": "CONFLICT | DOMAIN_RESERVED",
+            "description": "CONFLICT | DOMAIN_RESERVED | CONCURRENCY_CONFLICT",
             "content": {
               "application/json": {
                 "schema": {

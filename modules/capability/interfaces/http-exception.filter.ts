@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 import { CapabilityError } from "../contracts/index.js";
 import type { CapabilityErrorCode } from "../contracts/index.js";
+import { isConcurrencyFailure } from "../../../platform/db/concurrency-error.js";
 
 interface StableErrorBody {
   code: string;
@@ -68,6 +69,25 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.error(`Unmapped HttpException status ${status}: ${exception.message}`, undefined, requestId);
       const body: StableErrorBody = { code: "INTERNAL_ERROR", message: "An unexpected error occurred.", requestId };
       response.status(500).json(body);
+      return;
+    }
+
+    // RISK_REGISTER.md R-008's candidate mitigation (2), decisions/2026-08.md
+    // this date: a raw PostgreSQL deadlock (40P01) or serialization failure
+    // (40001) reaches here unwrapped — Kysely surfaces the driver's
+    // DatabaseError as-is, and it is neither a CapabilityError (no repository
+    // translates it into one; unlike a unique-violation, a concurrency
+    // failure carries no call-site-specific meaning worth extracting — see
+    // platform/db/concurrency-error.ts's own doc comment) nor a NestJS
+    // HttpException. Checked before the generic 500 specifically so this
+    // RETRYABLE failure is never conflated with a genuinely unexpected error.
+    if (isConcurrencyFailure(exception)) {
+      const body: StableErrorBody = {
+        code: "CONCURRENCY_CONFLICT",
+        message: "The request could not complete due to a database conflict. Retrying is expected to succeed.",
+        requestId,
+      };
+      response.status(409).json(body);
       return;
     }
 

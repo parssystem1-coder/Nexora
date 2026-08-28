@@ -12,7 +12,7 @@ Every claim below was verified directly against the repository for this document
 | D-2 | Redis + BullMQ | PARTIALLY CLOSED |
 | D-3 | Shared capability pipeline | CLOSED |
 | D-4 | Linter and formatter | CLOSED |
-| D-5 | `outbox_events` and `identity_providers` | PENDING |
+| D-5 | `outbox_events` and `identity_providers` | CLOSED |
 | D-6 | R-008's intermittent regression-test failure, investigated properly | CLOSED |
 
 ---
@@ -74,6 +74,8 @@ Every claim below was verified directly against the repository for this document
 **The correction:** the claim that "no decision record defers either" is not accurate as stated. `DECISION_LOG.md`'s 2026-08-22 migration-scope entry explicitly defers both: *"Deferred to whichever later Task 2 slice first needs them: `credentials`, `identity_providers` (needed by `auth.login`, not by validating an existing session)... `outbox_events` (needed once eventing starts)... All five remain inside the §4 ceiling and will be added in their own migration when that slice starts."* For `identity_providers` specifically, a follow-up decision exists too, made when `auth.login` actually shipped (2026-08-23): *"`identity_providers` is NOT created — this capability (password-only login) does not need it... its tenancy stays undecided."*
 
 **What is genuinely missing, and is the real gap this item tracks:** both deferrals were conditional — "when that slice starts" / "once eventing starts." Task 2 is now complete, all seven of its capabilities shipped, and the condition never fired for either table: no Phase 1 slice ever needed `identity_providers` (no SSO/OAuth capability was built) and none ever needed `outbox_events` (no eventing capability was built). Nothing revisited either deferral once that became knowable — there is no decision record stating "Phase 1 is closing and these remain deliberately absent, here is what that means for Phase 2," only the original, now-lapsed conditional deferrals. `08_PHASE_1_BRIEF.md` §4's framing ("Only these... out of scope" for anything else) reads as an expectation these would exist by phase end, not a list some members of which could silently carry past it. That gap — a closing decision, not an opening one — is what needs to be made, not the original deferral, which was reasonable and already made.
+
+**CLOSED, 2026-08-28 — the closing decision this item tracked, written** (`decisions/2026-08.md`, this date, has the full entry): both tables stay absent through the end of Phase 1, deliberately, with a real trigger each rather than a repeat of the lapsed "when that slice starts" framing. `outbox_events`: nothing in this codebase currently needs to emit an event outside its own request/response cycle — the trigger is the first capability that does, most likely `06_IMPLEMENTATION_PLAN.md` Phase 2 item 17 ("notification flows for every lifecycle event") or any earlier webhook/integration need. `identity_providers`: nothing currently authenticates via an external identity provider — ADR-029 item 7 already names this as an extension point, not V1 scope; the trigger is the first SSO/OAuth capability actually being scheduled. This item closes on the decision being made and recorded, not on either table being built — matching D-6's own precedent that a closing decision and a technical fix are not the same thing and should not be conflated.
 
 ---
 

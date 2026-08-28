@@ -53,6 +53,7 @@ export const membershipRevokeCapability: CapabilityDefinition = {
     "FORBIDDEN",
     "RESOURCE_NOT_FOUND",
     "CONFLICT",
+    "CONCURRENCY_CONFLICT",
     "INTERNAL_ERROR",
   ],
 };

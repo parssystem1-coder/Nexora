@@ -13,6 +13,7 @@ export type CapabilityErrorCode =
   | "VALIDATION_ERROR"
   | "RESOURCE_NOT_FOUND"
   | "CONFLICT"
+  | "CONCURRENCY_CONFLICT"
   | "DOMAIN_RESERVED"
   | "INTERNAL_ERROR";
 
@@ -30,6 +31,15 @@ const STATUS_BY_CODE: Record<CapabilityErrorCode, number> = {
   VALIDATION_ERROR: 400,
   RESOURCE_NOT_FOUND: 404,
   CONFLICT: 409,
+  // 409, same status as CONFLICT, deliberately a DISTINCT code: CONFLICT
+  // means the request permanently conflicts with existing state until the
+  // client changes something; CONCURRENCY_CONFLICT (RISK_REGISTER.md R-008,
+  // platform/db/concurrency-error.ts) means a PostgreSQL deadlock or
+  // serialization failure aborted this specific attempt, and the identical
+  // request is expected to succeed on retry. Conflating the two would tell
+  // a client to give up on a transient failure, or to blindly retry a real
+  // conflict — the exact ambiguity this second code exists to remove.
+  CONCURRENCY_CONFLICT: 409,
   // 409, the same class as CONFLICT but a distinct code: the slug conflicts
   // with a platform-reserved word, not with another row's unique index.
   // store.create (05_API_CAPABILITY_CONTRACTS.md §7) is its first user.

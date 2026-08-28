@@ -253,6 +253,7 @@ APPROVAL_EXPIRED
 VALIDATION_ERROR
 RESOURCE_NOT_FOUND
 CONFLICT
+CONCURRENCY_CONFLICT
 INTERNAL_ERROR
 
 -- added in 2.0
@@ -278,6 +279,8 @@ HOST_NOT_RESOLVED
 ```
 
 `QUOTA_EXCEEDED` and `OVER_LIMIT` must include, in `details`: `resource`, `current`, `limit`, and `resolution` (`upgrade` or `reduce`). A bare limit error is not an acceptable contract.
+
+`CONCURRENCY_CONFLICT` is RETRYABLE — unlike `CONFLICT`, which means the request permanently conflicts with existing state until the client changes something, `CONCURRENCY_CONFLICT` means a database-level deadlock or serialization failure aborted this specific attempt, and resubmitting the identical request is the expected client behavior. A client must not treat the two the same way.
 
 ---
 

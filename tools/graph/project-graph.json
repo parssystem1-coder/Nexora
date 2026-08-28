@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "c4297b8",
+    "commit": "2f105d8",
     "dirty": true
   },
   "modules": [
@@ -732,6 +732,11 @@
       "cases": 13
     },
     {
+      "file": "apps/api/concurrency-conflict.integration.spec.ts",
+      "layer": "integration",
+      "cases": 1
+    },
+    {
       "file": "apps/api/error-contract.integration.spec.ts",
       "layer": "integration",
       "cases": 3
@@ -865,8 +870,8 @@
     "tablesWithRls": 6,
     "capabilities": 10,
     "routes": 11,
-    "testFiles": 41,
-    "testCases": 383,
+    "testFiles": 42,
+    "testCases": 384,
     "adrs": 38,
     "adrsAccepted": 30
   }
