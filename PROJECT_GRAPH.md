@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `a192e78` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `800ebbd` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 379 test cases in 40 files · 38 ADRs (30 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 380 test cases in 40 files · 38 ADRs (30 accepted)
 
 ## Modules
 
@@ -74,7 +74,7 @@ Roles ADR-030 requires exactly one implementation of.
 | integration | 13 | 187 |
 | interfaces | 1 | 2 |
 | other | 2 | 12 |
-| platform | 2 | 14 |
+| platform | 2 | 15 |
 
 <details><summary>Per file</summary>
 
@@ -102,7 +102,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/tenant/application/switch-organization.service.spec.ts` | application | 2 |
 | `modules/tenant/infrastructure/organizations-rls.spec.ts` | infrastructure | 4 |
 | `platform/db/tenant-context.spec.ts` | platform | 5 |
-| `platform/rate-limit/in-process-store.spec.ts` | platform | 9 |
+| `platform/rate-limit/in-process-store.spec.ts` | platform | 10 |
 | `apps/api/auth-login-rate-limit.integration.spec.ts` | integration | 4 |
 | `apps/api/auth-login.integration.spec.ts` | integration | 19 |
 | `apps/api/auth-logout.integration.spec.ts` | integration | 13 |

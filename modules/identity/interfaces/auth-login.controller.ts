@@ -8,6 +8,7 @@ import { systemClock } from "../../../platform/clock.js";
 import { RATE_LIMIT_STORE } from "../../../platform/rate-limit/store.js";
 import type { RateLimitStore } from "../../../platform/rate-limit/store.js";
 import type { RateLimitPolicy } from "../../../platform/rate-limit/policy.js";
+import { clientIp } from "../../../platform/http/client-ip.js";
 import { CapabilityError, runCapabilityAttempt } from "../../capability/contracts/index.js";
 import { AuditEvent, PLATFORM_TENANT_ID } from "../../audit/contracts/index.js";
 import { authLoginCapability } from "./auth-login.capability.js";
@@ -68,8 +69,11 @@ const LOGIN_IP_POLICY: RateLimitPolicy = { windowMs: 15 * 60 * 1000, maxAttempts
  * checked first, inside this same audited attempt, before `LoginService` is
  * even constructed — before the Argon2 verify and before the one write this
  * capability can make. Keyed on the RAW client-supplied email (lowercased,
- * never the resolved user id) and on `request.ip`, exactly the two things
- * `LoginService` itself already has before it does anything expensive. This
+ * never the resolved user id) and on the client IP resolved through
+ * `platform/http/client-ip.ts` (never inlined here directly — see
+ * RISK_REGISTER.md R-012 for why that derivation has its own single, named
+ * home rather than being read off the request per call site), exactly the
+ * two things `LoginService` itself already has before it does anything expensive. This
  * is deliberate, not incidental: checking by raw identifier means an unknown
  * email and a real one are throttled by an IDENTICAL rule after an IDENTICAL
  * number of attempts, with an IDENTICAL (fast, pre-Argon2) response — a
@@ -109,7 +113,7 @@ export class AuthLoginController {
 
     let actorUserId: string | null = null;
     const identifierKey = `login:identifier:${parsed.data.email.trim().toLowerCase()}`;
-    const ipKey = `login:ip:${request.ip}`;
+    const ipKey = `login:ip:${clientIp(request)}`;
 
     // step 8 - durable audit, on the dedicated connection, before this
     // handler resolves either way (ADR-034), under the platform-scope

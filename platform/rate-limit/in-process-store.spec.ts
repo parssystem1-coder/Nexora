@@ -115,6 +115,35 @@ describe("InProcessRateLimitStore", () => {
     expect(store.isBlocked("k", POLICY)).toBe(true);
   });
 
+  it("evicts expired windows on write, so many distinct keys over time never accumulate without bound", () => {
+    // A component whose purpose is resisting abuse must not itself be a
+    // memory-exhaustion vector: an attacker rotating through many distinct
+    // identifiers/IPs must not grow this store forever. Simulated entirely
+    // through the fake Clock's advance() - no real setTimeout, no real
+    // Date.now() - proving eviction is driven by the injected Clock alone.
+    const clock = fakeClock(0);
+    const store = new InProcessRateLimitStore(clock);
+    const shortPolicy: RateLimitPolicy = { windowMs: 1000, maxAttempts: 100 };
+
+    const ROUNDS = 20;
+    const KEYS_PER_ROUND = 10;
+
+    for (let round = 0; round < ROUNDS; round++) {
+      for (let i = 0; i < KEYS_PER_ROUND; i++) {
+        store.recordAttempt(`round${round}-key${i}`, shortPolicy);
+      }
+      // Every key just recorded is now guaranteed expired before the next
+      // round's first recordAttempt() call, which is what triggers the sweep.
+      clock.advance(shortPolicy.windowMs);
+    }
+
+    // 200 distinct keys were created in total (ROUNDS * KEYS_PER_ROUND) over
+    // the life of this store, but every earlier round's keys had already
+    // expired before the next round even started - only the most recent
+    // round's worth should ever be retained at once.
+    expect(store.size).toBeLessThanOrEqual(KEYS_PER_ROUND);
+  });
+
   it("different policies (different windowMs/maxAttempts) can be applied to the same key independently in sequence", () => {
     const clock = fakeClock(0);
     const store = new InProcessRateLimitStore(clock);

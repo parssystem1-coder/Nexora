@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "a192e78",
+    "commit": "800ebbd",
     "dirty": true
   },
   "modules": [
@@ -709,7 +709,7 @@
     {
       "file": "platform/rate-limit/in-process-store.spec.ts",
       "layer": "platform",
-      "cases": 9
+      "cases": 10
     },
     {
       "file": "apps/api/auth-login-rate-limit.integration.spec.ts",
@@ -861,7 +861,7 @@
     "capabilities": 10,
     "routes": 11,
     "testFiles": 40,
-    "testCases": 379,
+    "testCases": 380,
     "adrs": 38,
     "adrsAccepted": 30
   }
