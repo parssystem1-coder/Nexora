@@ -7,6 +7,22 @@ import type { AuditOutcome } from "../../audit/contracts/index.js";
 
 const logger = new Logger("CapabilityAttempt");
 
+/** Stable, greppable name for the structured event below — `grep`/a log-search query for this exact string finds every audit-write failure, across any capability, without parsing prose. */
+export const AUDIT_WRITE_FAILED_EVENT = "audit_write_failed";
+
+/**
+ * How many audit writes have failed and been swallowed (R-009's fix), across
+ * this process's whole lifetime. RISK_REGISTER.md R-010's detectability half
+ * — see the doc comment on the catch block below for the full reasoning on
+ * where this is (and is deliberately not) exposed.
+ */
+let auditWriteFailureCount = 0;
+
+/** Read-only accessor for `auditWriteFailureCount` — the seam a future metrics sink reads from. Never used to make any decision in this file; only ever incremented, never reset (a restart is the only reset, which is honest: it really did happen this many times since the process started). */
+export function getAuditWriteFailureCount(): number {
+  return auditWriteFailureCount;
+}
+
 /**
  * `PHASE_1_DEBT_CLOSURE.md` D-3: the composition every one of Phase 1's ten
  * controllers repeated by hand — run the capability's own work, track
@@ -69,6 +85,38 @@ const logger = new Logger("CapabilityAttempt");
  *     Closing that gap fully would mean putting the audit row in the
  *     domain transaction, which ADR-034 already rejected for losing every
  *     failure audit — the identical trade-off, not a new one.
+ *
+ * R-010 DETECTABILITY (`RISK_REGISTER.md`, decisions/2026-08.md, this date):
+ * R-009's fix made a SUSTAINED audit outage silent — every request still
+ * succeeds, but the audit trail goes empty for as long as the outage lasts,
+ * and a `Logger.error` prose line nobody is watching is not detection. Two
+ * things now exist because of this, deliberately bounded in scope:
+ *   - a stable, greppable structured event (`AUDIT_WRITE_FAILED_EVENT`,
+ *     JSON, not prose) logged on every audit-write failure, so a real log
+ *     pipeline (a log-search query, a CloudWatch/Datadog metric filter, a
+ *     SIEM rule) can alert on it TODAY, without this codebase building any
+ *     of that infrastructure itself.
+ *   - `auditWriteFailureCount` / `getAuditWriteFailureCount()`, an in-
+ *     process counter — the seam a future real metrics endpoint reads from,
+ *     so wiring one in later needs no change here.
+ * Deliberately NOT wired into `GET /health` (`apps/api/health.controller.ts`):
+ * that endpoint is public and unauthenticated, and publishing an internal
+ * failure count there is real operational information disclosure, however
+ * small — and audit-write health is orthogonal to whether this instance
+ * should keep receiving traffic (R-009's whole point is that it should),
+ * so folding it into a liveness/readiness signal risks an orchestrator
+ * taking a perfectly healthy instance out of rotation over a problem that
+ * does not affect any user-facing correctness. The opposite mistake — a
+ * counter nothing can ever read — would leave R-010 exactly as open as
+ * before; the structured log line is the real, working answer to that
+ * today, not merely a consolation prize while something better is missing.
+ * SCOPE CEILING, same posture as this file's own D-3 one above: this is
+ * deliberately not a metrics/alerting stack. No dashboard, no threshold
+ * alert, no error-tracking sink integration is built here — building
+ * platform-wide observability one corner at a time, starting from this one
+ * failure mode, is exactly the premature, narrow abstraction `AGENTS.md`
+ * §4 warns against and R-010's own text already named. This is the signal
+ * and the seam a real one plugs into later, nothing more.
  */
 export async function runCapabilityAttempt<T>(
   auditDb: Kysely<Database>,
@@ -95,9 +143,23 @@ export async function runCapabilityAttempt<T>(
   try {
     await recordAuditEventDurable(auditDb, rlsContext, event);
   } catch (auditError) {
+    auditWriteFailureCount += 1;
+    // Structured and greppable (RISK_REGISTER.md R-010) — see this
+    // function's own "R-010 DETECTABILITY" doc comment above for why this
+    // exists alongside the counter, and why neither is wired into /health.
     logger.error(
-      `Audit write failed for capability '${event.capability}' (outcome=${event.outcome}, resourceType=${event.resourceType}, resourceId=${event.resourceId}, requestId=${event.requestId}, correlationId=${event.correlationId}) — the domain outcome is still what the caller sees, per R-009's fix.`,
-      auditError instanceof Error ? auditError.stack : String(auditError),
+      JSON.stringify({
+        event: AUDIT_WRITE_FAILED_EVENT,
+        capability: event.capability,
+        outcome: event.outcome,
+        resourceType: event.resourceType,
+        resourceId: event.resourceId,
+        requestId: event.requestId,
+        correlationId: event.correlationId,
+        totalFailuresThisProcess: auditWriteFailureCount,
+        error: auditError instanceof Error ? auditError.message : String(auditError),
+      }),
+      auditError instanceof Error ? auditError.stack : undefined,
     );
   }
 

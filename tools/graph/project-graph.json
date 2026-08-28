@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "800ebbd",
+    "commit": "c4297b8",
     "dirty": true
   },
   "modules": [
@@ -619,7 +619,7 @@
     {
       "file": "modules/capability/interfaces/capability-attempt.spec.ts",
       "layer": "interfaces",
-      "cases": 2
+      "cases": 4
     },
     {
       "file": "modules/identity/application/login.service.spec.ts",
@@ -715,6 +715,11 @@
       "file": "apps/api/auth-login-rate-limit.integration.spec.ts",
       "layer": "integration",
       "cases": 4
+    },
+    {
+      "file": "apps/api/auth-login-trust-proxy.integration.spec.ts",
+      "layer": "integration",
+      "cases": 1
     },
     {
       "file": "apps/api/auth-login.integration.spec.ts",
@@ -860,8 +865,8 @@
     "tablesWithRls": 6,
     "capabilities": 10,
     "routes": 11,
-    "testFiles": 40,
-    "testCases": 380,
+    "testFiles": 41,
+    "testCases": 383,
     "adrs": 38,
     "adrsAccepted": 30
   }

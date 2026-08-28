@@ -67,6 +67,22 @@ interface WindowState {
  * distinct keys failed within one window, which is what this defect needed
  * bounded in the first place — not a new, separate scaling concern.
  *
+ * **What the above bounds, stated precisely, and what it does NOT
+ * (RISK_REGISTER.md R-013, UNMEASURED):** it bounds RETENTION — a key that
+ * stops being touched is gone within one more write, not kept forever. It
+ * does NOT bound LIVE size within a single window, or the cost of a single
+ * `recordAttempt` call: `sweepExpired` is O(current map size) every time,
+ * and every entry created during an attack stays fully live — and is
+ * therefore walked by every subsequent sweep — until its own window
+ * elapses. An attacker with many source addresses (trivial over IPv6)
+ * controls how many entries are simultaneously live during exactly the
+ * window they are attacking through, so the mitigation's per-write cost
+ * peaks precisely under the load it exists to blunt. Not fixed here,
+ * deliberately — see R-013 for the concrete alternative (a two-generation
+ * map, rotated per window, giving O(1) amortized eviction with no sweep at
+ * all) and for why no benchmark exists yet to say whether this actually
+ * matters at this endpoint's real traffic.
+ *
  * Honest limits, named because they matter, not glossed over
  * (decisions/2026-08.md): this store is per-PROCESS state in a plain `Map`
  * — it does not hold across multiple instances of this API behind a load

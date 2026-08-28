@@ -25,6 +25,22 @@ export function loadDbConfig(env: NodeJS.ProcessEnv = process.env): DbConfig {
   };
 }
 
+/**
+ * The audit-write connection (`AUDIT_DB`, `platform/db/connections.ts`).
+ * Defaults to `DATABASE_URL` (the same value `loadDbConfig` reads) when
+ * `AUDIT_DATABASE_URL` is unset, so behavior today is byte-identical to
+ * before this existed — a configuration change, not a code change, is all
+ * that is needed to point audit writes at a genuinely separate database.
+ * See `platform/db/connections.ts`'s own doc comment for exactly what
+ * independence exists today (a separate connection pool) and what does not
+ * (a separate host/database) until `AUDIT_DATABASE_URL` is actually set.
+ */
+export function loadAuditDbConfig(env: NodeJS.ProcessEnv = process.env): DbConfig {
+  return {
+    connectionString: env.AUDIT_DATABASE_URL ?? env.DATABASE_URL ?? DEV_DEFAULT_APP_DATABASE_URL,
+  };
+}
+
 /** The migration/schema-owner connection (nexora_migrate). Only migrate-cli.ts and schema-structure tooling use this. */
 export function loadMigrateDbConfig(env: NodeJS.ProcessEnv = process.env): DbConfig {
   return {
