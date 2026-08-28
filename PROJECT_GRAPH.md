@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `2f105d8` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `e04f3c1` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 384 test cases in 42 files · 38 ADRs (30 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 384 test cases in 42 files · 43 ADRs (33 accepted)
 
 ## Modules
 
@@ -137,11 +137,11 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-004b | Service Authentication Between AI Plane and NestJS | ACCEPTED | Phase 8 |
 | ADR-005 | In-Process Plugin Security Boundary | ACCEPTED | Phase 6 |
 | ADR-005b | Malicious/Buggy Plugin Tenant Isolation Testing | ACCEPTED | Phase 6 release |
-| ADR-006 | Concurrent Usage and AI Credit Accounting | ACCEPTED | Phase 2 |
+| ADR-006 | Concurrent Usage and AI Credit Accounting | ACCEPTED | Phase 2 (usage-ledger half) · Phase 6+ (AI-credit half) — split by amendment 2026-08-28, see the ADR body |
 | ADR-007 | External MCP Trust Boundary | ACCEPTED | Phase 9 |
 | ADR-008 | Entitlement Precedence and Conflict Resolution | ACCEPTED | Phase 2 |
 | ADR-009 | Shared Idempotency Store | ACCEPTED | Phase 2, Phase 9 |
-| ADR-010 | Non-Functional Requirements and Scale Assumptions | ACCEPTED (was OPEN) | nothing; revisit triggers defined |
+| ADR-010 | Non-Functional Requirements and Scale Assumptions | ACCEPTED (was OPEN) | nothing; revisit triggers defined — targets are unverified assumptions until Phase 4 item 9, amendment 2026-08-28 |
 | ADR-019 | Storefront Delivery, Caching and Domain Routing | ACCEPTED (was OPEN) | Phase 1 exit, Phase 4 |
 | ADR-020 | Data Retention, Deletion and Tenant Offboarding | ACCEPTED (was OPEN) | Phase 2 |
 | ADR-021 | Database Access, ORM and RLS Session Handling | ACCEPTED (new) | Phase 1 |
@@ -159,6 +159,11 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-033 | API Schema Artifact Generation | ACCEPTED (new) | Task 2 (Phase 1) |
 | ADR-034 | Audit Event Placement and Durability | ACCEPTED (new) | Phase 1 (in effect), Task 2 |
 | ADR-035 | Platform-Scope Audit Events | ACCEPTED (new) | Task 2, `auth.login`/`auth.logout`/`auth.logout_all` (NOT `organization.switch` — it has a real tenant; see the ADR body) |
+| ADR-036 | Collection Pagination Contract | ACCEPTED (new) | Phase 2 item 1, and every later `*.list` capability |
+| ADR-037 | Credential Storage and the Encryption Deferral | ACCEPTED (new) | Phase 2 item 10 (storage shape) · Phase 3/4 (the mechanism itself) |
+| ADR-038 | Idempotency Composition at the Capability Boundary | ACCEPTED (new) | Phase 2 item 3, and every idempotent capability after it |
+| ADR-039 | Connection Pool Sizing and Query Timeouts | OPEN | first deployment carrying real traffic, or the first second instance |
+| ADR-040 | Observability Boundary | OPEN | nothing in Phase 2; owed before production |
 | ADR-011 | Co-Pilot Cadence vs AI Credit Cost | DEFERRED | Phase 12 |
 | ADR-012 | Autonomous AI Execution Opt-In | DEFERRED | Phase 13 |
 | ADR-013 | Voice Input Retention | DEFERRED | Phase 14 |

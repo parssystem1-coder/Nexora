@@ -18,7 +18,7 @@ You may not write feature code until all three are true:
 ## 1. Authority and Read Order
 
 1. `AGENTS.md` (this file) for how to work.
-2. `08_PHASE_1_BRIEF.md` for what to build now.
+2. `PHASE_2_BRIEF.md` for what to build now. `08_PHASE_1_BRIEF.md` is the closed phase's record — read its §5 to understand the existing schema's RLS exemptions, never for current scope.
 3. `02_ADR_INDEX_NORMATIVE_DECISIONS.md` for binding decisions. **ADRs override every other document.**
 4. `01_ARCHITECTURE_BASELINE_RFC.md` for architectural shape.
 5. `03_TECHNICAL_BLUEPRINT.md` for implementation boundaries.

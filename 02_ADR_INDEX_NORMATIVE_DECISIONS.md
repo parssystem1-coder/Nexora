@@ -47,11 +47,11 @@ For each ADR, completion requires:
 | ADR-004b | Service Authentication Between AI Plane and NestJS | AI / Security | ACCEPTED | Phase 8 |
 | ADR-005 | In-Process Plugin Security Boundary | Plugin / Security | ACCEPTED | Phase 6 |
 | ADR-005b | Malicious/Buggy Plugin Tenant Isolation Testing | Plugin / Testing | ACCEPTED | Phase 6 release |
-| ADR-006 | Concurrent Usage and AI Credit Accounting | Billing / Integrity | ACCEPTED | Phase 2 |
+| ADR-006 | Concurrent Usage and AI Credit Accounting | Billing / Integrity | ACCEPTED | Phase 2 (usage-ledger half) · Phase 6+ (AI-credit half) — split by amendment 2026-08-28, see the ADR body |
 | ADR-007 | External MCP Trust Boundary | AI / Security | ACCEPTED | Phase 9 |
 | ADR-008 | Entitlement Precedence and Conflict Resolution | Entitlement | ACCEPTED | Phase 2 |
 | ADR-009 | Shared Idempotency Store | Platform / Integrity | ACCEPTED | Phase 2, Phase 9 |
-| ADR-010 | Non-Functional Requirements and Scale Assumptions | Platform | **ACCEPTED (was OPEN)** | nothing; revisit triggers defined |
+| ADR-010 | Non-Functional Requirements and Scale Assumptions | Platform | **ACCEPTED (was OPEN)** | nothing; revisit triggers defined — targets are unverified assumptions until Phase 4 item 9, amendment 2026-08-28 |
 | ADR-019 | Storefront Delivery, Caching and Domain Routing | Storefront / Ops | **ACCEPTED (was OPEN)** | Phase 1 exit, Phase 4 |
 | ADR-020 | Data Retention, Deletion and Tenant Offboarding | Compliance | **ACCEPTED (was OPEN)** | Phase 2 |
 | ADR-021 | Database Access, ORM and RLS Session Handling | Platform / Data | **ACCEPTED (new)** | Phase 1 |
@@ -69,6 +69,11 @@ For each ADR, completion requires:
 | ADR-033 | API Schema Artifact Generation | Platform / Contracts | **ACCEPTED (new)** | Task 2 (Phase 1) |
 | ADR-034 | Audit Event Placement and Durability | Platform / Audit | **ACCEPTED (new)** | Phase 1 (in effect), Task 2 |
 | ADR-035 | Platform-Scope Audit Events | Platform / Audit | **ACCEPTED (new)** | Task 2, `auth.login`/`auth.logout`/`auth.logout_all` (NOT `organization.switch` — it has a real tenant; see the ADR body) |
+| ADR-036 | Collection Pagination Contract | Platform / Contracts | **ACCEPTED (new)** | Phase 2 item 1, and every later `*.list` capability |
+| ADR-037 | Credential Storage and the Encryption Deferral | Billing / Security | **ACCEPTED (new)** | Phase 2 item 10 (storage shape) · Phase 3/4 (the mechanism itself) |
+| ADR-038 | Idempotency Composition at the Capability Boundary | Platform / Integrity | **ACCEPTED (new)** | Phase 2 item 3, and every idempotent capability after it |
+| ADR-039 | Connection Pool Sizing and Query Timeouts | Platform / Data | **OPEN** | first deployment carrying real traffic, or the first second instance |
+| ADR-040 | Observability Boundary | Platform / Ops | **OPEN** | nothing in Phase 2; owed before production |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -515,12 +520,27 @@ The system must prevent negative effective balances unless explicitly supported 
 
 All monetary and credit amounts follow ADR-022.
 
+### Amendment, 2026-08-28 — the `Blocks` designation is split, not moved
+
+**Context.** `PHASE_2_BRIEF.md` §4 excludes `ai_credit_ledger_entries` and `ai_credit_reservations` from Phase 2 on the authority of decision D2-6 (`decisions/2026-08.md`, 2026-08-28), and says so explicitly *because* this index still read `Blocks: Phase 2` — so a reader consulting only the index reached the opposite conclusion. That debt is paid here.
+
+**What the amendment found, and it is not what D2-6 assumed.** D2-6 was framed as "ADR-006 is marked *Blocks: Phase 2* and no `06` item delivers AI credit accounting, therefore the designation is stale." Checking `06_IMPLEMENTATION_PLAN.md` item by item rather than inheriting that framing shows the designation is **half right**: this ADR governs two distinct things, and only one of them is AI-specific.
+
+1. **The usage/credit-ledger concurrency half genuinely blocks Phase 2.** "Usage and AI Credit ledgers are authoritative and must be protected against concurrent modification… inside database transactions using row-level locking such as `SELECT FOR UPDATE`, database constraints, and idempotency" applies directly to **`06` Phase 2 item 9, "usage ledger"**, which is in scope and is a ledger. This half is not deferred and must not be read as deferred.
+2. **The AI-credit reservation half does not.** The `AVAILABLE -> RESERVED -> CONSUMED | RELEASED` lifecycle, and the two tables `04_DATABASE_BLUEPRINT.md` §2.4 declares for it, have no consumer: nothing in `06`'s eighteen Phase 2 items produces or consumes a credit. `06`'s own phase list places AI in **Phase 6+ ("Deferred Expansion": *"Plugins, AI, MCP, advanced automation… Content lives in `future/`"*, `06` line 114); this index separately assigns the AI plane to Phase 8 (ADR-004) at a finer granularity. Either way it is not Phase 2, and building a reservation lifecycle with no consumer would be the speculative table `AGENTS.md` §4 prohibits.
+
+**Decision.** The summary-table designation becomes **Phase 2 (usage-ledger half) · Phase 6+ (AI-credit half)**. Precedent for re-designating a blocking relationship on evidence rather than by rewriting the ADR: ADR-010 and ADR-019 in this same index, both re-designated when the evidence changed.
+
+**Nothing in the Decision section above is withdrawn or edited** — the original text stands and applies in full to any ledger built in Phase 2. Only the phase at which the AI-specific half becomes owed is restated. `ai_credit_ledger_entries` and `ai_credit_reservations` stay uncreated until the phase that first consumes a credit.
+
 ### Verification
 
 - [ ] concurrent consumption test produces exactly-once accounting
 - [ ] failed AI execution releases reservation
 - [ ] balance cannot go negative without explicit policy
 - [ ] ledger sum reconciles against cached counters
+- [ ] **(amendment, 2026-08-28)** Phase 2's `usage_ledger_entries` write path takes explicit row locks and is idempotent, proven against real PostgreSQL — the usage-ledger half of this ADR, which Phase 2 does owe
+- [ ] **(amendment, 2026-08-28)** no `ai_credit_*` table exists at the Phase 2 gate, and no Phase 2 capability references one
 
 ---
 
@@ -702,11 +722,24 @@ This ADR must be reopened when any of these is observed for seven consecutive da
 - the largest store exceeds 50 percent of any per-store assumption
 - a single tenant exceeds 20 percent of total platform load
 
+### Amendment, 2026-08-28 — the targets are unverified assumptions, and this ADR says so rather than reading as if they were measured
+
+**Context.** `PHASE_2_DOCUMENTATION_GAPS_2026-08-28.md` G-9 established that this ADR is, by its own verification text, currently unmeetable: it requires that "metrics exist for every dimension in the table, otherwise the target is unmeasurable and therefore fictional," and its revisit triggers require conditions "observed for seven consecutive days" — while `RISK_REGISTER.md` R-010 records that no metric, alert or dashboard exists anywhere in the platform, and no phase before Phase 4 builds one.
+
+**Decision.** Every number in the table above is an **unverified design assumption, not a measured requirement and not a contractual SLO.** This restates in normative terms what the Decision section already half-says ("These are design assumptions, not contractual SLOs") and closes the gap between that sentence and a verification list written as though the numbers were observable.
+
+They become measurable at **`06_IMPLEMENTATION_PLAN.md` Phase 4 item 9, "load test against the ADR-010 assumptions"** — confirmed against `06` rather than assumed. Until that item runs against real instrumentation, this ADR's targets may be used to size indexes, pools and caches (their stated purpose) and **may not** be cited as evidence that the platform meets any latency, throughput or availability figure.
+
+**No number is changed, added or removed.** The amendment changes the epistemic status of the targets, not the targets. The revisit triggers stand as written and remain unfireable until instrumentation exists — which is a real, recorded consequence, not an oversight: see ADR-040 (`OPEN`), which owns where the observability boundary sits, and R-010.
+
+**On the `entitlement.resolve` p95 budget `PHASE_2_BRIEF.md` §5 records as owed (decision D2-4): it does not belong here, and is deliberately not added.** Two reasons, the second more interesting than the first. (i) This table is a table of numbers; adding a row requires inventing one, and D2-4's entire point was that no number is derivable today — a `TBD` row would manufacture exactly the unmeetable verification item this amendment exists to correct. (ii) Checked rather than assumed: ADR-010 **already bounds `entitlement.resolve` when it is an API request** — it is an Admin API capability, so the existing "Admin API p95 under 500 ms" row covers it. What is genuinely unbounded is *resolution as an inner pipeline step*, invoked inside another capability's request, where its cost is a fraction of some other request's budget rather than a request of its own. That is a different kind of number from anything in this table, and it stays owed to whoever first measures it.
+
 ### Verification
 
 - [ ] load test exercises the storefront read path at the assumed peak
 - [ ] metrics exist for every dimension in the table, otherwise the target is unmeasurable and therefore fictional
 - [ ] restore drill meets the stated RPO and RTO at least once before production
+- [ ] **(amendment, 2026-08-28)** no document, review or gate report cites a number from this table as a met or measured figure before Phase 4 item 9 has run
 
 ---
 
@@ -1597,6 +1630,256 @@ Rejected: nullable `tenant_id` (permanently unreadable, per above); a second RLS
 - [ ] `PLATFORM_TENANT_ID` never appears in `request.tenantContext`, a structured log line, or a response body
 - [ ] no RLS policy on `audit_events` changed
 - [ ] `organizations` cannot hold `PLATFORM_TENANT_ID` as a real row's id — enforced by a `CHECK` constraint, not merely an improbability argument
+
+---
+
+## ADR-036 - Collection Pagination Contract
+
+**ACCEPTED (new)**, depends on ADR-021 and ADR-033
+
+### Problem
+
+`05_API_CAPABILITY_CONTRACTS.md` §1 requires that "Pagination, filtering and sorting are explicit per endpoint" and never defines what *explicit* means. No implemented capability paginates — every Phase 1 READ is single-resource — so nothing establishes a shape, while `05` §4.2 and §4.4 contract `plan.list`, `invoice.list` and `domain.list`. `AGENTS.md` §2 guarantees that whatever the first list capability ships is copied by every later one, so the first implementer would be setting a platform-wide contract as a side effect of a slice. This ADR supplies the definition `05` §1 requires, before that happens.
+
+Recorded as `RISK_REGISTER.md` R-024; decided as D2-1 (`decisions/2026-08.md`, 2026-08-28) and previously carried only in `PHASE_2_BRIEF.md` §5, which expires with the phase — the wrong home for a platform-wide contract.
+
+### Decision
+
+1. **Keyset (seek) pagination with an opaque cursor. One style platform-wide.** No capability introduces offset/limit, and no capability invents a second cursor format. Offset is rejected because every paginated Phase 2 collection is append-heavy and time-ordered, where offset silently skips or repeats rows under concurrent inserts, and because deep pages cost the database a scan proportional to the offset.
+
+2. **Request shape.** Two optional parameters: `limit` (integer, capability-declared default and maximum) and `cursor` (opaque string). Absent `cursor` means the first page. A capability declares its default and maximum `limit` in its Zod input schema, so both appear in the generated OpenAPI artifact (ADR-033).
+
+3. **Response shape.** `{ items: T[], nextCursor: string | null }`. `nextCursor` is `null` when no further page exists. No total count is returned: a count requires a second scan of the full result set, which defeats the reason keyset was chosen, and a count that is computed on one page and consumed on the next is stale by construction. A capability that genuinely needs a total declares it as its own field with its own justification.
+
+4. **A collection that fits in one page is this contract at its natural bound, not a second style.** `plan.list` will normally return every row with `nextCursor: null`. That is conforming. It is explicitly **not** licence to reimplement a small collection as an offset endpoint, an unpaginated array, or a bare `T[]` later on the grounds that it is small — the shape is uniform so that a client written against one list capability works against all of them.
+
+5. **The cursor is opaque and its encoding is not contract.** It encodes the sort key of the last item on the page delivered, plus the capability id and sort order it was issued for. Clients must treat it as a bearer token for position: not parsed, not constructed, not modified, not carried between capabilities. Encoding may change without a contract version bump precisely because it is opaque; a client that parses it has taken a dependency the contract does not grant.
+
+6. **Sort order is total, and declared.** The sort key must be unique or be made unique by appending a tiebreaker (conventionally the primary key). A non-total order makes keyset pagination skip or duplicate rows at page boundaries, which is the failure this whole shape exists to avoid.
+
+7. **Interaction with RLS, which is where a naive implementation degrades.** For a tenant-owned table, the index backing the cursor's sort key **must have `tenant_id` as its leading column** — `04_DATABASE_BLUEPRINT.md` §8 already requires this of every tenant-owned table's primary access path, and pagination is one. Without it, the RLS policy filters *after* the index scan, so each page costs a scan of every tenant's rows and the cost grows with total platform size rather than with the tenant's own data. This is a correctness-preserving but performance-destroying failure that will not show up in a single-tenant test.
+
+8. **Invalid cursor handling.** A cursor that is malformed, undecodable, or issued for a different capability or sort order is a client error and returns `VALIDATION_ERROR` (`05` §7), the same as any other bad input. **No new error code is required, and none is requested of `05`** — this was checked rather than assumed: a *stale* cursor (well-formed, but the row it names has since been deleted) is not an error at all under keyset semantics, because the query seeks past the encoded key and the deleted row's absence is invisible. Only offset pagination needs a "page no longer exists" concept.
+
+### Rejected
+
+Offset/limit (silent skip-and-repeat under concurrent inserts, and deep-page cost); per-capability choice (maximum fit, guaranteed inconsistency, and nothing for a later slice to mirror, which is what `AGENTS.md` §2 exists to prevent); returning a total count by default (a second full scan per page, for a number that is stale as soon as it is read).
+
+### Verification
+
+- [ ] a paginated capability returns `{ items, nextCursor }` and rejects an `offset` parameter
+- [ ] a collection smaller than one page returns every row with `nextCursor: null`, and does so through the same code path as a multi-page collection
+- [ ] iterating every page of a collection under concurrent inserts yields no duplicated and no skipped row, proven against real PostgreSQL
+- [ ] a malformed cursor, and a cursor issued for a different capability, each return `VALIDATION_ERROR`
+- [ ] a cursor whose referenced row has been deleted still returns the correct next page rather than an error
+- [ ] the index backing each paginated tenant-owned query has `tenant_id` as its leading column, asserted against the live schema
+- [ ] the generated OpenAPI artifact documents `limit`, `cursor` and `nextCursor` for every paginated capability
+
+---
+
+## ADR-037 - Credential Storage and the Encryption Deferral
+
+**ACCEPTED (new)**, depends on ADR-021 and ADR-023
+
+### Problem
+
+ADR-023 item 8 is accepted and binding:
+
+> **Store-scoped credentials** are encrypted at rest, never returned by any read API, and never logged. A store operator may rotate them; rotation must not invalidate historical payment records.
+
+Nothing in this repository implements any of it. `platform/config.ts` reads every value as a plain environment variable; `tools/conformance/rules/secrets.ts` prevents *committing* a credential-shaped literal and is unrelated to *storing* one safely. `RISK_REGISTER.md` R-029 records this, and `06_IMPLEMENTATION_PLAN.md` Phase 2 items 10–12 introduce the payment provider port and its first adapter — the work that first needs somewhere to put a credential.
+
+**This ADR does not restate ADR-023 item 8; it decides how the platform stays compliant with it while the encryption mechanism is deferred.**
+
+**Why this ADR exists before item 10 rather than after it.** Migrations are forward-only (ADR-021 item 8). The moment item 10's `billing_provider_configs` migration merges, its column shape is a schema commitment, and adding encryption afterwards becomes a data migration over live credentials rather than a configuration change. The deferral of the mechanism is cheap; deferring the *shape* alongside it is not, and the two were being treated as one question.
+
+### Decision
+
+1. **The deferral covers building the encryption/KMS service. It never covers writing a plaintext secret.** These were conflated in the reasoning this ADR replaces (D2-2 as originally recommended); the maintainer separated them, and the separation is the substance of this ADR.
+
+2. **Storage shape: a reference to a secret held outside the database.** `billing_provider_configs` stores a provider identifier, a non-secret configuration payload, and a `secret_ref` — an opaque locator naming where the credential actually lives — never the credential itself. `04_DATABASE_BLUEPRINT.md` §2.5 already describes this column as a "platform-scoped credentials **reference**", and §2.7's `store_domain_certificates` already uses `secret_ref` with the same intent ("reference only, never key material"), so this follows an established shape in the pack rather than inventing one.
+
+   Chosen over an envelope-shaped column (ciphertext + key id + algorithm + nonce) because a reference is **shape-stable under every later choice of mechanism**: whether the secret ends up in a KMS, a vault, a sealed secret, or an encrypted column, the reference either resolves to it or is migrated to a new locator, and neither case rewrites the credential's own storage. An envelope column commits now to encryption-in-database specifically, which is one of the options the deferral exists to keep open.
+
+3. **No plaintext secret is ever written to this table, by any code path — including a stub adapter, a seed, a fixture, or a test.** This is the operative rule and the one most likely to be broken by convenience. A fixture that stores `"test-api-key"` in a config column normalises the shape the production path then copies.
+
+4. **Until a resolver exists, a `secret_ref` resolves from configuration.** Phase 2's adapters are fixture-modelled and hold no live credential, so the resolver may be a thin read from `platform/config.ts` keyed by the reference. That is a legitimate implementation of the seam, not a violation of it — what matters is that the *table* never holds the material.
+
+5. **Trigger at which the mechanism itself is owed:** before the first live provider credential is stored — which under ADR-023's fixture-based verification and the Phase 3/4 provider-selection timing is not in Phase 2. Whoever stores the first real credential owns building the resolver against a real secret store, and this ADR is what tells them the column shape already accommodates it.
+
+6. **ADR-023 items 7 and 8 are unchanged and still bind.** Platform-scoped and store-scoped credentials remain separately configured and mutually unresolvable; nothing here weakens the "never returned by any read API, never logged" half, which applies from the first row written.
+
+### Verification
+
+- [ ] `billing_provider_configs` has no column capable of holding credential material, asserted against the live schema
+- [ ] no seed, fixture, test or stub adapter writes a credential-shaped value into that table — a deliberately failing fixture proves the check works (ADR-030's standard)
+- [ ] a provider config row round-trips through the read path with no secret in the response body and none in any log line
+- [ ] the stored shape can be repointed to a real secret store by configuration, with no change to the table's columns — demonstrated by pointing the resolver at a second source in a test
+- [ ] rotating the referenced secret does not alter any historical payment record (ADR-023 item 8)
+
+---
+
+## ADR-038 - Idempotency Composition at the Capability Boundary
+
+**ACCEPTED (new)**, depends on ADR-009 and ADR-034
+
+### Problem
+
+ADR-009 governs the shared idempotency store and requires that "a claim is made inside the same transaction that performs the write where the write is single-transaction." It does not say how a capability *reaches* that store.
+
+`modules/capability/interfaces/capability-attempt.ts`'s `runCapabilityAttempt` is the shared outcome-tracking, audit-write and rethrow tail every one of Phase 1's ten capabilities calls (`PHASE_1_DEBT_CLOSURE.md` D-3). Its own doc comment declares a scope ceiling: it "does not choose a transaction strategy," and names Phase 5's capability registry as deliberately deferred work. ADR-009's requirement and that ceiling are in direct tension, and nothing resolved it — recorded as `RISK_REGISTER.md` R-017 and `PHASE_2_DOCUMENTATION_GAPS_2026-08-28.md` G-5, decided as D2-10.
+
+`06_IMPLEMENTATION_PLAN.md` Phase 2 item 3 builds the store. Every idempotent capability after it inherits whatever shape item 3 establishes, so the shape is decided here rather than by item 3's implementer.
+
+### Decision
+
+1. **Composition, not a branch.** A separate `withIdempotentCapability` wrapper composes with `runCapabilityAttempt`. No idempotency branch is added inside `runCapabilityAttempt`, and no controller hand-rolls a claim.
+
+2. **Order: `runCapabilityAttempt` is outermost; `withIdempotentCapability` runs inside it.**
+
+```plain
+runCapabilityAttempt(            <- audits every attempt, fresh or replayed
+  withIdempotentCapability(      <- owns the transaction; claim + write together
+    domain work
+  )
+)
+```
+
+3. **Why that order, stated normatively rather than left to the implementer.** ADR-034 item 5 is explicit that "an audit event attests to an authorized **attempt**, not to a committed effect." A replayed request *is* a new authorized attempt — a real caller really did make a second authenticated, authorized request — so it is audited like any other. With the wrapper outermost instead, a replay would short-circuit before the audit tail ran and the retry would leave no trace, which both contradicts ADR-034 item 5 and makes a retry storm invisible in exactly the record built to explain what happened.
+
+4. **A replayed attempt is audited, and is distinguishable.** It writes exactly one audit event (ADR-034 item 1) with the outcome the stored snapshot records, and its `metadata` carries an explicit replay marker. Without the marker the audit trail shows two successful creations of one resource and cannot say that only one happened.
+
+5. **The wrapper owns the transaction.** Because the claim and the write must share one transaction (ADR-009), `withIdempotentCapability` opens it via the existing tenant-context helper. This is what keeps `runCapabilityAttempt` at its declared ceiling: the shared tail still knows nothing about transactions, because the layer beneath it does.
+
+6. **It is platform-level, satisfying `AGENTS.md` §4.** One mechanism, owned by the `idempotency` module, used by every capability. "Do not create module-specific idempotency mechanisms" is satisfied by the wrapper being shared infrastructure, not by each module calling the store its own way.
+
+7. **A non-idempotent capability composes only the outer function**, exactly as all ten Phase 1 capabilities do today. Adding the store changes no existing capability's structure until that capability's `idempotent` flag flips.
+
+### The two failure modes this shape exists to prevent
+
+Recorded because they are what a future session will otherwise rediscover:
+
+- **Branching inside `runCapabilityAttempt`** breaches the scope ceiling its own doc comment declares, and starts turning the shared tail into Phase 5's capability registry under Phase 2 schedule pressure — a phase's worth of design taken by accident.
+- **Hand-rolling a claim per controller** re-creates precisely the ten-fold duplication `PHASE_1_DEBT_CLOSURE.md` D-3 spent a slice removing, and guarantees the claim/write transaction boundary is got wrong in at least one of them.
+
+### Verification
+
+- [ ] concurrent identical requests with the same key execute the domain work exactly once, proven against real PostgreSQL
+- [ ] the same key with a divergent `request_hash` returns `IDEMPOTENCY_CONFLICT` (`05` §7)
+- [ ] a replayed request writes its own audit event, carrying the replay marker, and does not write a second domain effect
+- [ ] the claim and the write commit or roll back together — a forced failure after the claim leaves no claim behind
+- [ ] `runCapabilityAttempt` contains no idempotency-aware branch, asserted mechanically
+- [ ] exactly one idempotency implementation exists (ADR-030's existing singleton rule)
+
+---
+
+## ADR-039 - Connection Pool Sizing and Query Timeouts
+
+**OPEN** — options and a recommendation are recorded; the decision is the maintainer's
+
+### Problem
+
+ADR-021 item 6 states:
+
+> **Connection pooling.** Because context is transaction-local, an external pooler in transaction mode is compatible, but statement mode is **forbidden**. The application maintains its own pool; the pooler configuration must be documented and asserted in the deployment checklist.
+
+It requires the application to maintain its own pool — it does — and requires the *pooler's* configuration to be documented. **It specifies no sizing, no timeout and no ceiling for the application's own pool.** This ADR fills a documented silence rather than contradicting an existing decision.
+
+**What is unconfigured today**, verified against current source rather than copied from `RISK_REGISTER.md` R-020:
+
+- `platform/db/pool.ts` is six lines: `new Pool({ connectionString: config.connectionString })`. No `max`, `connectionTimeoutMillis`, `idleTimeoutMillis` or `allowExitOnIdle`.
+- `platform/db/connections.ts` creates **two** pools per process — `APP_DB` (`createAppDb`) and `AUDIT_DB` (`createAuditDb`) — each therefore at `pg`'s default `max: 10`, for 20 connections per instance that nobody chose.
+- `platform/db/init/001_roles.sql` sets no `statement_timeout` and no `idle_in_transaction_session_timeout` on either role. A repository-wide grep for all six settings returns nothing.
+
+Every capability opens a transaction through `withTenantContext`, so with no server-side `statement_timeout` a single slow query holds its connection with no ceiling at any layer.
+
+### Options
+
+**Where pool sizing belongs.**
+  A. `platform/config.ts`, read from the environment — per-process, tunable per deployment without a release, consistent with how every other connection setting is already loaded.
+  B. Hard-coded in `pool.ts` — one obvious place, no environment drift, requires a release to change.
+
+**Where statement and idle-transaction timeouts belong.**
+  C. Client-side, in the `pg` pool options — travels with the application, and is silently absent for any other connection path (`psql`, a migration run, a future worker).
+  D. Server-side, `ALTER ROLE nexora_app SET statement_timeout = …` in a migration — enforced by PostgreSQL regardless of which client connects, cannot be forgotten by a new consumer, and is naturally per-role: `nexora_app` wants a tight ceiling while `nexora_migrate` must be allowed long migrations.
+  E. The deployment checklist ADR-021 item 6 already requires — documented, not enforced.
+
+### Recommendation
+
+**A for sizing, D for timeouts, with E documenting both.** Sizing is genuinely deployment-shaped (instance count, database `max_connections`, and provider limits all vary) and belongs in environment config. Timeouts are a safety property that should not depend on which client opened the connection, which is exactly what D gives and C does not; and the per-role split falls out for free, since a migration legitimately needs the ceiling `nexora_app` must not have.
+
+**Two constraints the decision must respect, whichever options are taken:**
+
+- **`AUDIT_DB` must stay available when `APP_DB` is saturated.** Separate pools already guarantee a domain transaction cannot hold an audit connection. But both pools default to the same connection string (`loadAuditDbConfig` falls back to `DATABASE_URL`), so they contend for one PostgreSQL `max_connections` budget: `instances × 2 pools × max` must leave headroom, or a burst exhausts the server and audit writes fail — the exact condition R-010 records as silent.
+- **Sizing must be computed against `max_connections`, not chosen per pool in isolation.** PostgreSQL's default is 100; two pools at `pg`'s default 10 means five instances reach it with nothing left for `psql`, migrations or a reconciliation worker.
+
+**On numbers: this ADR proposes none as measured.** `pg`'s `max: 10` is a library default, not a measurement of this workload, and no load test exists (see ADR-010's 2026-08-28 amendment). Any number written into the eventual decision is a starting point to be revised against the first real measurement, and should be labelled as such rather than acquiring authority by being written down.
+
+**Trigger:** the same deployment moment R-012's `TRUST_PROXY` decision is owed at — before this API is first placed behind a proxy or load balancer, or before a second instance runs, whichever comes first. Both are decisions that can only be made correctly with the real topology in hand, and taking them together is cheaper than twice.
+
+### Verification
+
+*(applies once the decision is taken; an `OPEN` ADR has nothing to verify yet)*
+
+- [ ] every pool's `max`, `connectionTimeoutMillis` and `idleTimeoutMillis` is set explicitly, with no reliance on a library default
+- [ ] `statement_timeout` and `idle_in_transaction_session_timeout` are set for `nexora_app` and are proven to fire, by a test that runs a deliberately slow query and observes it aborted
+- [ ] `nexora_migrate` is exempt from the statement ceiling, proven by a long migration succeeding
+- [ ] the sum of all pools' `max` across the planned instance count is asserted against the database's `max_connections`, with documented headroom
+- [ ] an exhausted `APP_DB` pool does not prevent an audit write from completing on `AUDIT_DB`
+- [ ] the pooler mode assertion ADR-021 item 6 requires exists in the deployment checklist
+
+---
+
+## ADR-040 - Observability Boundary
+
+**OPEN** — options and a recommendation are recorded; the decision is the maintainer's
+
+### Problem
+
+`06_IMPLEMENTATION_PLAN.md` Phase 1 item 12 reads "audit events **and structured observability**," and never defines the second half. `RISK_REGISTER.md` R-010 records that an `AUDIT_DB` outage is detectable but not alerted; `EXTERNAL_ARCHITECTURE_REVIEW_2026-08-28.md` F-5 records two inconsistent logging paths and no field redaction. Every future observability question currently has no home, so each one is re-argued from scratch.
+
+**This ADR is not "the platform has no observability."** Stated first, because the opposite framing has already caused one over-scoped proposal:
+
+- **Structured request logging exists and meets its requirement.** `apps/api/logging.middleware.ts` emits one JSON line per request with `requestId`, `correlationId`, `tenantId`, method, path, status and duration — exactly what `08_PHASE_1_BRIEF.md` §2 step 10 requires, which its own doc comment cites.
+- **A machine-detectable audit-failure signal exists.** `runCapabilityAttempt` emits a stable structured `audit_write_failed` event and increments `getAuditWriteFailureCount()`, deliberately built as a seam for a future metrics sink (R-010).
+- **Error logging is structured and request-correlated** through `HttpExceptionFilter`.
+
+What is undecided is where the *next* layer's boundary sits.
+
+### Options
+
+**1. The two logging paths.** `apps/api/logging.middleware.ts` uses a bare `console.log(JSON.stringify(...))`; `http-exception.filter.ts` and `capability-attempt.ts` use NestJS's `Logger`. There is no shared level control, and `platform/` has no `observability/`.
+  A. Unify onto one logger behind a thin platform seam — cheap, no dependency, gives level control and one place to add redaction.
+  B. Leave both — they work, and unifying touches request-path code for no behavioural gain.
+
+**2. Tracing and metrics.**
+  C. Adopt OpenTelemetry auto-instrumentation now. It is the obvious candidate for a NestJS + `pg` stack and would cover both pools with near-zero application code. **Assessed rather than assumed, and the assessment is not clean:** this repository runs through `tsx`/Vitest, both esbuild-based, and esbuild does not implement `emitDecoratorMetadata` — the limitation that already forced explicit DI in the golden path and eliminated `@nestjs/swagger` in ADR-033. OTel's Node auto-instrumentation relies on module-load patching rather than decorator metadata, so it is *probably* unaffected, but "probably" is not the standard this repository has applied to the two prior instances of the same class of problem, both of which failed silently. Adopting C requires demonstrating it works under this toolchain first.
+  D. Defer tracing/metrics with a hard trigger (first multi-instance deployment, or first production traffic), keeping `getAuditWriteFailureCount()`'s seam as the documented first consumer.
+  E. Expose a minimal metrics endpoint now with no tracing.
+
+**3. Redaction.** Nothing redacts any field today; what stays out of a log is a property of what callers happen to pass.
+  F. Redact at the logging seam, by declared allow-list.
+  G. Redact at each call site — flexible, and reliably forgotten.
+
+**4. A metrics endpoint, if one exists.** `apps/api/health.controller.ts` deliberately carries neither the rate-limit state nor the audit-failure counter, on recorded reasoning: `/health` is public and unauthenticated, and publishing internal failure counts there is real operational information disclosure. Any metrics endpoint inherits that reasoning — it is authenticated, bound to a non-public interface, or both. It is never merged into `/health`.
+
+### Recommendation
+
+**A + D + F, with the metrics endpoint constrained as above when it arrives.** Unifying the logging paths (A) is cheap, adds no dependency, and is the prerequisite that makes redaction (F) implementable in one place rather than fifteen — and redaction is the item with real downside today, since nothing prevents a future log line carrying a token or an email. Tracing and metrics (D) should wait for a trigger: there is no production traffic, one instance, and no alerting destination, so adopting OTel now means carrying a dependency and a collector to observe a system nobody is watching — and it should not be adopted at all until it is demonstrated working under this repository's esbuild-based toolchain, given ADR-033's precedent.
+
+### What this ADR does not decide
+
+Named explicitly so it does not become the venue for every future observability argument: **alerting policy** (thresholds, escalation, who is paged), **dashboards**, and **vendor or backend choice** (collector, storage, APM). Those are operational decisions belonging to whoever runs this platform in production, and none of them is blocked by, or blocks, the boundary question above.
+
+### Verification
+
+*(applies once the decision is taken; an `OPEN` ADR has nothing to verify yet)*
+
+- [ ] every log line in the request path is emitted through one seam, asserted mechanically
+- [ ] a declared-sensitive field is redacted in a log line, proven by a deliberately failing fixture
+- [ ] the audit-failure counter has at least one consumer, or its absence is a recorded, dated deferral
+- [ ] no metrics or internal counter is reachable from an unauthenticated endpoint, `/health` included
+- [ ] if tracing is adopted, a trace spans an HTTP request through both connection pools and is demonstrated working under `tsx`/Vitest, not only under `tsc`
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "2f105d8",
+    "commit": "e04f3c1",
     "dirty": true
   },
   "modules": [
@@ -418,7 +418,7 @@
       "id": "ADR-006",
       "title": "Concurrent Usage and AI Credit Accounting",
       "status": "ACCEPTED",
-      "blocks": "Phase 2"
+      "blocks": "Phase 2 (usage-ledger half) · Phase 6+ (AI-credit half) — split by amendment 2026-08-28, see the ADR body"
     },
     {
       "id": "ADR-007",
@@ -442,7 +442,7 @@
       "id": "ADR-010",
       "title": "Non-Functional Requirements and Scale Assumptions",
       "status": "ACCEPTED (was OPEN)",
-      "blocks": "nothing; revisit triggers defined"
+      "blocks": "nothing; revisit triggers defined — targets are unverified assumptions until Phase 4 item 9, amendment 2026-08-28"
     },
     {
       "id": "ADR-019",
@@ -545,6 +545,36 @@
       "title": "Platform-Scope Audit Events",
       "status": "ACCEPTED (new)",
       "blocks": "Task 2, `auth.login`/`auth.logout`/`auth.logout_all` (NOT `organization.switch` — it has a real tenant; see the ADR body)"
+    },
+    {
+      "id": "ADR-036",
+      "title": "Collection Pagination Contract",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 2 item 1, and every later `*.list` capability"
+    },
+    {
+      "id": "ADR-037",
+      "title": "Credential Storage and the Encryption Deferral",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 2 item 10 (storage shape) · Phase 3/4 (the mechanism itself)"
+    },
+    {
+      "id": "ADR-038",
+      "title": "Idempotency Composition at the Capability Boundary",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 2 item 3, and every idempotent capability after it"
+    },
+    {
+      "id": "ADR-039",
+      "title": "Connection Pool Sizing and Query Timeouts",
+      "status": "OPEN",
+      "blocks": "first deployment carrying real traffic, or the first second instance"
+    },
+    {
+      "id": "ADR-040",
+      "title": "Observability Boundary",
+      "status": "OPEN",
+      "blocks": "nothing in Phase 2; owed before production"
     },
     {
       "id": "ADR-011",
@@ -872,7 +902,7 @@
     "routes": 11,
     "testFiles": 42,
     "testCases": 384,
-    "adrs": 38,
-    "adrsAccepted": 30
+    "adrs": 43,
+    "adrsAccepted": 33
   }
 }
