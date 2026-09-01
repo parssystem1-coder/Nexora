@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `e04f3c1` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `cf61d21` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 384 test cases in 42 files · 43 ADRs (33 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 384 test cases in 42 files · 46 ADRs (35 accepted)
 
 ## Modules
 
@@ -164,6 +164,9 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-038 | Idempotency Composition at the Capability Boundary | ACCEPTED (new) | Phase 2 item 3, and every idempotent capability after it |
 | ADR-039 | Connection Pool Sizing and Query Timeouts | OPEN | first deployment carrying real traffic, or the first second instance |
 | ADR-040 | Observability Boundary | OPEN | nothing in Phase 2; owed before production |
+| ADR-041 | Ledger and Audit Table Growth | OPEN | nothing today; cheapest at Phase 2 ledger-table creation, expensive after |
+| ADR-042 | Error Message Audience and Localization | ACCEPTED (new) | Phase 2, every capability that raises an error |
+| ADR-043 | Guarding `CapabilityDefinition` Against `05` §5 | ACCEPTED (new) | Phase 2 items 6–7 (the first slices that would add a declared field) |
 | ADR-011 | Co-Pilot Cadence vs AI Credit Cost | DEFERRED | Phase 12 |
 | ADR-012 | Autonomous AI Execution Opt-In | DEFERRED | Phase 13 |
 | ADR-013 | Voice Input Retention | DEFERRED | Phase 14 |

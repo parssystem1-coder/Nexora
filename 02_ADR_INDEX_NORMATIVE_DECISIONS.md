@@ -74,6 +74,9 @@ For each ADR, completion requires:
 | ADR-038 | Idempotency Composition at the Capability Boundary | Platform / Integrity | **ACCEPTED (new)** | Phase 2 item 3, and every idempotent capability after it |
 | ADR-039 | Connection Pool Sizing and Query Timeouts | Platform / Data | **OPEN** | first deployment carrying real traffic, or the first second instance |
 | ADR-040 | Observability Boundary | Platform / Ops | **OPEN** | nothing in Phase 2; owed before production |
+| ADR-041 | Ledger and Audit Table Growth | Platform / Data | **OPEN** | nothing today; cheapest at Phase 2 ledger-table creation, expensive after |
+| ADR-042 | Error Message Audience and Localization | Platform / Contracts | **ACCEPTED (new)** | Phase 2, every capability that raises an error |
+| ADR-043 | Guarding `CapabilityDefinition` Against `05` §5 | Platform / CI | **ACCEPTED (new)** | Phase 2 items 6–7 (the first slices that would add a declared field) |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -1880,6 +1883,169 @@ Named explicitly so it does not become the venue for every future observability 
 - [ ] the audit-failure counter has at least one consumer, or its absence is a recorded, dated deferral
 - [ ] no metrics or internal counter is reachable from an unauthenticated endpoint, `/health` included
 - [ ] if tracing is adopted, a trace spans an HTTP request through both connection pools and is demonstrated working under `tsx`/Vitest, not only under `tsc`
+
+---
+
+## ADR-041 - Ledger and Audit Table Growth
+
+**OPEN**, new, depends on ADR-020 and ADR-021
+
+### Why this is OPEN rather than ACCEPTED
+
+`PHASE_2_BRIEF.md` §5 settles how ledger tables are *protected* (`REVOKE UPDATE, DELETE` in each creating migration) and says nothing about how they are *bounded*. `RISK_REGISTER.md` R-030 rates the risk `UNMEASURED` and not urgent. No option below has been chosen, and choosing one silently would be exactly the kind of unrecorded architectural decision `AGENTS.md` §5 forbids. It is `OPEN` for that reason and not because it is unimportant — see the timing problem.
+
+### Problem
+
+`audit_events` grows by exactly one row per capability attempt, on both success and failure (ADR-034 item 4), and carries a single index, `(tenant_id, occurred_at)`. Phase 2 adds four more tables with the same growth shape, all append-only per `PHASE_2_BRIEF.md` §5: `usage_ledger_entries`, `billing_payment_events`, `subscription_state_transitions`, and `invoice_lines`.
+
+**What ADR-020 does and does not commit the platform to, for these rows specifically** — read directly, because it is routinely mis-summarised as a retention policy that permits cleanup:
+
+- Rule 4: *"Purge scope is tenant-owned data. Append-only records required for financial, tax or legal purposes are retained per the legal retention window and are **excluded from purge**; they must be reduced to the minimum fields required."*
+- Rule 5: *"Audit events recording the deletion itself are **never purged**."*
+
+So ADR-020 **excludes** these rows from the one deletion mechanism the platform has, and commits to retaining financial records for a legal window it does not numerically specify. It says nothing about partitioning, archival, index strategy, or growth of any kind. **The practical consequence: these tables only ever grow, by design, and no document currently owns that.** Deletion is not among the options below because ADR-020 has already removed it.
+
+### The timing problem, which is the real reason this cannot wait indefinitely
+
+Partitioning an empty or small table is a schema change. Partitioning a large populated table is a data migration — and migrations here are forward-only (ADR-021 item 8). `audit_events` is small today. The four Phase 2 ledger tables **do not exist yet**, which is the cheapest moment they will ever have. A decision deferred past their creating migrations converts a cheap option into an expensive one without anyone choosing to.
+
+### Options
+
+1. **Native declarative partitioning by time** (`PARTITION BY RANGE (occurred_at)` or equivalent per table). No extension dependency. Requires a partition-creation policy — a migration per period, or a job. Bounds per-partition scan size and makes detaching a period for archival cheap.
+2. **`pg_partman`.** Automates partition creation and retention. A further extension dependency for automation that, at ADR-010's assumed V1 scale (≤5,000 organizations, 50 admin RPS peak), native declarative partitioning covers without it. *(Extension behaviour understood at 2026-09-01, not verified against upstream in this pass.)*
+3. **Archival to cold storage.** Detach or export old rows to object storage. Interacts with **R-025**: no object storage port exists, and no phase item owns one.
+4. **Accept unbounded growth with a stated trigger** — for example a row count or table size at which option 1 is revisited. Honest and cheap now, and it forfeits the cheap moment described above.
+
+**Recommendation, not a ruling:** option 1 for `audit_events` and the four Phase 2 ledger tables, decided *before* their creating migrations are written, with option 3 layered later if retention windows demand it. Option 2 is not justified at V1 scale. Option 4 is defensible only if the maintainer accepts that revisiting it later is a data migration.
+
+### The non-obvious constraint: partitioning × `FORCE ROW LEVEL SECURITY`
+
+This is the part that could silently weaken tenant isolation, so it is separated from the options above and its epistemic status is stated per claim.
+
+**Established from this repository, verifiable without a database:**
+
+- Every non-exempt table must carry `tenant_id`, `ENABLE ROW LEVEL SECURITY`, `FORCE ROW LEVEL SECURITY` and a policy (`04` §7; `PHASE_2_BRIEF.md` §5).
+- `tools/conformance/rules/schema-live.ts` enumerates tables via `information_schema.tables WHERE table_type = 'BASE TABLE'` and applies those four requirements to **every** enumerated table that is not on its `TENANT_EXEMPT` list. It reads `relrowsecurity` and `relforcerowsecurity` from `pg_class`, and checks `pg_policies` for a matching row.
+- **Therefore, whatever PostgreSQL's inheritance semantics turn out to be, introducing partitions changes what this checker sees.** If partitions are enumerated as base tables, each one is independently subjected to the tenant_id/RLS/FORCE/policy requirement. The harness will then either flag every partition (a false alarm that invites someone to add an `exceptions.json` entry — which `CLAUDE.md`'s standing rule forbids as a way to reach green), or pass them without ever having checked the property it believes it checked. **Both failure modes are worse than the status quo, and the second is silent.**
+
+**NOT established, and explicitly owed verification** — these require running PostgreSQL 17 and were not attempted in this documentation-only pass:
+
+- Whether `FORCE ROW LEVEL SECURITY` set on a partitioned parent applies to reads and writes routed through the parent, to partitions accessed directly, or both.
+- Whether a policy created on the parent is enforced for direct access to a partition.
+- Whether `relrowsecurity` / `relforcerowsecurity` on a partition's own `pg_class` row reflect the parent's setting or are independent.
+- How `information_schema.tables` reports a partitioned parent versus its partitions, which determines exactly what `schema-live.ts` enumerates.
+
+**No claim about these four is made here.** Whoever takes this decision must establish them empirically first — the same standard `RISK_REGISTER.md` R-002 met when it confirmed by direct test that a table's owning role bypasses RLS by default, rather than reasoning about it from documentation.
+
+### Verification
+
+- [ ] the four PostgreSQL semantics questions above are answered empirically against PostgreSQL 17, and the answers recorded, **before** any partitioning migration is written
+- [ ] `tools/conformance/rules/schema-live.ts` is confirmed to enumerate partitions and parents as intended, with a deliberately failing fixture proving it still detects a partition missing RLS, FORCE or a policy (ADR-030's own standard)
+- [ ] a cross-tenant read against a partitioned tenant-owned table returns zero rows with no tenant context, and zero rows from a wrong tenant's context — proven live, not inferred
+- [ ] no `exceptions.json` entry is added to make the harness green over a partitioning change
+- [ ] whichever option is chosen, the decision is recorded before the first Phase 2 ledger table's creating migration merges
+
+---
+
+## ADR-042 - Error Message Audience and Localization
+
+**ACCEPTED (new)**, depends on ADR-033 and `05_API_CAPABILITY_CONTRACTS.md` §§1, 7
+
+### Why this is ACCEPTED rather than OPEN
+
+`RISK_REGISTER.md` R-026 recorded this as genuine ambiguity rather than a simple absence, and it stayed unresolved because the question looked like a preference. It is not: `05` §7 already contains a decisive precedent, below, and the evidence runs one way once that precedent is read. Leaving it `OPEN` has a cost that leaving most things open does not — every Phase 2 slice writes error messages under no rule about what may live in them, and the ruling gets *more* expensive the more strings exist and the sooner a client depends on one.
+
+### Problem
+
+`05` §1 defines the error envelope as `code`, `message`, `details`, `requestId`, and **never says who `message` is for** — a developer reading a log, or an end user reading a screen. `CapabilityError` (`modules/capability/domain/capability.errors.ts`) carries a free-text English `message`; `HttpExceptionFilter` returns it verbatim. `05` §2's `TenantContext` carries no locale, and nothing in `apps/`, `modules/` or `platform/` handles `Accept-Language`. Meanwhile `05` §6.4's own worked example is a Persian IDN hostname (`فروشگاه.example`) and `00_PLATFORM_OVERVIEW.md` describes a merchant-facing product.
+
+The gap is the silence, not a missing translation layer. Until the audience is decided, it is unknowable whether *any* localization work is owed.
+
+### The precedent that decides it
+
+`05` §7, on `QUOTA_EXCEEDED` and `OVER_LIMIT`: *"must include, in `details`: `resource`, `current`, `limit`, and `resolution` (`upgrade` or `reduce`). **A bare limit error is not an acceptable contract.**"*
+
+That requirement only makes sense under one reading. If `message` were the user-facing string, the numbers would live in the prose and `details` would be redundant. Requiring them **separately and structurally** means the contract already assumes a consumer that composes its own user-facing text from `code` plus parameters. The localization-key-plus-parameters pattern is therefore not a new proposal — it is what §7 already specifies, for the two codes that most need it.
+
+### Decision
+
+1. **`message` is developer-facing.** It is diagnostic text for a log, a trace, an error tracker or a developer console. It is English, it is not localized, it is not a stable contract, and **it must never be displayed to an end user.**
+2. **`code` is the localization key.** It is stable, documented, enumerated in `05` §7, and already declared per capability in `CapabilityDefinition.errorCodes` (ADR-033 item 6) — so the set of keys a client must translate is machine-readable from the published artifact and cannot silently diverge from what the platform raises.
+3. **`details` carries the parameters.** Generalised from §7's existing requirement: **any information an end user needs in order to understand or act on an error must be present in `code` + `details`, and must not exist only in `message`.** This is the operative rule and the one that constrains implementers.
+4. **No locale in `TenantContext`, and no `Accept-Language` handling, in Phase 2.** Both are premature: under items 1–3 the platform emits no user-facing text, so it has nothing to localize. The interface layer that eventually renders errors owns locale resolution, consistent with ADR-022 item 4's identical treatment of money presentation ("Display is not storage… applied only in the interface layer") and ADR-031 item 5's of calendars ("Calendar display is a presentation concern").
+5. **`message` may be logged and returned; it may not be relied on.** It stays in the envelope — removing it would make production debugging materially harder — but no client behaviour, test assertion or UI string may depend on its wording.
+
+**Rejected:** making `message` user-facing and localizing it server-side, which would require a locale in `TenantContext`, a message catalogue, and translation of ~37 codes before any of them has a real consumer — and would put presentation concerns in the domain and application layers that ADR-022 and ADR-031 both keep out.
+
+### What follows for Phase 2
+
+**No localization work is owed, and that is a ruling rather than a deferral.** One obligation is created, and it is small: every capability raising an error must put user-actionable information in `details`, not only in `message`. Concretely, **12 error codes are implemented today** against the **37** `05` §7 lists — so the audit surface is 12 messages, not 37, and it shrinks the earlier it is done. Phase 2's new codes (`ENTITLEMENT_CONFLICT`, `QUOTA_EXCEEDED`, `OVER_LIMIT`, `IDEMPOTENCY_CONFLICT`, `CURRENCY_MISMATCH` and the payment codes) are written under this rule from the start.
+
+### Verification
+
+- [ ] no test asserts on `message` text; assertions are on `code` and on `details` fields
+- [ ] `QUOTA_EXCEEDED` and `OVER_LIMIT` carry `resource`, `current`, `limit` and `resolution` in `details`, per `05` §7 — the existing precedent, now the general pattern
+- [ ] each of the 12 implemented codes is audited once for information that exists only in `message`, and anything user-actionable is moved into `details`
+- [ ] `TenantContext` carries no locale field, and no `Accept-Language` handling exists, at the Phase 2 gate
+- [ ] every code a capability can raise appears in its `CapabilityDefinition.errorCodes` and therefore in `openapi.json` (ADR-033 item 6, already enforced) — so a client can enumerate the keys it must translate
+
+---
+
+## ADR-043 - Guarding `CapabilityDefinition` Against `05` §5
+
+**ACCEPTED (new)**, depends on ADR-030 and ADR-033
+
+### Why this is ACCEPTED rather than OPEN
+
+The *rule* is already settled — `PHASE_2_BRIEF.md` §5: "a field is added in the same slice that adds its enforcement, never ahead of it." What was open is whether that rule is enforced mechanically or by review, and in which direction. The analysis below shows only one assertion shape survives contact with the code that already exists, so the direction is determined rather than chosen. That makes it a decision to record, not a question to hold open.
+
+### Problem
+
+`05` §5 declares 14 fields on `CapabilityDefinition`. The implemented type (`modules/capability/domain/capability-definition.ts`) implements 9, omits 5 (`requiredEntitlements`, `quota`, `emitsEvents`, `approval`, `requiresServingSubscription` — the last two non-optional in §5), and adds 2 that §5 does not list (`route`, `errorCodes`, both introduced by ADR-033, which post-dates §5).
+
+The omissions are deliberate and well-argued in the file's own doc comment: "declaring a field nothing enforces is the 'documentation, not architecture' failure ADR-030 warns about." **That reasoning is correct and this ADR does not disturb it.** The defect is that it is prose — and `AGENTS.md` §2 states the governing thesis: "Rules expressed only as prose are not enforceable on a long task." `RISK_REGISTER.md` R-022 records that no conformance rule ties the type to §5. Phase 2 items 6 (entitlement resolution) and 7 (quota policies) are the first work that would add any of the five.
+
+### The direction, and why the obvious ones are all wrong
+
+| Candidate assertion | Fails because |
+|---|---|
+| implemented **⊆** §5 | `route` and `errorCodes` are in the implemented type and not in §5. Correct code fails today. |
+| implemented **⊇** §5 | The five omissions are deliberate and correct. Correct code fails today. |
+| implemented **=** §5 | Fails in both directions simultaneously. |
+
+All three naive directions reject the current, correct state. That is not a reason to abandon the check — it is the shape of the answer.
+
+**Decision: assert the *declared difference*, not the sets.** The difference between §5 and the implemented type is itself version-controlled, and the harness fails on any difference that is not declared:
+
+1. **Every field in the implemented type** must either appear in `05` §5, **or** be listed in an `additions` list with the ADR that introduced it. Today that list is exactly `route` and `errorCodes`, both citing ADR-033.
+2. **Every field in `05` §5 absent from the implemented type** must be listed in a `deferred` list naming the phase item that will add it. Today: `requiredEntitlements` and `quota` (Phase 2 items 6–7), `approval` (ADR-001, Phase 9), `requiresServingSubscription` (ADR-024, first needed at Phase 2 item 4), `emitsEvents` (the outbox contract, Phase 2 item 14).
+3. **Any undeclared difference in either direction fails the build.**
+
+**What this forbids that a subset or superset rule would not:** adding a field to the implemented type without either §5 listing it or an ADR justifying it (the "documentation, not architecture" failure, now mechanical); and **silently dropping a §5 field from the `deferred` list** — which would erase the evidence that the field is still owed. The second is the one review reliably misses, because a shrinking list looks like progress.
+
+**What it deliberately permits:** the current state, unchanged, and every legitimate future divergence — provided the divergence is written down.
+
+### Where the check belongs
+
+**In the ADR-030 conformance harness**, as a new rule with a deliberately failing fixture per ADR-030's own standard. Rejected alternatives:
+
+- **The type system.** TypeScript cannot read a Markdown table. Any type-level version would be a hand-maintained second copy of §5, which is the two-sources-of-truth problem ADR-033 rejected for schemas.
+- **The ADR-033 OpenAPI generator.** It already reads `CapabilityDefinition`, which makes it tempting, but its job is publishing, not policing — and it only touches the fields it consumes, so it would be blind to exactly the unconsumed additions this rule exists to catch. Conflating the two would also mean a contract-publishing failure and a governance failure produce the same error.
+
+### Scope: what this ADR does not do
+
+**This ADR decides *what* is enforced and *where*. It does not implement the rule** — no code, fixture or parser is written here, and the `additions`/`deferred` lists above are the decision's content, not a file that now exists. A later, code-authorized session builds it. Until then the rule remains review-enforced and R-022 stays open, which is the honest status.
+
+One consequence to note for that session: §5 is prose in a Markdown table, so the rule needs a parser for it, and a brittle parser that silently matches nothing would be a check that always passes — the same silent-failure mode ADR-033 rejected `@nestjs/swagger` for. The fixture must therefore prove the rule *fails* on a real undeclared divergence, not merely that it passes today.
+
+### Verification
+
+- [ ] a conformance rule exists that parses `05` §5's field list and compares it to the implemented type
+- [ ] the rule fails on an undeclared field added to the implemented type, proven by a deliberately failing fixture
+- [ ] the rule fails on a `05` §5 field removed from the `deferred` list while still absent from the type, proven by a second fixture
+- [ ] the rule passes against the current state with `route`/`errorCodes` declared as ADR-033 additions and the five omissions declared as deferred
+- [ ] the rule is not satisfied by an `exceptions.json` entry
+- [ ] adding `requiredEntitlements` or `quota` in Phase 2 item 6 or 7 requires removing it from the `deferred` list in the same commit
 
 ---
 

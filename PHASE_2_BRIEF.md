@@ -57,6 +57,8 @@ Phase 1's rows carry forward unchanged; Phase 2's additions follow. A concern wi
 | Retention on billing events | expiry, downgrade and cancellation are never destructive | ADR-020 rule 1, ADR-026 item 1 |
 | Audit placement | one event per capability attempt, on an independent connection, both outcomes | ADR-034 |
 | Platform-scope audit | reserved sentinel `tenant_id` for capabilities with no tenant | ADR-035 |
+| Error message audience | `message` is developer-facing and never shown to an end user; `code` is the localization key, `details` carries the parameters | **ADR-042** |
+| `CapabilityDefinition` field drift | a field is added in the same slice that adds its enforcement; the difference from `05` §5 is itself declared and CI-asserted | **ADR-043** |
 | Schema artifacts | OpenAPI generated from Zod + `CapabilityDefinition`, committed, CI-drift-checked | ADR-033 |
 | Migrations | reviewed plain SQL, forward-only | ADR-021 item 8 |
 
@@ -396,7 +398,7 @@ All fourteen questions this brief was drafted around are answered. Full reasonin
 
 | Owed | To | Raised by |
 |---|---|---|
-| Correct the "no earlier than Phase 3/4" claim and its unsound `03` §9 citation | `PROVIDER_MATRIX.md` | D2-3 / R-015 |
+| ~~Correct the "no earlier than Phase 3/4" claim and its unsound `03` §9 citation~~ — **PAID 2026-09-01.** `PROVIDER_MATRIX.md` carries a dated correction block stating D2-3's ruling with ADR-023/ADR-037 as authority. R-015 stays OPEN: the file is fixed, but no provider has been selected, which is what that row tracks. | `PROVIDER_MATRIX.md` | D2-3 / R-015 |
 | ~~Dated amendment revising ADR-006's `Blocks: Phase 2` designation~~ — **PAID 2026-08-28** (split, not moved: the usage-ledger half still blocks Phase 2) | `02_ADR_INDEX_NORMATIVE_DECISIONS.md` | D2-6 / R-019 |
 | ~~Dated amendment stating ADR-010's targets are unverified assumptions, naming the phase that changes that~~ — **PAID 2026-08-28** | `02_ADR_INDEX_NORMATIVE_DECISIONS.md` | D2-9 |
 | Re-phrase Phase 2's items to name their capabilities, so the §3(a) mapping becomes mechanical | `06_IMPLEMENTATION_PLAN.md` | D2-13 |
