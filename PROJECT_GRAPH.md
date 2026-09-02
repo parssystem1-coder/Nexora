@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `ee6cb68` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `d11ce2a` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 384 test cases in 42 files · 53 ADRs (42 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 394 test cases in 43 files · 54 ADRs (42 accepted)
 
 ## Modules
 
@@ -73,7 +73,7 @@ Roles ADR-030 requires exactly one implementation of.
 | infrastructure | 4 | 15 |
 | integration | 15 | 189 |
 | interfaces | 1 | 4 |
-| other | 2 | 12 |
+| other | 3 | 22 |
 | platform | 2 | 15 |
 
 <details><summary>Per file</summary>
@@ -122,6 +122,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `tools/conformance/harness.selftest.spec.ts` | conformance | 23 |
 | `tools/graph/extract.spec.ts` | other | 5 |
 | `tools/openapi/openapi.spec.ts` | other | 7 |
+| `tools/register/register-integrity.spec.ts` | other | 10 |
 
 </details>
 
@@ -174,6 +175,7 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-048 | Invoice Numbering | ACCEPTED (was OPEN) | Phase 2 item 13; the counter table is owed to `PHASE_2_BRIEF.md` §4 before that migration |
 | ADR-049 | MCP Readiness Posture for Phase 2 | ACCEPTED (new) | nothing directly — constrains every Phase 2 capability so Phase 9 stays reachable |
 | ADR-050 | Financial Event Packet and External Delivery Path | ACCEPTED (was OPEN) | Phase 2 item 14; the delivery table is owed to `PHASE_2_BRIEF.md` §4 before that migration |
+| ADR-051 | Error Code for a Membership Revoked Mid-Flight | OPEN | nothing in Phase 2; owns R-036 and is the last live thread of R-008 |
 | ADR-011 | Co-Pilot Cadence vs AI Credit Cost | DEFERRED | Phase 12 |
 | ADR-012 | Autonomous AI Execution Opt-In | DEFERRED | Phase 13 |
 | ADR-013 | Voice Input Retention | DEFERRED | Phase 14 |

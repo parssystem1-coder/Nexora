@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "ee6cb68",
+    "commit": "d11ce2a",
     "dirty": true
   },
   "modules": [
@@ -637,6 +637,12 @@
       "blocks": "Phase 2 item 14; the delivery table is owed to `PHASE_2_BRIEF.md` §4 before that migration"
     },
     {
+      "id": "ADR-051",
+      "title": "Error Code for a Membership Revoked Mid-Flight",
+      "status": "OPEN",
+      "blocks": "nothing in Phase 2; owns R-036 and is the last live thread of R-008"
+    },
+    {
       "id": "ADR-011",
       "title": "Co-Pilot Cadence vs AI Credit Cost",
       "status": "DEFERRED",
@@ -895,6 +901,11 @@
       "file": "tools/openapi/openapi.spec.ts",
       "layer": "other",
       "cases": 7
+    },
+    {
+      "file": "tools/register/register-integrity.spec.ts",
+      "layer": "other",
+      "cases": 10
     }
   ],
   "routes": [
@@ -960,9 +971,9 @@
     "tablesWithRls": 6,
     "capabilities": 10,
     "routes": 11,
-    "testFiles": 42,
-    "testCases": 384,
-    "adrs": 53,
+    "testFiles": 43,
+    "testCases": 394,
+    "adrs": 54,
     "adrsAccepted": 42
   }
 }

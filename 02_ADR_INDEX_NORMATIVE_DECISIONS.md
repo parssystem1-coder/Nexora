@@ -84,6 +84,7 @@ For each ADR, completion requires:
 | ADR-048 | Invoice Numbering | Billing / Contracts | **ACCEPTED (was OPEN)** | Phase 2 item 13; the counter table is owed to `PHASE_2_BRIEF.md` §4 before that migration |
 | ADR-049 | MCP Readiness Posture for Phase 2 | MCP / Architecture | **ACCEPTED (new)** | nothing directly — constrains every Phase 2 capability so Phase 9 stays reachable |
 | ADR-050 | Financial Event Packet and External Delivery Path | Platform / Eventing | **ACCEPTED (was OPEN)** | Phase 2 item 14; the delivery table is owed to `PHASE_2_BRIEF.md` §4 before that migration |
+| ADR-051 | Error Code for a Membership Revoked Mid-Flight | Identity / Contracts | **OPEN** | nothing in Phase 2; owns R-036 and is the last live thread of R-008 |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -2590,6 +2591,76 @@ correlation_id     ties the event to the capability attempt and its audit_events
 - [ ] `04` §8's `outbox_events (dispatched_at)` index is reconciled with the ruling rather than left contradicting it
 
 ---
+
+
+---
+
+## ADR-051 - Error Code for a Membership Revoked Mid-Flight
+
+**OPEN**, new, depends on ADR-029 and ADR-033; owns **R-036**, and is the last live thread of **R-008** and the named producer for **R-037**
+
+### Why this is OPEN rather than ACCEPTED
+
+The evidence points one way, but the three options differ in what production code they oblige a later slice to write, and this session writes none. Ruling it is the maintainer's. What is *not* open is whether the question must be answered: **R-008 cannot close until it is**, and R-008 is the regression guard for R-007, a critical data-integrity race.
+
+### Problem
+
+**No document states which error code is correct when a membership is revoked while another request from that same session is already in flight.** `05` §7 lists thirty-seven codes and defines each one's meaning in isolation; it does not say which applies to this condition, and no ADR does either.
+
+The condition is not hypothetical. It is what `apps/api/membership-revoke.integration.spec.ts`'s two-concurrent-owners test exercises, and it is the reason that test has failed in CI four times (`R-008`, root cause DETERMINED 2026-09-02).
+
+**The guard chain, read from the source rather than inferred.** `membership.revoke` writes the target's membership status **and** revokes every session belonging to the target's user inside **one transaction** — `RevokeMembershipService.execute` lines 111-112, under the controller's single `withTenantContext` (`membership-revoke.controller.ts:93`). The losing request, meanwhile, makes its checks **sequentially and non-atomically**, each in its own database round trip:
+
+| Where the winner's commit lands relative to the loser | What the loser throws | HTTP |
+|---|---|---|
+| Before `SessionGuard` reads `sessions` | `AUTHENTICATION_REQUIRED` — *"Session is missing, expired or revoked."* (`session.guard.ts:42`) | **401** |
+| Between `SessionGuard` and `OrganizationAccessGuard` | `FORBIDDEN` — *"No active membership in this organization."* (`resolve-organization-access.service.ts:31`, reached from `organization-access.guard.ts:84`, which opens its **own** `withTenantContext`) | **403** |
+| After both guards, inside the domain transaction | `CONFLICT` — *"This membership is already revoked."* (`revoke-membership.service.ts:96`, from `lockActiveForUpdate`'s post-lock re-read) | **409** |
+
+**So the code a client receives is determined by where in this pipeline the winner's commit lands, while the underlying fact is identical in all three cases and is a single atomic event.** The public contract currently exposes the internal ordering of two guards and a service.
+
+**A correction to how this question has been described, made here because it changes one option's cost.** The third outcome is `CONFLICT`, **not** `CONCURRENCY_CONFLICT`. The two share HTTP 409 and are deliberately distinct codes, and `05` §7 states the difference normatively: *"`CONCURRENCY_CONFLICT` is RETRYABLE — unlike `CONFLICT`, which means the request permanently conflicts with existing state until the client changes something ... resubmitting the identical request is the expected client behavior. A client must not treat the two the same way."* Any option that reaches for `CONCURRENCY_CONFLICT` here is not merely unconventional, it contradicts an accepted contract, because a mid-flight revocation is final and no retry can ever succeed.
+
+### The one place this is currently decided, and it is the wrong place
+
+`membership-revoke.integration.spec.ts:494` classifies the loser with `statuses.filter((s) => s === 409 || s === 401)`. That line accepts 401 and 409 and rejects 403 — which is a contract decision, taken in a spec file, by omission. **It is also why the test fails**: the 403 path is legal behaviour the classification does not admit.
+
+Widening that filter to accept 403 would silently ratify Option A below. **R-036 exists to prevent exactly that**, and the filter must not move before this ADR is ruled.
+
+### Options
+
+| Option | What it costs | What it forecloses |
+|---|---|---|
+| **A. Accept all three.** Document in `05` §7 that a mid-flight revocation may surface as `AUTHENTICATION_REQUIRED` (401), `FORBIDDEN` (403) or `CONFLICT` (409) depending on where the commit lands, and widen the test's accepted set to match. | The public contract permanently exposes internal pipeline ordering, and every client must handle three codes for one condition — including a 403 that means something different from every other 403 the platform returns. Cheapest by far: nothing changes but prose and one line of test. | Any later normalization becomes a **breaking** contract change, because clients will have been told all three are correct. |
+| **B. Normalize to 401 `SESSION_INVALIDATED`.** The revoke invalidates the session atomically, so every later request from it is invalid whichever checkpoint notices first. | Real production code in a later slice: `SessionGuard` must distinguish *"no session presented"* from *"a session existed and was revoked"*, and `OrganizationAccessGuard` must distinguish *"membership revoked mid-flight"* from *"never a member of this organization"* — the second requires reading revoked memberships, which it does not do today. | Nothing. |
+| **C. Normalize to a 409.** Treat it as what it structurally is — a request that raced a conflicting write. | The natural code, `CONCURRENCY_CONFLICT`, is **ruled out by `05` §7's own retryability clause** (above): it would tell clients to retry a state that is final. Using `CONFLICT` instead avoids that, but then a request refused *before authentication or authorization ever succeeded* returns a code reserved for domain-state conflicts, and the guards must reach domain knowledge they currently do not have — the same production work Option B costs, for a weaker result. | Nothing, but it spends B's implementation budget without B's clarity. |
+
+### Recommendation
+
+**Option B**, advisory — the ruling is the maintainer's.
+
+1. **It is the only option whose answer does not depend on timing.** A and C both name a *consequence* of where the commit landed. B names the *fact*: the session was revoked. That is true before, between and after every checkpoint, so the code stops being a function of scheduling.
+2. **It gives R-037's orphaned code its producer.** `SESSION_INVALIDATED` is declared in `05` §7, present in `CapabilityErrorCode`, mapped to 401 — and **thrown nowhere in the repository** (verified by grep across `modules/`, `apps/` and `platform/`: the only occurrences are the type and the status map). R-037 exists precisely because a code can look entirely valid in the contract and never fire. This is its natural and possibly only producer, so ruling B converts a documented-but-unreachable code into a used one and gives R-037 a path to closure.
+3. **`AUTHENTICATION_REQUIRED` currently conflates two conditions a client cannot tell apart** — *no session presented* and *a session existed and was revoked*. The first is a client bug; the second is a legitimate mid-session event a client should surface differently. Separating them is worth doing on its own merits, independently of this race.
+
+**The scope limit of B, stated precisely because it is easy to over-read.** A 401 `SESSION_INVALIDATED` is correct when the caller's **own session** was revoked. It is **not** correct for a caller who is still authenticated and has merely lost membership in one organization — that remains `FORBIDDEN`/403, and nothing here changes it. B applies to the two-concurrent-owners case because the loser's own session genuinely was revoked by the winner's transaction; it does not apply to an unrelated caller who was never a member.
+
+### What this ADR does not do
+
+- **It implements nothing.** The guard changes Option B implies are production code, owed by a later slice, and no session may write them before this is ruled.
+- **It does not widen `membership-revoke.integration.spec.ts`'s accepted status codes.** Doing so before the ruling decides the contract in a spec file, which is the trap R-036 was opened to keep open.
+- **It does not close R-008.** It names the path: R-008's root cause is determined and its only remaining thread is this contract question. R-008 closes when this is ruled and the resulting behaviour is proven by a test.
+- **It does not close R-037.** R-037 is broader — it records that nothing in this repository checks the *documented → declared/thrown* direction, so other codes could sit unreachable the same way. Ruling B fixes this one instance and leaves R-037's structural gap intact.
+- **It does not touch ADR-029's session model.** Whether a revoked session is deleted or tombstoned, and for how long a "was revoked" answer remains distinguishable from "never existed", is ADR-029's territory. **Option B depends on that distinction being available at guard time**, and an implementer must confirm it against `sessions` before building B rather than assuming it.
+
+### Verification
+
+- [ ] the ruling is recorded in a `### Ruling` section naming the maintainer and the date, with the options and this recommendation left intact
+- [ ] `05` §7 states which code a mid-flight revocation returns, in whichever direction is ruled
+- [ ] a test at the interface-contract layer asserts that code for the concurrent case — `AGENTS.md` §8, "HTTP contract, error codes → interface contract test"
+- [ ] `membership-revoke.integration.spec.ts`'s classification is updated to match the ruling **and not before it**
+- [ ] if B is ruled: `SESSION_INVALIDATED` is thrown somewhere, and `ERROR-CODE-UNDECLARED` proves the capability declaring it
+- [ ] R-036 is closed by the ruling; R-008 is closed by the ruling plus its proving test
 
 ## 3. Open Items Deliberately Left Open
 
