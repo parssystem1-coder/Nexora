@@ -84,7 +84,9 @@ For each ADR, completion requires:
 | ADR-048 | Invoice Numbering | Billing / Contracts | **ACCEPTED (was OPEN)** | Phase 2 item 13; the counter table is owed to `PHASE_2_BRIEF.md` §4 before that migration |
 | ADR-049 | MCP Readiness Posture for Phase 2 | MCP / Architecture | **ACCEPTED (new)** | nothing directly — constrains every Phase 2 capability so Phase 9 stays reachable |
 | ADR-050 | Financial Event Packet and External Delivery Path | Platform / Eventing | **ACCEPTED (was OPEN)** | Phase 2 item 14; the delivery table is owed to `PHASE_2_BRIEF.md` §4 before that migration |
-| ADR-051 | Error Code for a Membership Revoked Mid-Flight | Identity / Contracts | **OPEN** | nothing in Phase 2; owns R-036 and is the last live thread of R-008 |
+| ADR-051 | Error Code for a Membership Revoked Mid-Flight | Identity / Contracts | **ACCEPTED (was OPEN)** | nothing in Phase 2 directly; the guard changes are a later slice, and R-008 closes on the proving test |
+| ADR-052 | Self-Serve Trial: Eligibility, Entry Point and Duration | Billing / Lifecycle | **ACCEPTED (new)** | **Phase 2 items 1 and 2 — their creating migrations**, because trial eligibility and duration are plan-version columns and migrations are forward-only; then item 4 |
+| ADR-053 | Session Retention and Purge | Identity / Data | **ACCEPTED (new)** | nothing today; `session.purge` is owed to Phase 2 item 12, which does not currently schedule it |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -2597,9 +2599,9 @@ correlation_id     ties the event to the capability attempt and its audit_events
 
 ## ADR-051 - Error Code for a Membership Revoked Mid-Flight
 
-**OPEN**, new, depends on ADR-029 and ADR-033; owns **R-036**, and is the last live thread of **R-008** and the named producer for **R-037**
+**ACCEPTED (was OPEN)**, ruled by the maintainer on 2026-09-03, depends on ADR-029 and ADR-033; owns **R-036**, and is the last live thread of **R-008** and the named producer for **R-037**
 
-### Why this is OPEN rather than ACCEPTED
+### Why this was OPEN rather than ACCEPTED (recorded before the ruling; left as written)
 
 The evidence points one way, but the three options differ in what production code they oblige a later slice to write, and this session writes none. Ruling it is the maintainer's. What is *not* open is whether the question must be answered: **R-008 cannot close until it is**, and R-008 is the regression guard for R-007, a critical data-integrity race.
 
@@ -2645,6 +2647,20 @@ Widening that filter to accept 403 would silently ratify Option A below. **R-036
 
 **The scope limit of B, stated precisely because it is easy to over-read.** A 401 `SESSION_INVALIDATED` is correct when the caller's **own session** was revoked. It is **not** correct for a caller who is still authenticated and has merely lost membership in one organization — that remains `FORBIDDEN`/403, and nothing here changes it. B applies to the two-concurrent-owners case because the loser's own session genuinely was revoked by the winner's transaction; it does not apply to an unrelated caller who was never a member.
 
+### Ruling
+
+**Option B. Ruled by the maintainer on 2026-09-03, following the recommendation above.** A membership revoked while a request from that same session is already in flight surfaces as **`SESSION_INVALIDATED` / 401**, whichever checkpoint notices it first.
+
+**The scope limit, stated first because it is the part most easily over-read. Ruling B does not make `403` obsolete.** A `401 SESSION_INVALIDATED` is correct when **the caller's own session was revoked**. A caller who is still authenticated and has merely lost membership in this organization — or never had one — still receives **`FORBIDDEN` / 403**, and nothing here changes that. The two-concurrent-owners case falls under B because the winner's transaction revokes the loser's *own* sessions; a bystander who was never a member is untouched by this ruling.
+
+**What this ruling does not decide.** The guard changes B implies are **production code in a later slice, and this ADR implements none of them**: `SessionGuard` must distinguish *"no session presented"* from *"a session existed and was revoked"*, and `OrganizationAccessGuard` must distinguish *"membership revoked mid-flight"* from *"never a member"*. Whether that distinction is even available at guard time — how long a revoked session stays distinguishable from one that never existed — is **ADR-029**'s territory, and the fence in `### What this ADR does not do` below stands unchanged. An implementer confirms it against `sessions` before building B rather than assuming it.
+
+**Option C's disqualification, and a note on how it is framed above.** The third code the pipeline actually throws is **`CONFLICT`** (`revoke-membership.service.ts:96`, *"This membership is already revoked."*), **not `CONCURRENCY_CONFLICT`**. `05` §7 rules on the difference normatively — `CONCURRENCY_CONFLICT` is RETRYABLE, `CONFLICT` is permanent, and *"a client must not treat the two the same way"* — so normalizing this condition onto `CONCURRENCY_CONFLICT` would **contradict an accepted contract** rather than merely be unconventional, because a mid-flight revocation is final and no retry can ever succeed. **No correction to the body above was required:** it was drafted with this already established — the `### Problem` section carries it as an explicit correction, and Option C is stated as *"normalize to a 409"* with `CONCURRENCY_CONFLICT` named as ruled out and `CONFLICT` costed as the weaker fallback. This paragraph records that the check was made, not that a defect was found.
+
+**What this ruling closes and what it does not.** It closes **R-036**'s contract question: a document now states which code is correct. It closes neither **R-008** nor **R-037**. R-008 closes when this ruling's behaviour is proven by a test at the interface-contract layer (`AGENTS.md` §8) — the ruling alone is a decision, not an implementation, and the live code still returns 401, 403 or 409 depending on where the winner's commit lands. R-037 is narrowed, not closed: `SESSION_INVALIDATED` now has a named producer, but nothing yet throws it, and R-037's structural finding — that no check verifies the *documented → declared/thrown* direction — is untouched.
+
+**`membership-revoke.integration.spec.ts`'s status-code filter still must not be widened ahead of the implementation.** Widening it now would make the test pass against behaviour this ruling declares wrong, which is the same defect in the opposite direction from the one R-036 was opened to prevent.
+
 ### What this ADR does not do
 
 - **It implements nothing.** The guard changes Option B implies are production code, owed by a later slice, and no session may write them before this is ruled.
@@ -2661,6 +2677,135 @@ Widening that filter to accept 403 would silently ratify Option A below. **R-036
 - [ ] `membership-revoke.integration.spec.ts`'s classification is updated to match the ruling **and not before it**
 - [ ] if B is ruled: `SESSION_INVALIDATED` is thrown somewhere, and `ERROR-CODE-UNDECLARED` proves the capability declaring it
 - [ ] R-036 is closed by the ruling; R-008 is closed by the ruling plus its proving test
+
+
+---
+
+## ADR-052 - Self-Serve Trial: Eligibility, Entry Point and Duration
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-03, depends on ADR-024 and ADR-021; closes the contract half of **R-040**
+
+### Problem
+
+`TRIALING` has been a legal subscription state since ADR-024 and **nothing can enter it.** Verified against the accepted documents rather than assumed:
+
+- **`TRIALING` is a legal state** and `TRIALING → ACTIVE | EXPIRED | CANCELED` are its only legal transitions (ADR-024 item 3).
+- **`TRIALING` is a SERVING state** (ADR-024 item 2) — a trialling tenant's storefront is served.
+- **`trial.expire` is already a required scheduled job** — *"terminate trials that were never converted"* (ADR-024 item 8).
+- **An unconverted trial goes to `EXPIRED`, never into grace.** `PHASE_2_BRIEF.md` §5's lifecycle crosswalk states it directly: grace is entered only from `PAST_DUE`.
+
+So the exit is fully specified and the entrance does not exist. `05` §4.2's fifteen capabilities contain no trial-start, and no document says whether a trial is a capability, an operator action, or a property of `plan.subscribe`. That is **R-040**.
+
+**Why this is blocking rather than merely untidy.** The maintainer ruled the trial **self-serve** — anyone who signs up gets it, with no operator action. Self-serve means eligibility and duration are **data on the plan version**, which means a column in the migration that **Phase 2 item 1 and item 2** create. Migrations are forward-only (ADR-021 item 8), so deciding this after those migrations merge turns a column definition into a data migration. It has to be settled first.
+
+The commercial model this serves is `D:\طرح پیشنهادی\12_COMMERCIAL_PRICING_AND_AI_DIAMOND_ECONOMY_SPEC11.md` §2, whose acquisition offer is a **7-day free trial**.
+
+### Decision
+
+Ruled by the maintainer on 2026-09-03. Four questions, four answers.
+
+**1. Trial eligibility and duration live on the plan version, not on the subscription.**
+
+A trial is a property of *what is offered*, not of *who took it*. Putting it on the immutable plan version means a later change to the offer cannot retroactively alter a trial already running — the same reasoning ADR-024 item 1 applies to `plan_version_id`/`price_version_id` pinning, and the same reasoning ADR-047 applies to renewal re-pinning. **The default trial length is 7 days**, matching the commercial model. A plan version offering no trial is expressible and is not a special case.
+
+**2. `plan.subscribe` starts the trial. No new capability, and no payment required.**
+
+A trial **is** a subscription, in `TRIALING`, and ADR-024's state machine already models its whole life — entry, serving, expiry, conversion. A separate `trial.start` capability would be **a second mechanism for one thing**: two entry points into one aggregate, two permission rows, two audit shapes, two idempotency claims, and two places for the state machine to be got wrong. `AGENTS.md` §4's prohibition on module-specific mechanisms is the general form of the same objection.
+
+`plan.subscribe` therefore has two outcomes depending on the plan version it is given: a trialling subscription when that version offers a trial and the organization is still eligible, an `ACTIVE` one when it does not. Both are the same capability, the same transaction, the same audit event.
+
+**3. One trial per organization, enforced by a database constraint.**
+
+Not by application logic. A uniqueness rule that lives only in a service is a rule that a second caller, a retry, or a future second code path can violate — the same argument ADR-009 makes for idempotency and `PHASE_2_BRIEF.md` §5 makes for append-only ledgers: *a comment asserting a property is not that property*. The constraint's exact shape is item 4's design work; that it is a constraint and not an `if` is decided here.
+
+**4. No payment method is required up front.**
+
+Requiring one converts a zero-friction acquisition offer into a paid signup with a delay, which is a different product from the one the commercial model sells. This is the whole point of the offer, and it is recorded as a deliberate ruling so that a later session cannot add a card-capture step as an "obvious" anti-abuse measure without reopening this ADR.
+
+### The abuse surface, accepted rather than closed
+
+**One trial per organization does not stop a determined abuser from creating a second organization**, and this ADR does not pretend otherwise. Nothing in Phase 2 prevents an operator from creating organizations freely; that is what makes the platform self-serve at all.
+
+This is true of essentially every self-serve trial in the industry, and **the mitigation for it is detection, not prevention** — prevention costs the acquisition funnel far more than the abuse costs the platform, at any volume this platform is designed for (ADR-010 assumes ≤5,000 organizations).
+
+**It is therefore ACCEPTED, in the register's own sense of that word: retained by an evaluated decision, not deferred and not overlooked. Named reopening trigger: evidence of real repeat-signup abuse** — not a suspicion, not a theoretical model, but observed duplicate-trial signups at a rate someone has measured.
+
+**No fraud-scoring mechanism is designed here, deliberately.** That is Pillar 4 territory, it belongs to no current phase, and inventing it inside a trial ADR would create exactly the speculative abstraction `AGENTS.md` §4's `future/` prohibition exists to prevent.
+
+### What this ADR does not do
+
+- **It does not build the capability.** `plan.subscribe` is Phase 2 item 4's work, and this ADR writes none of it.
+- **It does not write the migration**, and does not name the columns. That eligibility and duration live on the plan version is decided; their names, types and nullability are items 1 and 2's design work.
+- **It does not design abuse detection**, and explicitly declines to.
+- **It does not touch ADR-024's state machine**, which already models everything a trial needs: the state, its three legal exits, its SERVING status, and the job that expires it. Nothing in ADR-024 is amended, extended or reinterpreted here — this ADR supplies the one thing ADR-024 left out, which is the way in.
+- **It does not decide what a trial grants.** Whether a trialling tenant gets the full plan version's entitlements or a reduced set is an entitlement question owned by ADR-008's precedence chain and Phase 2 item 6, not by this ADR. **This is a real open edge and is named rather than assumed** — an implementer of item 6 who finds no answer here should read this sentence as confirmation that none was given, not as permission to invent one silently.
+- **It does not create a trial for an existing paying subscriber.** Conversion runs one way; `ACTIVE → TRIALING` is not a legal transition in ADR-024 item 3 and this ADR does not add one.
+
+### Verification
+
+- [ ] a plan version can express "offers a 7-day trial" and "offers no trial", and the second is not a special case in any query
+- [ ] `plan.subscribe` against a trial-offering plan version produces a subscription in `TRIALING` with no payment
+- [ ] a second trial for the same organization is refused **by the database**, proven by a test that bypasses the application service
+- [ ] a trial that is never converted reaches `EXPIRED` and not `PAST_DUE`, driven by `trial.expire`
+- [ ] a trialling tenant is SERVING, proven through ADR-024 item 2's one serving-state function and not by a second predicate
+- [ ] changing a plan's trial length publishes a new plan version and leaves running trials untouched
+
+---
+
+## ADR-053 - Session Retention and Purge
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-03, depends on ADR-020 and ADR-029; distinct from ADR-041; closes the decision half of **R-039**
+
+### Problem
+
+`sessions` has grown since Phase 1 with **no retention policy, no purge job, and nothing that ever deletes a row** — verified, not assumed: a repository-wide search for a delete against `sessions` returns nothing. Every login appends a row; revocation and expiry only flip `status` or let `expires_at` pass. The table is unbounded by construction.
+
+`RISK_REGISTER.md` **R-039** records the gap and four sub-questions nobody had answered. This ADR answers all four.
+
+**Two facts that shape the answer, both verified before writing.**
+
+- **`sessions` has no `tenant_id` and no RLS, and that is structural rather than an oversight.** Its creating migration says so in its own first line: *"sessions is exempt from tenant_id/RLS for the same reason users is: it is owned by the identity module's User aggregate, not by a tenant, and RLS here would be circular — validating a session is the step that establishes which tenant is trusted in the first place."* **The consequence for this ADR: a purge job runs outside tenant context and cannot use RLS to scope itself.** Every other purge-shaped operation this platform will write is scoped by a tenant predicate the database enforces; this one is not, and it must be written knowing that.
+- **`sessions` is not in ADR-041's scope, and must not be folded into it.** ADR-041 owns `audit_events` plus the four Phase 2 ledger tables (`usage_ledger_entries`, `billing_payment_events`, `subscription_state_transitions`, `invoice_lines`), and its whole premise is that **ADR-020 rule 4 excludes those rows from purge** — they can only ever grow, so its options are partitioning and archival, never deletion. `sessions` is the opposite case: ordinary operational state that nothing requires be retained. Merging the two questions would import a constraint that does not apply and rule out the only sensible answer.
+
+### Decision
+
+Ruled by the maintainer on 2026-09-03. Four questions, four answers.
+
+**1. A session row is kept for 30 days past the moment it stops being usable.**
+
+"Stops being usable" is whichever comes first of `expires_at` passing and `status` becoming `REVOKED` (`revoked_at`). Thirty days is long enough for an incident to be investigated after the fact — a compromised-account review needs the session history around the event, not just the live rows — and short enough to bound growth at a fixed multiple of login volume rather than letting it accumulate forever.
+
+**2. Revoked and expired sessions purge on one clock, not two.**
+
+Two clocks would be two policies to keep correct, two windows to reason about in an incident, and two ways for a future edit to change one and not the other — for no benefit anyone could state. A revoked session and an expired one are equally unusable and equally interesting to an investigation.
+
+**3. The purge is audited at the level of the job run, not the deleted row.**
+
+One audit row per deleted session would make `audit_events` grow **faster** than the table being purged, which is the exact opposite of the point. It would also do it in the one table that is hardest to undo: `audit_events` is append-only in its creating migration (`REVOKE UPDATE, DELETE ON audit_events FROM nexora_app`), and ADR-020 rule 4 excludes financial and legal append-only records from purge while rule 5 puts deletion-recording audit events permanently beyond it — so a bad decision there is not reversible by a later cleanup.
+
+**What is recorded instead is the job's run** — when it ran, what window it covered, how many rows it removed, and its outcome — which is what `scheduled_job_runs` already exists to hold. That is enough to answer *"was the purge running, and over what period"*, which is the question an incident actually asks. **This is a deliberate trade and the thing it gives up is real:** after the window, there is no per-session record that a specific session ever existed. Anyone who later needs that must change this ADR, not work around it.
+
+**4. It runs on the scheduled-job mechanism Phase 2 item 12 creates — and no Phase 2 item currently schedules it.**
+
+`scheduled_job_runs` is Phase 2 item 12's table (`PHASE_2_BRIEF.md` §4), and the job must be idempotent and safe to run repeatedly, the standard ADR-024 item 8 sets for every scheduled job. **But item 12's own scope is payment intent, verify and reconciliation, and ADR-024 item 8's job list contains no session purge.** Stated plainly rather than left to be discovered: **`session.purge` is owed to Phase 2 item 12 and is not in its current scope.** Adding it there is a scope decision belonging to `PHASE_2_BRIEF.md`, not to this ADR — the same fence ADR-048 and ADR-050 observed for the two tables they each required.
+
+### What this ADR does not do
+
+- **It does not write the job**, does not name its columns, and does not choose its schedule frequency. Idempotent and repeatable is required; hourly versus daily is item 12's call.
+- **It does not amend `PHASE_2_BRIEF.md`.** It records that `session.purge` is owed there, and stops.
+- **It does not touch ADR-041**, whose scope is ledger and audit growth and which stays `OPEN` and untouched. This ADR deliberately does not set a precedent for those tables: the reason deletion is available here is precisely the reason it is unavailable there.
+- **It does not touch ADR-029's session model** — not the token hashing, not the revocation semantics, not `active_organization_id`. It adds a retention window to rows ADR-029 already defines.
+- **It does not decide retention for `users`, `credentials`, or `audit_events`.** `sessions` is the table R-039 named and the only one ruled here. `users` and `credentials` share `sessions`' RLS exemption but not its growth shape, and neither has been assessed.
+- **It does not claim the 30 days is derived from a legal requirement.** It is an operational judgement about incident investigation, made in the absence of a stated compliance obligation. **If one is ever identified, it governs and this number changes** — recorded as an assumption rather than presented as a finding, per ADR-041's precedent.
+
+### Verification
+
+- [ ] a session unusable for more than the window is removed; one unusable for less is not
+- [ ] revoked and expired sessions are removed by the same job on the same window, proven with one test covering both
+- [ ] the job is idempotent — running it twice produces identical state (ADR-024 item 8)
+- [ ] the job writes one `scheduled_job_runs` row per run and no `audit_events` row per deleted session
+- [ ] the job's scoping is proven correct without relying on RLS, because `sessions` has none
+- [ ] a purge never removes a session that is still usable, proven by a test that would fail on an off-by-one in the window
 
 ## 3. Open Items Deliberately Left Open
 
