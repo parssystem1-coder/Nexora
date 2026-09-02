@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "cf61d21",
+    "commit": "ee6cb68",
     "dirty": true
   },
   "modules": [
@@ -595,6 +595,48 @@
       "blocks": "Phase 2 items 6–7 (the first slices that would add a declared field)"
     },
     {
+      "id": "ADR-044",
+      "title": "Localized Display Text in Phase 2 Tables",
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "Phase 2 item 1 (no display column) and item 13 (an invoice line carries its own description)"
+    },
+    {
+      "id": "ADR-045",
+      "title": "Optimistic Concurrency for Mutable Phase 2 Rows",
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "Phase 2 items 4, 8, 12, 15 — a `version` column in each creating migration; item 3 excluded by the ruling"
+    },
+    {
+      "id": "ADR-046",
+      "title": "Soft-Delete Mechanism for ADR-020's Reversible Window",
+      "status": "ACCEPTED (new)",
+      "blocks": "nothing — the ruling is that no Phase 2 table gains `deleted_at`; reopened by the first capability that deletes"
+    },
+    {
+      "id": "ADR-047",
+      "title": "Price Version Binding on Renewal",
+      "status": "ACCEPTED (new)",
+      "blocks": "Phase 2 items 2 and 14"
+    },
+    {
+      "id": "ADR-048",
+      "title": "Invoice Numbering",
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "Phase 2 item 13; the counter table is owed to `PHASE_2_BRIEF.md` §4 before that migration"
+    },
+    {
+      "id": "ADR-049",
+      "title": "MCP Readiness Posture for Phase 2",
+      "status": "ACCEPTED (new)",
+      "blocks": "nothing directly — constrains every Phase 2 capability so Phase 9 stays reachable"
+    },
+    {
+      "id": "ADR-050",
+      "title": "Financial Event Packet and External Delivery Path",
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "Phase 2 item 14; the delivery table is owed to `PHASE_2_BRIEF.md` §4 before that migration"
+    },
+    {
       "id": "ADR-011",
       "title": "Co-Pilot Cadence vs AI Credit Cost",
       "status": "DEFERRED",
@@ -920,7 +962,7 @@
     "routes": 11,
     "testFiles": 42,
     "testCases": 384,
-    "adrs": 46,
-    "adrsAccepted": 35
+    "adrs": 53,
+    "adrsAccepted": 42
   }
 }

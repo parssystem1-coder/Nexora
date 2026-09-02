@@ -271,9 +271,16 @@ billing_payment_intents (status, created_at)       -- reconciliation sweep
 store_domain_certificates (expires_at)             -- renewal sweep
 usage_ledger_entries (tenant_id, feature, period)
 idempotency_records (expires_at)                   -- pruning
-outbox_events (dispatched_at) where dispatched_at is null
 storefront_product_view (store_id, slug)
 ```
+
+**Correction, 2026-09-02 (ADR-050).** One line above was removed from the list and is preserved here struck through rather than silently dropped, per the correction convention this project applies to dated records elsewhere (`RISK_REGISTER.md`'s preamble, ADR-006's and ADR-010's amendments). **This is the first dated correction in this document; it establishes the pattern here rather than following one.**
+
+~~`outbox_events (dispatched_at) where dispatched_at is null`~~
+
+**Why it was wrong.** A partial index on `dispatched_at IS NULL` describes a column that starts null and is **set** when the event is dispatched — an in-place `UPDATE`. `PHASE_2_BRIEF.md` §5 places `outbox_events` on the append-only list and requires `REVOKE UPDATE, DELETE ON outbox_events FROM nexora_app` in its creating migration, under which the application role cannot set that column at all. The two statements are individually reasonable and jointly unimplementable.
+
+**Where it goes instead.** **ADR-050**, ruled 2026-09-02, places outbox delivery state in a **separate delivery table** rather than in `outbox_events`, and grants no column-level exception to that `REVOKE`. The undispatched-work index belongs on that table. **Its exact shape is deliberately not stated here** — the delivery table's name and columns are `06` Phase 2 item 14's design work, and inventing an index for a table that does not exist would repeat this correction's own error in a new place. That table is also owed to `PHASE_2_BRIEF.md` §4's scope list before item 14's migration; see ADR-050's ruling.
 
 ---
 

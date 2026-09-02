@@ -77,6 +77,13 @@ For each ADR, completion requires:
 | ADR-041 | Ledger and Audit Table Growth | Platform / Data | **OPEN** | nothing today; cheapest at Phase 2 ledger-table creation, expensive after |
 | ADR-042 | Error Message Audience and Localization | Platform / Contracts | **ACCEPTED (new)** | Phase 2, every capability that raises an error |
 | ADR-043 | Guarding `CapabilityDefinition` Against `05` §5 | Platform / CI | **ACCEPTED (new)** | Phase 2 items 6–7 (the first slices that would add a declared field) |
+| ADR-044 | Localized Display Text in Phase 2 Tables | Platform / Contracts | **ACCEPTED (was OPEN)** | Phase 2 item 1 (no display column) and item 13 (an invoice line carries its own description) |
+| ADR-045 | Optimistic Concurrency for Mutable Phase 2 Rows | Platform / Data | **ACCEPTED (was OPEN)** | Phase 2 items 4, 8, 12, 15 — a `version` column in each creating migration; item 3 excluded by the ruling |
+| ADR-046 | Soft-Delete Mechanism for ADR-020's Reversible Window | Compliance / Data | **ACCEPTED (new)** | nothing — the ruling is that no Phase 2 table gains `deleted_at`; reopened by the first capability that deletes |
+| ADR-047 | Price Version Binding on Renewal | Billing / Lifecycle | **ACCEPTED (new)** | Phase 2 items 2 and 14 |
+| ADR-048 | Invoice Numbering | Billing / Contracts | **ACCEPTED (was OPEN)** | Phase 2 item 13; the counter table is owed to `PHASE_2_BRIEF.md` §4 before that migration |
+| ADR-049 | MCP Readiness Posture for Phase 2 | MCP / Architecture | **ACCEPTED (new)** | nothing directly — constrains every Phase 2 capability so Phase 9 stays reachable |
+| ADR-050 | Financial Event Packet and External Delivery Path | Platform / Eventing | **ACCEPTED (was OPEN)** | Phase 2 item 14; the delivery table is owed to `PHASE_2_BRIEF.md` §4 before that migration |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -2046,6 +2053,541 @@ One consequence to note for that session: §5 is prose in a Markdown table, so t
 - [ ] the rule passes against the current state with `route`/`errorCodes` declared as ADR-033 additions and the five omissions declared as deferred
 - [ ] the rule is not satisfied by an `exceptions.json` entry
 - [ ] adding `requiredEntitlements` or `quota` in Phase 2 item 6 or 7 requires removing it from the `deferred` list in the same commit
+
+---
+
+## ADR-044 - Localized Display Text in Phase 2 Tables
+
+**ACCEPTED (was OPEN)**, ruled by the maintainer on 2026-09-02, depends on ADR-021, ADR-033 and ADR-042
+
+### Why this was OPEN rather than ACCEPTED (recorded before the ruling; left as written)
+
+Unlike ADR-042, which had a decisive precedent in `05` §7, this one has no precedent anywhere in the pack. `05` §4.2 gives `plan.list` a scope, a risk class and an idempotency flag and **defines no response shape for it at all**; `05` §6's example contracts do not include it. So no document states whether `plans`, `plan_versions` or `plan_features` carry display text, and none can be read to imply an answer. That is a genuine choice with a real cost in both directions, which is what `OPEN` is for.
+
+### Problem
+
+Phase 2 item 1 creates `plans`, `plan_versions` and `plan_features`; item 17 creates `notifications` and `notification_deliveries`. Some or all of these may need human-readable text — a plan's display name, a feature's label, a notification's body.
+
+**ADR-042 is the closest accepted decision and it does not answer this.** ADR-042 ruled on *error* messages: `message` is developer-facing, `code` is the localization key, `details` carries the parameters, and no localization work is owed in Phase 2 — a ruling, not a deferral. That settles the error envelope and nothing else. **Content a tenant reads in a UI is a different surface, and this ADR exists partly so that a later reader does not mistake ADR-042 for coverage of it.**
+
+The cost of leaving it undecided is asymmetric. `plans` is created once, in item 1, by a forward-only migration (ADR-021 item 8). If a bare `text` column ships and a locale map is needed later, that is a data migration plus a contract change on a published `plan.list` response. If a locale map ships and nothing ever renders it, that is a column nothing enforces — the "documentation, not architecture" failure ADR-030 warns about and ADR-043 was written to police.
+
+### Options
+
+| Option | What it costs | What it forecloses |
+|---|---|---|
+| **A. No display text in Phase 2.** Plan and feature rows carry a stable machine `key` only; display text is a client-side or catalogue concern introduced by the phase that first renders it. | A UI must ship its own mapping. `plan.list` returns keys, not names. | Nothing. A text column is additive later, in the slice that needs it. |
+| **B. Single `text` column now**, locale added later. | An additive migration plus a backfill later, and a contract change on `plan.list`. | Cheap now; the most expensive of the four if a second locale ever arrives. |
+| **C. JSONB locale map now** — `{"fa": "…", "en": "…"}` — on every display-bearing column. | A column nothing currently renders, and no constraint expresses "the default locale must be present" without a `CHECK`. | Nothing structurally; the retrofit cost is paid up front whether or not it is ever needed. |
+| **D. Separate `*_translations` tables.** | An extra table per entity and a join on every read. For tenant-owned entities it would also duplicate RLS policies onto the translation table; for the platform-global plan tables that cost does not apply, which makes it less bad here than it looks elsewhere. | Heaviest option. It also adds tables, and `PHASE_2_BRIEF.md` §4's 27-table list is described there as "the wall, not a suggestion" — so D cannot be chosen without amending that list. |
+
+### Recommendation
+
+**Advisory only — the ruling is the maintainer's. Option A, with Option C as the named escape hatch.**
+
+1. `plan.list` is scoped **global** by `05` §4.2 and its slice is Phase 2's reference slice, carrying the phase's first review stop (`PHASE_2_BRIEF.md` §3(b)). Returning stable keys keeps that slice minimal, which is what a reference slice is for.
+2. Adding a display column that nothing renders is what `PHASE_2_BRIEF.md` §5's `CapabilityDefinition` rule forbids by analogy: "a field is added in the same slice that adds its enforcement, never ahead of it."
+3. If the maintainer judges a display name is needed in item 1, then **Option C rather than Option B** — the only expensive mistake available here is choosing a shape that cannot absorb a second locale without a data migration.
+
+**One concrete input the maintainer now has that the drafters of this question did not.** The business-model reconciliation of 2026-09-02 (`D:\طرح پیشنهادی\12_COMMERCIAL_PRICING_AND_AI_DIAMOND_ECONOMY_SPEC11.md` §§2, 6, recorded in `decisions/2026-09.md`) names real plan and add-on products in Persian, and the platform's own worked example of a hostname in `05` §6.4 is a Persian IDN. Whether those names are platform data or client presentation is exactly what this ADR asks, and it is now answerable against a concrete catalogue rather than in the abstract.
+
+### Ruling
+
+**Option A. Ruled by the maintainer on 2026-09-02, following the recommendation above.**
+
+1. **No display text in the Phase 2 plan tables.** `plans`, `plan_versions` and `plan_features` carry a stable machine `key` only. No `name`, `label`, `title`, `description` or locale-map column is added by item 1.
+2. **`plan.list` returns keys, not names.** A client renders them through its own catalogue mapping.
+3. **Option C (a JSONB locale map) remains the named escape hatch**, available to the phase that first renders plan text and decides the text belongs in the database rather than in the client. That phase reopens this ADR; nothing else does.
+
+**The reasoning, because it is what makes this a ruling rather than a preference.** Plan names are marketing copy and have a materially shorter half-life than the schema they would live in. Under Option B or C a typo in a plan name becomes a data edit against a **platform-global** table — a change with no tenant scope, no RLS boundary and no natural review path — to fix something that is not data in any meaningful sense. And the catalogue is small: the maintainer's own commercial document (`D:\طرح پیشنهادی\12_COMMERCIAL_PRICING_AND_AI_DIAMOND_ECONOMY_SPEC11.md` §§2, 6, reconciled against Phase 2 on 2026-09-02) describes **one subscription plan and three add-ons**, so a client-side mapping costs approximately nothing. That concrete catalogue is what was weighed; the ruling would be less obvious against a fifty-plan catalogue, and a reader should know that.
+
+**One obligation this ruling creates, and it is the reason the ruling is safe rather than merely cheap.**
+
+> **An invoice line must carry its own denormalized description text, captured at issuance.** `invoices` and `invoice_lines` are append-only (`PHASE_2_BRIEF.md` §5) and are read as financial records years after the fact. A line that resolves only to a `plan_key` is not a readable record — and worse, an invoice that renders through a live catalogue mapping would silently **change its own wording** when a plan is renamed or a client's mapping is updated. An issued financial document must not do that.
+
+**This is a requirement on Phase 2 item 13, not a reopening of this ADR.** It is the counterpart of ADR-048's ruling that an invoice carries its own number: both are things an append-only financial record must hold on its own rather than resolve by reference. Item 13's slice owes the column; this ADR owes only the statement that it is owed.
+
+### What this ADR does not do
+
+- **It does not reopen ADR-042.** Error-message audience, the `code`-as-localization-key rule, and the ruling that no localization work is owed in Phase 2 all stand unchanged. This ADR concerns content text only.
+- It does not decide anything about Phase 3 commerce catalogue text (product names, descriptions, category labels) — `04` §3, a different phase, and a far larger surface on which Option D becomes materially more attractive.
+- It does not add a locale to `TenantContext` or introduce `Accept-Language` handling; ADR-042 item 4 already rules those out for Phase 2 and this ADR does not disturb that.
+
+### Verification
+
+- [ ] the ruling names, per Phase 2 table, whether it carries display text
+- [ ] item 1's migration matches the ruling exactly, with no display column added "for later"
+- [ ] if Option C is ruled, a `CHECK` guarantees the default locale is present, and a contract test proves a missing locale is rejected rather than silently returning `NULL`
+- [ ] `openapi.json` is regenerated if the `plan.list` response shape changes (ADR-033 items 4-6)
+- [ ] a reader of this ADR cannot come away believing ADR-042 already covered content text
+
+---
+
+## ADR-045 - Optimistic Concurrency for Mutable Phase 2 Rows
+
+**ACCEPTED (was OPEN)**, ruled by the maintainer on 2026-09-02, depends on ADR-021 and ADR-036; interacts with R-008, R-036 and ADR-048
+
+### Why this was OPEN rather than ACCEPTED (recorded before the ruling; left as written)
+
+The mechanism is nearly forced — see the recommendation — but **the decision's real content is the list of tables, not the column type**, and that list is a scope judgment about which rows may be concurrently written in Phase 2. Several candidate tables have no second writer until an item that has not been designed yet exists. Choosing silently for them would be exactly the unrecorded architectural decision `AGENTS.md` §5 forbids.
+
+### Problem
+
+Most of Phase 2's 27 tables cannot suffer a lost update: seven are append-only under `PHASE_2_BRIEF.md` §5's `REVOKE UPDATE, DELETE`, and nine are platform-global reference data written by migration or operator action rather than by a tenant-facing capability. A minority are genuinely mutable, and for those a read-modify-write race is undetected today.
+
+**Why the existing mitigation does not cover this.** A PostgreSQL deadlock or serialization failure already reaches the client as `CONCURRENCY_CONFLICT` / 409 rather than `INTERNAL_ERROR` / 500 — that mapping shipped as R-008's candidate mitigation. But it fires only when PostgreSQL itself raises an error. A read-modify-write at `READ COMMITTED` — read the row, compute in application code, write it back — produces no database error at all: PostgreSQL serializes the two writes happily and the first one is simply lost. **The existing mapping cannot catch it, because there is nothing to catch.**
+
+This failure family is not hypothetical in this codebase. **R-008** records an intermittent failure on `membership-revoke`'s two-concurrent-owners test whose root cause is `UNDETERMINED` for one of its two now-distinct threads, and **R-036** records that the error-code contract for a mid-flight membership revocation is undefined. Neither is resolved by this ADR.
+
+The forward-only constraint applies with full force: a `version` column must exist in the **creating** migration, or adding it later means backfilling live rows.
+
+### The table list, derived here rather than inherited
+
+Derived from `PHASE_2_BRIEF.md` §4 and §5 by elimination — 7 append-only + 9 platform-global + 11 remaining = 27 — and the remainder then sorted by whether Phase 2 as scoped actually produces two concurrent writers for the same row.
+
+**Tier 1 — concurrently mutable, with two distinct writers demonstrable from Phase 2's own scope. These are the ones a ruling must cover.**
+
+| Table | Item | Mutated | The second writer, named |
+|---|---|---|---|
+| `subscriptions` | 4 | status, `auto_renew`, pinned version ids, current period reference | ADR-024 item 8's jobs (`subscription.rollover`, `subscription.expire`, `trial.expire`) run against rows a capability (`plan.change`, `subscription.cancel`, `subscription.renew`) can be mutating at the same moment |
+| `billing_payment_intents` | 12 | status, verification attempts | item 12 is "payment intent, **verify, sweep**" — the reconciliation sweep and `billing.payment.verify` are two writers by the item's own name |
+| `tenant_over_limit_states` | 8 | current count, limit, `entered_at` | two concurrent `usage.record` calls, which is the ordinary case rather than the edge case |
+| `subscription_changes` | 15 | the scheduled change's state | **ADR-025 item 5 designs this race explicitly**: a pending downgrade is a persisted row the tenant "must be able to see and revoke before it applies" (`plan.change.cancel_scheduled`) while "applying it is a scheduled job" |
+| `idempotency_records` | 3 | status, `response_snapshot` | concurrent duplicate requests are the table's entire purpose |
+
+**`subscription_changes` is an addition to the list this ADR was drafted from, and it is not a marginal one:** ADR-025 item 5 requires a user-cancellable row that a job also applies, which is a lost-update race specified by an accepted ADR. **`idempotency_records` is on the list but may not need the column:** ADR-009's `UNIQUE (tenant_id, capability, idempotency_key)` plus the claim-inside-the-transaction rule may already serialize every writer, in which case a `version` column there is redundant rather than wrong. The ruling should say which, because "add it everywhere" and "add it where it does work" are different decisions.
+
+**Tier 2 — mutable, but no second Phase 2 writer exists. A ruling must state a position rather than pass over them in silence.**
+
+| Table | Item | Why it is not Tier 1 |
+|---|---|---|
+| `notifications`, `notification_deliveries` | 17 | delivery attempt state is mutable and a retry worker is the obvious second writer, but item 17's flows are not designed yet |
+| `billing_refunds` | 13 | ADR-023 item 10's intent-and-verify shape implies mutable status, but **no refund capability exists in Phase 2** (`05` §4.2 has none; `commerce.refund.create` is Phase 3 and store-scoped), so the manual audited path is the only writer |
+| `tenant_entitlement_overrides`, `tenant_quota_overrides` | 6, 7 | no `05` §4.2 capability sets an override; these are written by seed or operator action |
+| `entitlement_sources` | 6 | ADR-008's explainability record of a resolution — record-shaped, and arguably it should never be updated at all. **Side finding, recorded because this derivation surfaced it and nothing else owns it: `entitlement_sources` is record-shaped and is *not* on `PHASE_2_BRIEF.md` §5's `REVOKE UPDATE, DELETE` list.** Whether that omission is deliberate is stated nowhere. It is not this ADR's to decide. |
+
+### Options
+
+| Option | What it costs | What it forecloses |
+|---|---|---|
+| **A. Nothing.** Rely on transaction isolation as-is. | Lost updates are silent and will be found in production, not in tests. | Nothing formally — but the cheapest moment to add a column passes and does not come back. |
+| **B. `version integer NOT NULL DEFAULT 0`** on a named list; every update carries `WHERE … AND version = $n` and bumps it; zero rows affected → `CONCURRENCY_CONFLICT`. | One column and one discipline per listed table. Callers must handle 409. | Nothing. Composes with C. |
+| **C. `SELECT … FOR UPDATE`** in the use case. | A lock held for the transaction's duration; contention on hot rows; deadlock risk, which is the family R-008 already lives in. ADR-021's own verification list already requires explicit row locking on ledger write paths, so this is partly existing house practice. | Nothing — it composes with B rather than replacing it. |
+| **D. `SERIALIZABLE` isolation** for those transactions. | Higher abort rate under load; every caller must retry; a global change to how transactions are opened. | Interacts with **ADR-039 (OPEN)** on pool sizing and timeouts — ruling D here would partly pre-empt an open ADR. |
+
+### Recommendation
+
+**Advisory only — the ruling is the maintainer's. Option B, scoped to Tier 1, with an explicit position recorded for Tier 2 and for `idempotency_records`.**
+
+1. It reuses the **already-mapped** `CONCURRENCY_CONFLICT` / 409 rather than inventing a code, so `05` §7 and the error contract need no change.
+2. The column is free at creation time and a data migration afterwards — the same forward-only argument `PHASE_2_BRIEF.md` §5 makes for `billing_provider_configs`.
+3. It does not pre-empt ADR-039, which Option D would.
+
+**Adding `version` to an append-only table is a defect, not a harmless extra.** The seven tables on §5's `REVOKE UPDATE, DELETE` list cannot be updated by `nexora_app` at all, so a `version` column there would be a field nothing can ever change — precisely the "documentation, not architecture" failure. **`outbox_events` is on that list**, and is therefore **not** a candidate here despite being obviously stateful; where its delivery state lives is ADR-050's question, not this one's.
+
+### Ruling
+
+**Option B, scoped to Tier 1 minus `idempotency_records`. Ruled by the maintainer on 2026-09-02, following the recommendation above** — including its instruction that the ruling state a position on Tier 2 and on `idempotency_records` rather than leave them implied.
+
+`version integer NOT NULL DEFAULT 0`, added in each table's **creating** migration, with every update carrying `WHERE … AND version = $n` and bumping it; zero rows affected surfaces as `CONCURRENCY_CONFLICT` / 409.
+
+| Table | Column | Why |
+|---|---|---|
+| `subscriptions` | **yes** | the renewal job, `subscription.cancel`, `plan.change` and `subscription.reactivate` all write it |
+| `subscription_changes` | **yes** | ADR-025 item 5's own design — the tenant may revoke a pending change while a scheduled job applies it |
+| `billing_payment_intents` | **yes** | the verify callback and the reconciliation sweep both write status |
+| `tenant_over_limit_states` | **yes** | the usage recorder and the over-limit evaluator both write it |
+| `idempotency_records` | **no** | below |
+| the six Tier 2 tables | **no** | below |
+
+**`idempotency_records` is excluded, and the reason matters more than the exclusion.** ADR-009's `UNIQUE (tenant_id, capability, idempotency_key)` plus the claim-inside-the-transaction rule already serialises every writer of a given row: a second claimant does not read-modify-write, it **collides on the constraint** and is rejected by the database before any application-computed value exists to be lost. A `version` column there would be a field nothing needs — the same defect this ADR's own recommendation warns against for append-only tables, arriving in a different shape. **Reopening trigger: the first slice that adds a writer which mutates an already-claimed record outside the claiming transaction.** ADR-009's own reconciliation path for operations spanning an external call is the likeliest candidate, and it is a slice's decision, not this one's.
+
+**Tier 2 gets no column now**, on ADR-046's logic applied to columns — a field is added in the same slice that adds its enforcement, never ahead of it. The six, named so the trigger is checkable rather than rhetorical: **`notifications`, `notification_deliveries`, `billing_refunds`, `tenant_entitlement_overrides`, `tenant_quota_overrides`, `entitlement_sources`.** **Reopening trigger: the first slice that gives any one of them a second writer** — for the first three that is a retry worker, a refund capability, or a delivery-status callback; for the two override tables it is a capability that sets an override, of which `05` §4.2 currently has none. That slice adds the column to that table, in its own migration, and records which of the six it moved.
+
+**The interaction with ADR-048 is resolved rather than left open, and the section immediately below records why it was thought to be open.** The tension it names — gap-free numbering versus optimistic-concurrency retry — does not bite, for two independent reasons: **`invoices` is append-only and never carries a `version` column at all**, so the optimistic mechanism ruled here never touches it; and **ADR-048's counter is locked pessimistically inside the issuing transaction** rather than retried optimistically, so no number is ever allocated by a writer that will later be rejected and retried. The two mechanisms do not meet. Both ADRs were ruled on the same day with the other in view, satisfying that section's own condition.
+
+**This ruling closes neither R-008 nor R-036**, exactly as the scope fence below states. Nothing here establishes that a `version` column is relevant to R-008's undetermined thread, and nothing here defines R-036's missing error-code contract.
+
+### The interaction with ADR-048, which neither ADR may be ruled without
+
+**Gap-free invoice numbering and optimistic-concurrency retry pull in opposite directions.** Optimistic concurrency's whole contract is that a losing writer is rejected and retries; a gap-free number allocated before that rejection is either burned — producing exactly the gap the scheme exists to prevent — or held under a lock for the transaction's duration, serialising issuance and removing the concurrency the retry model assumes. ADR-048 records the same tension from its own side. **Rule one and the other's option set changes.**
+
+### What this ADR does not do
+
+- It does **not** resolve **R-008**. R-008's root cause is undetermined for one of its two threads; a `version` column may or may not be relevant, and asserting that it is would be the unverified claim this project's house style refuses.
+- It does **not** define **R-036**'s missing error-code contract for a mid-flight membership revocation.
+- It does **not** touch any Phase 1 table. The list above is Phase 2 tables only; whether `memberships` or any other existing mutable table needs the same treatment is a separate question this ADR deliberately leaves alone.
+- It does **not** decide where `outbox_events`' delivery state lives (ADR-050), and it does **not** rule on `entitlement_sources`' append-only posture, which it only records as found.
+- It does **not** cover Phase 3 inventory or oversell, which is `04` §3 and a different phase.
+
+### Verification
+
+- [ ] the ruling names the exact set of tables that gain the column, and states for each Tier 2 table why it does or does not
+- [ ] the ruling states whether `idempotency_records` needs the column given ADR-009's unique constraint, rather than leaving it implied
+- [ ] each named table's creating migration includes the column — not a later migration
+- [ ] no append-only table on `PHASE_2_BRIEF.md` §5's `REVOKE` list carries a `version` column
+- [ ] an application integration test proves a stale-version update is rejected, not silently applied
+- [ ] an interface contract test proves that rejection surfaces as `CONCURRENCY_CONFLICT` / 409
+- [ ] this ADR and ADR-048 are ruled together, or the second ruling re-reads the first
+- [ ] the ADR text states explicitly that it closes neither R-008 nor R-036
+
+---
+
+## ADR-046 - Soft-Delete Mechanism for ADR-020's Reversible Window
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-02, depends on ADR-020 and ADR-026
+
+### Why this is ACCEPTED rather than OPEN
+
+The same shape of argument ADR-042 made: the evidence runs one way, and leaving the question open has an asymmetric cost.
+
+**No Phase 2 capability deletes anything.** `05` §4.2's fifteen commercial-lifecycle capabilities contain no delete; `PHASE_2_BRIEF.md` §5 states that deletion is only ever an explicit tenant or operator request and that no Phase 2 capability performs one. So the "add the column now, it is cheap at creation time" argument — correct for ADR-045's `version` and for `billing_provider_configs`' credential shape — **does not transfer**, because there would be no reader, no writer and no test to exercise the column. Meanwhile the cost of adding it is not one column but roughly twenty, each carrying a permanent query-correctness obligation (`WHERE deleted_at IS NULL`) that **no conformance rule catches** and whose failure mode is a data-visibility bug rather than a loud error.
+
+Held open, every Phase 2 slice would be written by someone who does not know whether their queries owe that filter. That is the asymmetry: the cost of the wrong ruling here is one additive migration later; the cost of no ruling is twenty slices of ambiguity.
+
+### Problem
+
+**What is already settled and is not reopened here:** nothing is deleted by any billing event — expiry, downgrade and cancellation are never destructive (ADR-020 rule 1, ADR-026 item 1, `AGENTS.md` §4). Deletion is only ever an explicit, authenticated, logged tenant or operator request, **two-phase with a reversible window** (ADR-020 rules 2-3), default 30 days.
+
+**What was not settled is whether that reversible window has a per-row schema representation.** Read directly, ADR-020's state table says OFFBOARDED data is *"retained for the retention window, then purged"* — so during the window **nothing has been deleted**, and reversibility is satisfied by retention alone. The question is therefore narrower than it first appears: not "how is the window implemented" but "does any table need a `deleted_at` column to express it".
+
+There is a specific trap in the neighbourhood, which `PHASE_2_BRIEF.md` §5 already documents for the nullable-`tenant_id` case and which applies to any RLS-level `deleted_at` filtering. This codebase's RLS policies compare `tenant_id::text = current_setting('app.tenant_id', true)`. Under three-valued logic a `NULL` comparison evaluates to `NULL` — neither true nor false — so the row becomes invisible to **every** caller including its intended reader, and **the failure is silent rather than loud**. ADR-035 rejected the closely related nullable-`tenant_id` approach for `audit_events` on exactly this ground.
+
+**The interaction of any such policy predicate with `FORCE ROW LEVEL SECURITY` is unverified in this repository and is not asserted here** — the same posture ADR-041 takes toward partitioning × `FORCE`, recorded as *owed empirical verification* rather than claimed. Nothing in this ADR depends on the answer, because the ruling adds no such predicate; the note exists so that whoever later rules Option B or C knows the verification is owed before, not after.
+
+### Options
+
+| Option | What it costs | What it forecloses |
+|---|---|---|
+| **A. Tenant-state only.** ADR-020's four tenant-data states live on the tenant; no per-row column anywhere. The reversible window is a window on the *tenant*, not on rows. | Cannot express "this one plan was deleted and can be restored" — only "this tenant is in OFFBOARDED and can be brought back". | Per-row restore, which nothing in Phase 2 needs. |
+| **B. `deleted_at timestamptz` on every tenant-owned table now.** | ~20 columns nothing sets; a query-correctness obligation on every read that no test and no conformance rule enforces; if pushed into RLS, the three-valued-logic hazard above. | Nothing — but it front-loads the entire cost for a capability no Phase 2 item delivers. |
+| **C. `deleted_at` added per-table, in the slice that first needs it.** | An additive migration each time, and a rule that must be remembered. | Nothing. This is A plus a named escape hatch. |
+| **D. Out-of-table snapshot** — the row's pre-deletion state written to a retention store for the window's duration. | A new store and a new lifecycle to operate. | Overlaps with the tenant-granular recovery question now recorded as **R-038**; deciding it here would pre-empt that row. |
+
+### Decision
+
+**Option A, with Option C as the named escape hatch. Ruled by the maintainer on 2026-09-02.**
+
+1. **No `deleted_at` column is added to any table in Phase 2.** Not to a table in `PHASE_2_BRIEF.md` §4's list, and not to a Phase 1 table.
+2. **No query in Phase 2 owes a soft-delete filter**, and no reviewer should ask for one. This is the operative consequence and the reason the ruling is worth having.
+3. **The reopening trigger is named: the first capability that deletes anything.** Not a date, not a phase — a capability. When one is designed, this ADR is reopened and Option C applies to the table that capability deletes from, in that capability's own slice.
+4. **If B or C is ever ruled, one thing must be decided with it:** whether `deleted_at` filtering lives in the RLS policy or in application queries. The RLS variant's interaction with `FORCE ROW LEVEL SECURITY` is **unverified** (above) and must be established empirically first, to the standard R-002 met when it confirmed by direct test that a table's owning role bypasses RLS by default.
+
+### What this ADR does not do
+
+- **It does not disturb ADR-020 or ADR-026.** Non-destructiveness of billing events, the two-phase deletion requirement, the 30-day reversible window, ledger exclusion from purge (ADR-020 rules 4-5) and over-limit data preservation all stand exactly as accepted.
+- **It does not claim ADR-020's reversible window is unimplemented or unbacked.** During the window nothing has been deleted; retention is the mechanism. The distinct gap — that there is no *tenant-granular recovery path* from an erroneous or premature purge, or from any tenant-scoped data-loss incident — is **R-038**, and is deliberately not folded in here.
+- It does not design a backup, archival or restore system, and it commits to no RPO or RTO. ADR-010's numeric targets are already flagged as unverified assumptions until `06` Phase 4 item 9; inventing recovery numbers here would repeat that mistake in a new place.
+- It does not rule on retention *duration* for any table. `sessions` growth is **R-039**; ledger and audit growth is **ADR-041**; tenant data retention is ADR-020's own.
+
+### Verification
+
+- [ ] no Phase 2 migration adds a `deleted_at`, `is_deleted` or equivalent column to any table
+- [ ] no Phase 2 query carries a soft-delete predicate
+- [ ] the reopening trigger is honoured: the first capability that deletes reopens this ADR in its own slice, before its migration
+- [ ] if that reopening rules RLS-level filtering, an integration test against real PostgreSQL proves a soft-deleted row is invisible to its own tenant **and** that a non-deleted row is still visible — the three-valued-logic trap fails loudly in a test, not silently in production
+- [ ] ADR-020 rules 1-7 and ADR-026 items 1-8 are unchanged by this ADR
+
+---
+
+## ADR-047 - Price Version Binding on Renewal
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-02, extends ADR-024, depends on ADR-022 and ADR-025
+
+> **Number reassignment, recorded so a reader holding the strategic package is not confused.** `NEXORA_STRATEGIC_PACKAGE_2026-09-02`'s `03_DECISIONS_TO_LOCK.md` drafted ADR-047 as "Tenant-Granular Logical Restore". **That ADR was not written**, because its premise — that ADR-020's reversible window "has no mechanism behind it" — does not survive reading ADR-020: during the window nothing has been deleted, so retention *is* the mechanism (see ADR-046). The narrower true finding is recorded as **R-038**, a risk row rather than an ADR. The number ADR-047 carries this subject instead.
+
+### Problem
+
+`subscriptions` pins a `plan_version_id` and a `price_version_id` (`PHASE_2_BRIEF.md` §4; ADR-024 item 1 pins them on each `subscription_period` too), and `prices`/`price_versions` are immutable versioned rows (item 2). ADR-025 item 6 rules what happens to that pinning on a **plan change**: "a change moves the subscription to a specific target `plan_version_id` and `price_version_id`, captured at change time."
+
+**Nothing states what happens on a renewal.** ADR-024 item 4 describes the renewal lifecycle in full — T-30d invoice, T-14d and T-3d reminders, T-0 paid or unpaid — and never says which price version the T-30d invoice is drawn against. Both readings are defensible from the accepted text: the new period inherits the subscription's pinned version, so a subscriber is locked to the price they first bought at forever; or it re-pins to whatever version is current, so a published price change reaches everyone at their next renewal.
+
+This is not a theoretical fork. The business model reconciled against Phase 2 on 2026-09-02 (`D:\طرح پیشنهادی\12_COMMERCIAL_PRICING_AND_AI_DIAMOND_ECONOMY_SPEC11.md` §2) **prices renewal above the first year** — 6,000,000 for year one against a range of 8,000,000-10,000,000 per year thereafter. Under the inherit-forever reading, that product is not sellable on this schema at all, and nobody would discover it until the first renewal cycle, a year after item 4's migration became forward-only history.
+
+### Decision
+
+**Ruled by the maintainer on 2026-09-02.**
+
+1. **Renewal re-pins to the current price version.** A renewed period is bound to the `price_version_id` current at issuance, not to the version the subscription was created with. **No subscriber is locked to the price they first bought at**; a published price change reaches every subscriber at their next renewal.
+
+2. **The binding moment is the issuance of the renewal invoice — T-30d per ADR-024 item 4 — not `period_end`.** The price version current when the invoice is issued is pinned onto that invoice and onto the `SCHEDULED` period, and a price version published in the intervening 30 days does not move it. Binding at `period_end` would change an already-issued invoice underneath the customer, which is the failure this clause exists to prevent.
+
+3. **The T-30d notice carries the new price.** This is not an extra obligation — it is how ADR-024 item 10's mandatory notification is satisfied for a renewal whose amount has changed. A renewal notice that does not state a changed amount is a defect under item 10, not merely poor practice.
+
+4. **Early renewal is priced by the issued invoice, not by the payment date.** ADR-024 item 5 requires that paying before `period_end` extend from the existing `period_end` and never shorten a term. The price follows the same principle: **a tenant paying an issued renewal invoice pays that invoice's amount**, whatever the current price version has become in the meantime. If a tenant renews *before any invoice has been issued* — earlier than T-30d — the price version current at that payment applies, and that payment issues the invoice. **The rule in one line: the price is the invoice's; the invoice's price is the version current when the invoice was issued.**
+
+5. **A renewal re-price and a mid-term plan change must not double-count.** ADR-025 governs mid-term changes: an upgrade is prorated against the *current* period and explicitly **does not change `period_end`** (item 3). A renewal prices the *next* period. They address disjoint intervals, and the interaction rule is that **the re-pin at renewal is computed from whatever `plan_version_id` the subscription holds after any change has applied** — a mid-term change updates the pinning (ADR-025 item 6), and renewal then re-pins that plan's current price version for the next term. A scheduled downgrade with `effective_at` at `period_end` (ADR-025 item 5) applies **before** the next period is priced, so the renewal invoice for that period is drawn against the downgraded plan. **Proration is never applied to a renewal;** a renewal is a full term at the current price.
+
+### What this ADR does not do
+
+- **It does not set, constrain or endorse any price.** The business-model figures above are cited as evidence that the question is live and load-bearing, not as a commitment. Prices are data in `price_versions`, authored outside this document. Note also that those figures are denominated in Toman while ADR-022's worked example is IRR; ADR-022 item 4 ("Display is not storage… applied only in the interface layer") already governs that, and this ADR does not restate or amend it.
+- **It does not create a grandfathering mechanism.** If the platform ever needs to hold specific tenants at a legacy price, that is a new construct — a tenant-level price override, or a plan version reserved for them — and it needs its own ADR. This ADR rules the default and states plainly that there is no exception path today.
+- **It does not decide notice content or channel.** ADR-024 item 10 requires the owner be reached through at least one channel with the attempt audited; item 3 above adds only that the amount must be in it. Item 17's notification flows own the rest.
+- **It does not touch ADR-025's proration arithmetic.** The allocator, the half-up rounding, and the "`period_end` does not change on an upgrade" rule are unchanged.
+- **It does not address add-on pricing.** `PHASE_2_BRIEF.md` §4 excludes `subscription_items` and D2-7 keeps the add-on rung present-and-empty, while the business model sells three separately-priced add-ons. That mismatch is recorded in `decisions/2026-09.md`, deliberately not as a decision here.
+- It does not decide invoice numbering, which is **ADR-048**.
+
+### Verification
+
+- [ ] a renewal invoice issued after a price version is published is drawn against the new version, proven by a test that would fail under inherit-forever
+- [ ] a price version published between T-30d and `period_end` does **not** alter the already-issued invoice, proven by a test
+- [ ] an early payment of an issued renewal invoice charges the invoice's amount, not the current version's
+- [ ] a renewal following a mid-term plan change prices the next period against the changed plan, with no proration applied to the renewal
+- [ ] a scheduled downgrade effective at `period_end` is applied before the next period's invoice is priced
+- [ ] the T-30d notice includes the amount and currency as `MoneyDto` (ADR-022 item 7), and the notification attempt is audited (ADR-024 item 10)
+- [ ] `subscription_periods` reconstructs, for any past period, exactly which `price_version_id` it was billed at (ADR-024 item 1's append-only period history)
+
+---
+
+## ADR-048 - Invoice Numbering
+
+**ACCEPTED (was OPEN)**, ruled by the maintainer on 2026-09-02, depends on ADR-021 and ADR-022; interacts with ADR-045
+
+### Why this was OPEN rather than ACCEPTED (recorded before the ruling; left as written)
+
+The three sub-questions below trade off against each other and against ADR-045 in a way no existing document resolves, and at least one of them — gap-free versus gap-tolerant — is frequently a **legal or tax** requirement rather than an engineering preference, which makes it the maintainer's to answer and not an implementer's. Recording a recommendation without the ruling is the honest state.
+
+### Problem
+
+**Nothing anywhere in this repository addresses invoice numbering** — verified 2026-09-02 by grep across every Markdown and TypeScript file. `04` §2.5 and `PHASE_2_BRIEF.md` §4 name `invoices` and `invoice_lines`, both created by item 13 and both on §5's `REVOKE UPDATE, DELETE` append-only list; `05` §4.2 gives `invoice.list` a scope and a risk class and no response shape; ADR-024 item 4 requires an invoice be issued at T-30d; ADR-022 item 8 requires currency stored alongside every amount. None of them names an invoice number.
+
+The moment item 13's migration merges, three questions become schema commitments under a forward-only migration rule (ADR-021 item 8):
+
+1. **Per-tenant sequence or platform-global?** A tenant-visible number that jumps from 41 to 8,209 because other tenants were issued invoices in between is a support problem at best and an information leak about platform volume at worst. A per-tenant sequence is the shape tenants expect, and it multiplies the allocation state by the tenant count.
+2. **Gap-free or gap-tolerant?** A gap-tolerant number is trivially concurrent-safe. A gap-free number is a hard serialization problem, and it is often a compliance requirement rather than a preference.
+3. **What happens under concurrent issuance?** Both the T-30d `renewal.notice` job and a tenant-initiated path (`plan.change` payment, `subscription.renew`) can issue an invoice, and the job sweeps many subscriptions at once. Concurrency here is the normal case, not the edge case.
+
+### The real tension, stated because it is the part that gets discovered late
+
+**Gap-free numbering and optimistic-concurrency retry (ADR-045) pull in opposite directions.** Optimistic concurrency's contract is that a losing writer is rejected and retries. A gap-free number allocated before that rejection has two possible fates and no third: it is **burned** — producing exactly the gap the scheme exists to prevent — or it is **held under a lock for the transaction's duration**, which serialises invoice issuance and removes the concurrency the retry model assumes.
+
+`PHASE_2_BRIEF.md` §5's append-only `REVOKE` on `invoices` matters here too: a mis-numbered invoice cannot be corrected in place by the application role at all, so the correction path is necessarily a new record, not an `UPDATE`.
+
+**Neither this ADR nor ADR-045 may be ruled without the other in view.**
+
+### Options
+
+| Option | What it costs | What it forecloses |
+|---|---|---|
+| **A. A PostgreSQL sequence**, platform-global. | Cheapest, and concurrent-safe by construction. **Gap-tolerant by design**: `nextval` is non-transactional, so a rolled-back transaction burns its number permanently. Leaks issuance volume across tenants if the number is tenant-visible. | Gap-freeness. Retrofitting it onto already-issued numbers is not possible. |
+| **B. A per-tenant counter row locked `FOR UPDATE`.** | Gap-free and per-tenant. **Serialises issuance per tenant** for the transaction's duration; a slow invoice transaction blocks that tenant's next one; deadlock risk in the family R-008 already lives in. Needs a counter table `PHASE_2_BRIEF.md` §4's 27-table list does not contain — so choosing B amends that list. | Nothing structurally, at a throughput cost invisible at ADR-010's assumed V1 scale and not invisible later. |
+| **C. A reserved-number table with explicit voiding.** A number is reserved, then either consumed by an issued invoice or recorded as voided with a reason. | Gap-free *in the audit sense* — every number is accounted for as issued or voided, which is typically what a tax authority asks — while allowing the allocating transaction to fail. Costs a second table and a reconciliation obligation. Also needs a table not in §4's list. | Nothing. It is the most operationally honest option and the most machinery. |
+| **D. Composite human-readable number** (tenant prefix + period + per-period counter). | Orthogonal to A-C rather than an alternative: it still needs one of them underneath. Adds a formatting contract that becomes tenant-visible and therefore hard to change. | Nothing, provided the underlying allocator is decided first. |
+
+### Recommendation
+
+**Advisory only — the ruling is the maintainer's.** No option is recommended outright, because the deciding input is not in this repository: **whether gap-free numbering is a legal requirement in the platform's operating jurisdiction.** If it is, A is eliminated regardless of its engineering advantages and the real choice is B versus C. If it is not, A is clearly correct and the rest is over-engineering.
+
+What can be said without that input: **decide it before item 13's migration**, and if B or C is chosen, add the required table to `PHASE_2_BRIEF.md` §4's list in the same ruling — that list describes itself as "the wall, not a suggestion", so a table appearing in a migration without appearing there is a scope breach even when an ADR authorises it.
+
+### Ruling
+
+**Ruled by the maintainer on 2026-09-02. This ADR made no recommendation** — it declined one on the stated ground that the deciding input, whether gap-free numbering is a legal requirement in the platform's operating jurisdiction, was not in this repository. That input was researched externally on 2026-09-02 and the ruling follows from it. The recommendation above is left as written, because its refusal to guess was correct at the time.
+
+**1. Global, not per-tenant.** One sequence for the platform, not one series per subscriber.
+
+The reason is not technical. **The issuer of these invoices is one legal entity — the platform** — and a seller keeps one invoice book. A per-tenant series would produce hundreds of parallel books for a single seller, which is wrong for the seller's own accounting and wrong for reconciliation against a bank or a tax filing. The objection recorded in Option A above — that a global number leaks issuance volume to a tenant who watches their own invoices — is accepted as a real cost and judged the smaller one. It is also mitigated by part 3: the number a tenant sees is a rendered form, and what that form exposes is an interface decision.
+
+**2. Gap-free, allocated from a locked counter inside the issuing transaction.** A dedicated single-row counter is read `SELECT … FOR UPDATE` **inside the same transaction that inserts the invoice**, so a number is consumed only if that insert commits and a rolled-back transaction consumes nothing. This is Option B's mechanism with a global rather than a per-tenant counter.
+
+**The volume assumption that makes this affordable, recorded explicitly because it is the thing that would change.** Gap-free numbering costs serialised issuance: while one invoice transaction holds the counter row, every other issuance waits. **The platform issues on the order of thousands of invoices per year — not thousands per minute** — driven by annual subscription renewals across a merchant count that ADR-010 assumes at ≤5,000 organizations. At that rate the counter row is contended approximately never, and the serialisation Option B was penalised for is not a real cost. **If issuance ever becomes high-frequency — per-order commerce invoicing in Phase 3, usage-metered billing, or a merchant count an order of magnitude larger — that assumption is what changed**, and this ruling is what must be revisited. It is not a revisit trigger on a metric nobody will measure; it is a statement of the condition under which the reasoning stops holding.
+
+**3. Store the integer; render the display form.** The stored value is the sequence integer. A human-readable form such as `NX-1405-000123` is composed in the interface layer, never persisted as the identity.
+
+This is ADR-022 item 4's own principle — *display is not storage*, "the presentation unit, its divisor and its symbol live in the currency configuration and are applied only in the interface layer" — applied to an identifier rather than to money. The consequence that earns it: **a later change to the rendered format is not a schema change, does not break the continuity of the underlying series, and does not require reconciling two numbering eras.** A stored composite string would make the format itself part of the append-only record.
+
+**4. The Iranian tax unique number is a separate field and must never be conflated with this one.**
+
+The شماره منحصر به فرد مالیاتی required by سامانه مودیان is a fixed 22-character identifier composed of a 6-character tax-memory-device id, a 5-character hexadecimal registration date, a **10-character hexadecimal serial scoped to that memory device**, and a Verhoeff check digit. It is generated by the taxpayer's own terminal at the moment the invoice is registered with the tax system — not when the invoice is created in this platform. **It is therefore a different value, on a different clock, with a different scope, and neither can substitute for the other.** An implementer who stores one in the other's column produces a record that is wrong for both purposes.
+
+**Epistemic status of the preceding paragraph, stated in the house style ADR-041 established.** These facts were read from **vendor and integrator documentation on 2026-09-02, not from the Iranian Tax Administration's own published specification.** They are consistent across the sources consulted and they are **not verified against a primary source.** Nothing in parts 1-3 depends on them; they matter only to part 5, and part 5's ruling is the one that survives being wrong about the details.
+
+**5. The tax number is deferred, with a named trigger, and no column is reserved for it now.** Nothing in Phase 2 registers an invoice with سامانه مودیان or with any tax authority. **Trigger: the slice that integrates with سامانه مودیان.** That slice adds the column, in its own migration, against a then-current reading of the primary specification rather than against this ADR's secondhand summary.
+
+A nullable column reserved now and set by nothing is precisely the defect **ADR-046** was ruled to avoid — a permanent obligation on every reader of the table, enforced by nothing, for a capability no item delivers. The same argument that kept `deleted_at` out of twenty tables keeps this one out of `invoices`.
+
+**Cross-reference ADR-044's ruling.** An invoice line must carry its own denormalized description text, captured at issuance, for the same reason an invoice carries its own number rather than a reference: an append-only financial record must be readable on its own years later, and must not change its wording when something it points at is renamed.
+
+**One obligation this ruling creates that this ADR cannot discharge.** Part 2's counter is **a table**, and `PHASE_2_BRIEF.md` §4's 27-table list — which describes itself as "the wall, not a suggestion" — does not contain it. This ADR's own recommendation above anticipated exactly this ("if B or C is chosen, add the required table to `PHASE_2_BRIEF.md` §4's list in the same ruling"). **That list is `AGENTS.md` §1 authority #2 and amending it is a scope decision belonging to `PHASE_2_BRIEF.md`, not to an ADR.** The counter is platform-global — one invoice book for one legal entity — so its §5 entry will also owe a stated RLS-exemption reason alongside the existing exemptions for `billing_provider_configs` and `scheduled_job_runs`. **Owed before item 13's migration; recorded in `decisions/2026-09.md` and not discharged here.**
+
+### Why this blocks any two-way accounting integration
+
+An external accounting ledger keys on the invoice number. Once invoices carry numbers under one scheme, an integration built against them encodes that scheme — its uniqueness domain, its gap posture, its format. Changing the scheme afterwards means reconciling two numbering eras across a system this platform does not control. The business model's add-on matrix (`D:\طرح پیشنهادی\12_COMMERCIAL_PRICING_AND_AI_DIAMOND_ECONOMY_SPEC11.md` §6) sells an accounting bridge as a product, which makes this a foreseeable consumer rather than a hypothetical one. **The integration itself is out of scope here and is not designed by this ADR** — only the fact that it cannot be built on an undecided numbering scheme.
+
+### What this ADR does not do
+
+- **It does not design an accounting integration**, choose a partner, or commit to an export format. It records only that invoice numbering is that integration's prerequisite.
+- It does not decide the `invoices` response shape for `invoice.list`, beyond the observation that whatever number is chosen becomes part of it and therefore part of `openapi.json` (ADR-033).
+- It does not rule on credit notes, voiding of *issued* invoices, or refund documents. `billing_refunds` exists in item 13 with no refund capability in Phase 2, and a voiding scheme under Option C would need to say how the two relate — that is inside the ruling's scope only if C is chosen.
+- It does not touch ADR-022. Amount, currency and the `MoneyDto` contract are unchanged; a number is not money.
+- It does not resolve ADR-045; it names the tension and requires the two be read together.
+
+### Verification
+
+- [ ] the ruling answers all three questions — scope, gap posture, concurrency behaviour — not only the first
+- [ ] the ruling states whether gap-freeness was required for a legal reason or chosen for a product reason, so a later reader knows whether it is negotiable
+- [ ] if B or C is ruled, the required table is added to `PHASE_2_BRIEF.md` §4's list in the same change
+- [ ] item 13's creating migration implements the ruled scheme; no invoice is ever issued without a number
+- [ ] a concurrency test issues invoices from the `renewal.notice` sweep and a tenant-initiated path simultaneously, and proves the ruled uniqueness and gap properties actually hold
+- [ ] the interaction with ADR-045 is stated in whichever of the two is ruled second
+- [ ] no scheme is chosen that requires `UPDATE` on `invoices`, which `PHASE_2_BRIEF.md` §5 forbids to `nexora_app`
+
+---
+
+## ADR-049 - MCP Readiness Posture for Phase 2
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-02, depends on ADR-001, ADR-001b, ADR-003, ADR-007 and ADR-030
+
+### Why this is ACCEPTED rather than OPEN
+
+There is nothing to choose. ADR-001, ADR-001b, ADR-003 and ADR-007 are already ACCEPTED and already assign MCP to Phase 9; this ADR neither adds a decision nor weakens one. It records a **constraint on Phase 2 that follows from decisions already taken**, and it exists because that constraint is currently implicit — spread across four ADRs about a phase nobody is building, in a form no Phase 2 implementer will encounter. `AGENTS.md` §2 states the governing thesis: "Rules expressed only as prose are not enforceable on a long task." This is an attempt to make one of them findable at the moment it can be violated.
+
+### Problem
+
+Phase 9 exposes this platform's capabilities over MCP. Four accepted ADRs already constrain that: capabilities must carry risk classification and approval requirement as **policy metadata** (ADR-001); HIGH_WRITE requires platform-controlled approval independent of any client (ADR-001, ADR-001b); MCP writes enforce idempotency through the shared platform store, keyed on `tenantId`, `userId`, `capability`, `idempotencyKey`, `requestHash` (ADR-003, ADR-009); and external MCP output is data, never instructions, and can never trigger a write without independently passing platform capability authorization (ADR-007).
+
+**Every one of those presumes that a capability is a thing the platform can invoke without an HTTP request, described completely by its own definition.** Phase 2 adds eleven capability-surfacing items and fifteen capabilities — the largest single increase in the platform's capability surface — and does so seven phases before anything checks that presumption. A capability written so that only an HTTP request can invoke it is not a Phase 9 bug; it is a Phase 2 defect that becomes visible in Phase 9, by which point it has been copied fourteen times.
+
+### Decision
+
+**Phase 2 must not foreclose the MCP path.** Concretely, these three things would foreclose it, and each is prohibited in Phase 2:
+
+1. **Authoritative business logic in a controller rather than an application service.** Already forbidden by `AGENTS.md` §4 and `03_TECHNICAL_BLUEPRINT.md`; **this ADR ties the prohibition to a reason** rather than leaving it as a style rule. An MCP invocation reaches the application service and never touches the controller, so any rule living in the controller is a rule MCP silently does not enforce — and ADR-007's guarantee that an external MCP write "must independently pass platform capability authorization" is only true if that authorization is somewhere MCP goes.
+
+2. **A capability whose invocation cannot be expressed without an HTTP request.** The test is stateable and worth stating: *can this capability's inputs be constructed, and its policy chain run, from its `CapabilityDefinition` and a tenant context alone?* A capability that reads a header directly, depends on a cookie, derives identity from the transport, or returns something only meaningful as an HTTP response fails that test. This is not a hypothetical concern here: `CapabilityRoute`'s own `pathParams` field exists precisely to keep the HTTP shape declarative rather than known only to the controller.
+
+3. **`CapabilityDefinition` ceasing to be the single source of truth for what a capability is, what it may raise, and what it requires.** ADR-033 already builds `openapi.json` from it; ADR-043 already guards its field set against `05` §5. MCP tool descriptors, approval metadata and idempotency hints would be generated from the same definition. A capability whose real requirements live somewhere else — in a controller, in a guard chosen by hand and recorded nowhere, in a comment — cannot be published to MCP correctly, and worse, can be published to MCP *incorrectly and plausibly*.
+
+**None of this is new machinery.** Each of the three is a restatement, tied to its consequence, of something an accepted document already requires.
+
+### What this ADR does not do
+
+**It implements nothing and defers the mechanism to Phase 9** — the same shape ADR-043 used: it decides what is constrained and why, and does not build the check.
+
+- **No MCP code, table, adapter, tool descriptor or handler is written in Phase 2.** `PHASE_2_BRIEF.md` §4's exclusion of MCP tables stands unchanged.
+- **No field is added to `CapabilityDefinition` for MCP's benefit.** `PHASE_2_BRIEF.md` §5's rule — "a field is added in the same slice that adds its enforcement, never ahead of it" — and ADR-043's `deferred` list both stand. In particular `approval` stays deferred to Phase 9 exactly as ADR-043 records it, and **this ADR must not be read as a reason to add it early.**
+- **No conformance rule is written here.** Whether points 1-3 can be checked mechanically, and how, is a question for a code-authorized session; today they are review-enforced, which is the honest status. ADR-043's own scope note is the precedent.
+- It does not reopen ADR-001, ADR-001b, ADR-003 or ADR-007, and it does not move MCP earlier than Phase 9.
+- It does not constrain the AI plane (ADR-004, ADR-004b) or plugins (ADR-005) beyond what those ADRs already say, though the same three points would apply to them for the same reason.
+
+### Verification
+
+- [ ] every Phase 2 capability's authoritative rules — permission, entitlement, quota, invariant, transaction boundary — live in its application service or domain, not in its controller, reviewed per slice
+- [ ] every Phase 2 capability's inputs are constructible from its `CapabilityDefinition` and a tenant context, with no transport-only dependency
+- [ ] no Phase 2 capability reads a header, cookie or request object outside the interface layer
+- [ ] `CapabilityDefinition` remains the only source `tools/openapi/generate.ts` reads (ADR-033), and gains no MCP-specific field in Phase 2 (ADR-043's `deferred` list unchanged)
+- [ ] no MCP table, module or handler exists at the Phase 2 gate
+- [ ] at the Phase 2 gate, at least one capability is checked by hand against points 1-3 as a spot audit, and the result recorded
+
+---
+
+## ADR-050 - Financial Event Packet and External Delivery Path
+
+**ACCEPTED (was OPEN)**, ruled by the maintainer on 2026-09-02, depends on ADR-022, ADR-024 and ADR-034; interacts with ADR-045 and R-025
+
+### Why this was OPEN rather than ACCEPTED (recorded before the ruling; left as written)
+
+Question 2 below is a genuine fork with a real cost either way, and it touches a rule — `PHASE_2_BRIEF.md` §5's blanket `REVOKE UPDATE, DELETE` on `outbox_events` — that an ADR should not quietly carve an exception out of. Questions 1 and 3 have defensible answers that are nonetheless unwritten, and settling them without ruling question 2 would produce a contract that cannot be implemented.
+
+### Problem
+
+**The repository nowhere defines the body shape of an `outbox_events` entry.** `01` §24 says events requiring reliable asynchronous delivery must use a transactional outbox and that domain writes and outbox writes share one transaction. `03` §3 lists `eventing/` as "envelope, outbox, dispatcher" — naming an envelope without defining one. `04` §2.6 lists the table and §8 lists its index. **ADR-024 item 9 already requires that `SubscriptionExpired` be emitted through the outbox**, making this a Phase 2 obligation with no defined payload. `05` §5 lists `emitsEvents?: string[]` on `CapabilityDefinition` as "new, outbox contract" — a field pointing at a contract that does not exist, currently on ADR-043's `deferred` list for exactly that reason.
+
+An event body is a contract **every future consumer depends on and none can renegotiate**: an outbox event is consumed asynchronously, possibly by a system outside this codebase, and by then the emitting transaction is long committed. This is unlike an API response, where a client and a server can be versioned together.
+
+### A contradiction inside the current documents, found while writing this ADR
+
+`04` §8's index list contains:
+
+```text
+outbox_events (dispatched_at) where dispatched_at is null
+```
+
+A partial index on `dispatched_at IS NULL` describes a column that starts null and is **set** when the event is dispatched — an in-place `UPDATE`. But `PHASE_2_BRIEF.md` §5 places `outbox_events` on the append-only list and requires `REVOKE UPDATE, DELETE ON outbox_events FROM nexora_app` in its creating migration. **Under that revoke, the application role cannot set `dispatched_at` at all.** The two documents are individually reasonable and jointly unimplementable, and item 14's migration is where that becomes a schema commitment.
+
+This is question 2, and it is not a documentation typo — it is the substantive design question of where delivery state lives, surfacing as an inconsistency.
+
+### The three things to settle
+
+**1. Packet shape.** An envelope with, at minimum: event type; a **version for the packet itself**; tenant id; `occurred_at` as UTC `timestamptz` (ADR-031 item 1); a correlation identifier tying the event to the capability attempt that produced it and therefore to its `audit_events` row (ADR-034); and the payload.
+
+**The rule that must be written down explicitly, because it is the one most easily lost in a JSON payload: any monetary value in an event body is a `MoneyDto` — a string amount in minor units plus a currency — never a bare number** (ADR-022 items 1, 2, 7). An event body is JSON, and JSON is where ADR-022's prohibition is easiest to violate accidentally and hardest to catch: the existing `SCHEMA-FLOAT-MONEY-COLUMN` conformance rule inspects **columns**, and a float inside a `jsonb` payload is invisible to it.
+
+**2. Where delivery state lives. Both shapes are presented; this ADR does not choose.**
+
+| Shape | What it costs | What it forecloses |
+|---|---|---|
+| **A separate delivery-state table.** `outbox_events` stays strictly append-only; attempts, delivered-at, failure reason and next-retry live in a companion row that is freely updatable. | A second table not in `PHASE_2_BRIEF.md` §4's 27-table list — choosing this amends that list. A join, or a second query, on every dispatcher poll. `04` §8's `dispatched_at` index moves to the new table. | Nothing. It preserves the append-only rule intact — the rule Phase 1's `audit_events` repair exists to defend. |
+| **A documented per-column exception to the REVOKE.** `outbox_events` keeps `dispatched_at` and an attempt counter; the creating migration revokes `DELETE` and grants `UPDATE` on those columns only (PostgreSQL supports column-level `UPDATE` grants). | The append-only guarantee becomes "append-only except here", stated per column, and every future reader of `PHASE_2_BRIEF.md` §5's list must know this table is different. **Whether a column-level `UPDATE` grant composes correctly with `FORCE ROW LEVEL SECURITY` and the existing RLS policy shape on a tenant-owned table is unverified in this repository** — recorded as owed empirical verification, per ADR-041's precedent, and not asserted either way. | Nothing structurally. It is cheaper, and it spends a rule that was expensive to establish. |
+
+**3. The consumption rule.** Every external integration — accounting, webhooks, analytics — reads through this path only, **never directly from domain tables**. This is the rule that keeps `invoices`, `subscriptions` and the ledgers from acquiring undeclared external consumers who then constrain every future schema change. `01` §24 already names storefront cache invalidation and read-model projection as outbox consumers; this generalises it and states the prohibition explicitly.
+
+### Recommendation
+
+**Advisory only — the ruling is the maintainer's.** On question 1, the envelope as described, with the `MoneyDto` rule written as a normative sentence rather than left to a schema. **On question 2, no recommendation is offered** — the separate table is architecturally cleaner and the column-level grant is cheaper, and the choice turns on how much weight the maintainer puts on `PHASE_2_BRIEF.md` §5's list remaining exceptionless. On question 3, the prohibition as stated; it costs nothing today and is very expensive to introduce after the first integration exists.
+
+### Ruling
+
+**Ruled by the maintainer on 2026-09-02.** Questions 1 and 3 follow the recommendation above. **Question 2, on which this ADR deliberately offered no recommendation, is ruled for the separate delivery table.**
+
+**1. Delivery state lives in a separate table, not in `outbox_events`. No column-level exception to `REVOKE UPDATE, DELETE` is granted.**
+
+Three reasons, and the third is the one most easily misread:
+
+- **`outbox_events` stays genuinely immutable**, which is the entire point of putting it on `PHASE_2_BRIEF.md` §5's list. A list with one exception is a list every future reader must check against, and the exception would be invisible at every call site.
+- **Delivery attempts are naturally append-only in their own right** — one row per attempt, not a counter overwritten in place. So the shape that keeps the event ledger clean also produces a **retry audit trail for free**, instead of destroying the previous attempt's outcome each time a delivery fails. The cheaper option was also the one that loses information.
+- **It removes the need to answer the interaction the previous session flagged as unverified** — whether a column-level `UPDATE` grant on a tenant-owned table composes correctly with `FORCE ROW LEVEL SECURITY` and the existing policy shape. **The ruling does not resolve that interaction. It makes it unnecessary.** Nothing here establishes what PostgreSQL does in that case, and no later ADR may cite this ruling as evidence that it was checked. If a future decision needs the answer, it is still owed, on ADR-041's standard: established empirically against PostgreSQL 17, not reasoned from documentation.
+
+**2. The event packet carries a version from day one.** The envelope is:
+
+```text
+event_id
+event_type
+event_version
+tenant_id
+occurred_at        utc timestamptz, ADR-031 item 1
+payload
+correlation_id     ties the event to the capability attempt and its audit_events row, ADR-034
+```
+
+**Any monetary value inside `payload` is a `MoneyDto` — a string amount in minor units plus its currency — never a bare number** (ADR-022 items 1, 2, 7). This is restated as a normative sentence rather than left to a schema because the existing `SCHEMA-FLOAT-MONEY-COLUMN` conformance rule inspects **columns**, and a float inside a `jsonb` payload is invisible to it.
+
+**`event_version` is the field that carries the ruling's weight, because it is the one that cannot be retrofitted.** Every other envelope field can be added later and defaulted for old rows. A version cannot: a consumer that has already parsed a stream of unversioned events cannot afterwards be told which shape it was reading, and neither can the events themselves. It costs one field now and is unrecoverable later. That asymmetry is the whole argument.
+
+**3. Every external integration consumes through this path only** — accounting, webhooks, analytics — **never by reading a domain table directly.** This keeps `invoices`, `subscriptions` and the ledgers free of undeclared external consumers who would otherwise constrain every future schema change without ever being asked. `01` §24 already names storefront cache invalidation and read-model projection as outbox consumers; this generalises the pattern into a prohibition.
+
+`webhook_endpoints` and `webhook_deliveries` remain with **no owning phase** (recorded above). They are the natural first consumer of this path, and **assigning them one is a `PHASE_2_BRIEF.md` scope decision, not this ADR's.**
+
+**What this ruling does not decide.** **The delivery table's name and columns are item 14's design work.** This ADR decides only that delivery state does not live in `outbox_events` — not how many attempts are retained, not the retry schedule, not whether the table is tenant-owned (it will be, by `04` §7's default, but that is item 14's migration to state and to justify).
+
+**One obligation this ruling creates that this ADR cannot discharge.** The delivery table is **a table**, and `PHASE_2_BRIEF.md` §4's 27-table list — "the wall, not a suggestion" — does not contain it. **Amending that list is a scope decision belonging to `PHASE_2_BRIEF.md`, which is `AGENTS.md` §1 authority #2, not to an ADR.** Owed before item 14's migration; recorded in `decisions/2026-09.md` and not discharged here. It is the same obligation ADR-048's ruling creates for its invoice-number counter, and the two should be taken together.
+
+**Consequential correction to `04_DATABASE_BLUEPRINT.md` §8**, made under this ruling on 2026-09-02: the index `outbox_events (dispatched_at) where dispatched_at is null` presumed the in-place update this ruling forbids. It moves to the delivery table. See that section's dated correction.
+
+### Two things recorded here because nothing else owns them
+
+- **`webhook_endpoints` and `webhook_deliveries` exist in the documentation pack with no owning phase.** `04` §2.6 lists both; `PHASE_2_BRIEF.md` §4 excludes them explicitly on the ground that no Phase 2 item creates them. They are the natural first consumer of the path this ADR defines. **Assigning them a phase owner is a scope decision belonging to `PHASE_2_BRIEF.md`, not to this ADR**, and is deliberately left to a later scope review.
+- **R-025 records that no object storage port exists and no phase item owns one** — the same class of gap, already tracked. This ADR does not widen into it.
+
+### What this ADR does not do
+
+- **It does not design a queue, a dispatcher, a worker or a retry policy.** `PHASE_1_DEBT_CLOSURE.md` D-2 (Redis/BullMQ) is PARTIALLY CLOSED and owns that; this ADR defines what is dispatched, not what dispatches it.
+- **It does not enumerate Phase 2's events.** Only `SubscriptionExpired` is required by an accepted ADR (ADR-024 item 9). Which other events each capability emits is per-slice work, and adding `emitsEvents` to `CapabilityDefinition` remains governed by ADR-043's `deferred` list and `PHASE_2_BRIEF.md` §5's enforcement-first rule.
+- **It does not design a webhook system** or assign `webhook_endpoints`/`webhook_deliveries` an owner (above).
+- **It does not design an accounting integration.** ADR-048 records that invoice numbering is that integration's other prerequisite; neither ADR designs it.
+- It does not add `version` to `outbox_events` for optimistic concurrency — ADR-045 excludes append-only tables, and if question 2 is answered with a separate delivery table, that table is where any such column would belong.
+- **It does not alter ADR-034.** Audit events attest to an authorized attempt and are written *outside* the domain transaction; outbox events are written *inside* it. They are different mechanisms with different guarantees, and this ADR does not merge them.
+
+### Verification
+
+- [ ] the packet's envelope fields are named exhaustively, with types, before item 14's migration
+- [ ] the ruling answers question 2 explicitly, and if the column-level-grant shape is chosen, its interaction with `FORCE ROW LEVEL SECURITY` is established empirically first — not assumed
+- [ ] if the separate-table shape is chosen, that table is added to `PHASE_2_BRIEF.md` §4's list in the same change
+- [ ] a test proves a monetary value in an event body is a `MoneyDto`, and that a zero-minor-unit currency round-trips through the packet unchanged (ADR-022's own verification standard, applied to events)
+- [ ] `SubscriptionExpired` conforms to the ruled packet shape (ADR-024 item 9)
+- [ ] no external integration in any later phase reads a domain table directly; each reads through this path
+- [ ] `outbox_events` carries the append-only protection `PHASE_2_BRIEF.md` §5 requires, in whichever form question 2 rules
+- [ ] `04` §8's `outbox_events (dispatched_at)` index is reconciled with the ruling rather than left contradicting it
 
 ---
 

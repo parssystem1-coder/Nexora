@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `cf61d21` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `ee6cb68` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 384 test cases in 42 files · 46 ADRs (35 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 384 test cases in 42 files · 53 ADRs (42 accepted)
 
 ## Modules
 
@@ -167,6 +167,13 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-041 | Ledger and Audit Table Growth | OPEN | nothing today; cheapest at Phase 2 ledger-table creation, expensive after |
 | ADR-042 | Error Message Audience and Localization | ACCEPTED (new) | Phase 2, every capability that raises an error |
 | ADR-043 | Guarding `CapabilityDefinition` Against `05` §5 | ACCEPTED (new) | Phase 2 items 6–7 (the first slices that would add a declared field) |
+| ADR-044 | Localized Display Text in Phase 2 Tables | ACCEPTED (was OPEN) | Phase 2 item 1 (no display column) and item 13 (an invoice line carries its own description) |
+| ADR-045 | Optimistic Concurrency for Mutable Phase 2 Rows | ACCEPTED (was OPEN) | Phase 2 items 4, 8, 12, 15 — a `version` column in each creating migration; item 3 excluded by the ruling |
+| ADR-046 | Soft-Delete Mechanism for ADR-020's Reversible Window | ACCEPTED (new) | nothing — the ruling is that no Phase 2 table gains `deleted_at`; reopened by the first capability that deletes |
+| ADR-047 | Price Version Binding on Renewal | ACCEPTED (new) | Phase 2 items 2 and 14 |
+| ADR-048 | Invoice Numbering | ACCEPTED (was OPEN) | Phase 2 item 13; the counter table is owed to `PHASE_2_BRIEF.md` §4 before that migration |
+| ADR-049 | MCP Readiness Posture for Phase 2 | ACCEPTED (new) | nothing directly — constrains every Phase 2 capability so Phase 9 stays reachable |
+| ADR-050 | Financial Event Packet and External Delivery Path | ACCEPTED (was OPEN) | Phase 2 item 14; the delivery table is owed to `PHASE_2_BRIEF.md` §4 before that migration |
 | ADR-011 | Co-Pilot Cadence vs AI Credit Cost | DEFERRED | Phase 12 |
 | ADR-012 | Autonomous AI Execution Opt-In | DEFERRED | Phase 13 |
 | ADR-013 | Voice Input Retention | DEFERRED | Phase 14 |
