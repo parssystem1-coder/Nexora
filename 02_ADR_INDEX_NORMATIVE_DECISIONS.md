@@ -87,6 +87,7 @@ For each ADR, completion requires:
 | ADR-051 | Error Code for a Membership Revoked Mid-Flight | Identity / Contracts | **ACCEPTED (was OPEN)** | nothing in Phase 2 directly; the guard changes are a later slice, and R-008 closes on the proving test |
 | ADR-052 | Self-Serve Trial: Eligibility, Entry Point and Duration | Billing / Lifecycle | **ACCEPTED (new)** | **Phase 2 items 1 and 2 — their creating migrations**, because trial eligibility and duration are plan-version columns and migrations are forward-only; then item 4 |
 | ADR-053 | Session Retention and Purge | Identity / Data | **ACCEPTED (new)** | nothing today; `session.purge` is owed to Phase 2 item 12, which does not currently schedule it |
+| ADR-054 | Per-Tenant Recovery from Nightly Snapshots | Compliance / Ops | **ACCEPTED (new)** | nothing in Phase 2; Phase 2.5 builds it, and **object storage (R-025) is a hard prerequisite** |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -2806,6 +2807,75 @@ One audit row per deleted session would make `audit_events` grow **faster** than
 - [ ] the job writes one `scheduled_job_runs` row per run and no `audit_events` row per deleted session
 - [ ] the job's scoping is proven correct without relying on RLS, because `sessions` has none
 - [ ] a purge never removes a session that is still usable, proven by a test that would fail on an off-by-one in the window
+
+
+---
+
+## ADR-054 - Per-Tenant Recovery from Nightly Snapshots
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-03, depends on ADR-020, ADR-021 and ADR-034; interacts with ADR-041 and ADR-053; owns the **restore** half of **R-038**
+
+### Problem
+
+**The only recovery mechanism this platform has operates on the whole cluster.** PostgreSQL physical point-in-time recovery restores a cluster, not a row set — so recovering one tenant by that route rolls **every other tenant** back to the same instant. For a platform whose entire isolation model is per-tenant, the recovery story is the one place tenancy does not exist.
+
+`RISK_REGISTER.md` **R-038** records this. **ADR-020 rule 6 requires a tenant data *export* capability and says nothing about restoring one** — export is a tenant reading their own data out, which is a different operation with a different consumer from an operator putting a broken tenant back. Phase 2.5 was given the export half on 2026-09-03; the restore half belonged to no phase and had no decision behind it.
+
+The concrete requirement, in the maintainer's terms, is *"store #357 broke, put it back"* — and nothing in this repository could do it.
+
+### The ruling
+
+Ruled by the maintainer on 2026-09-03. **Recovery granularity is the last nightly snapshot: up to 24 hours of a tenant's data may be lost in a recovery, and arbitrary point-in-time recovery for a single tenant is explicitly not what is being built.**
+
+**That granularity ruling is the entire reason this ADR is cheap, and the reason belongs in the record rather than in someone's memory.** Arbitrary per-tenant point-in-time recovery would have required all three of: **continuous WAL archiving** (retained, monitored, and itself a thing that can silently stop working); **a standby restore target** kept warm enough to replay into; and **a full-cluster restore per incident**, from which one tenant's rows are then extracted — meaning recovery time scales with the whole cluster even when one tenant is affected. A nightly per-tenant logical snapshot requires **none of those**. The cost difference is not marginal; it is the difference between a scheduled job and an operational discipline.
+
+**1. Mechanism: a nightly per-tenant logical snapshot.** One snapshot per tenant per day, written by a scheduled job. Recovery restores a **named tenant** from a **named snapshot**.
+
+**2. RPO is 24 hours, and it is a decision rather than an assumption.** Up to a full day of that tenant's data may be lost in a recovery. **Stated plainly because it is the number a tenant has to be told** — and ADR-020 rule 7 already requires that the retention window be documented to the tenant, so this is an existing obligation acquiring a number rather than a new one.
+
+**3. RTO is owed a measurement and is deliberately not stated here.** ADR-010's numeric targets are already flagged, by dated amendment, as unverified assumptions until `06` Phase 4 item 9 — inventing a recovery-time number here would repeat that mistake in a new place, and a recovery target nobody has measured is worse than none because it will be quoted. **What can be stated is the shape: restore time scales with one tenant's data volume, not with the cluster's.** That is the property the nightly-snapshot design buys, and it is why a number is worth measuring at all. **The number is owed to the first drill** (part 6).
+
+**4. The snapshot mechanism and ADR-020 rule 6's export capability are one mechanism, not two.** A nightly snapshot and a tenant's own data export are **the same operation on different schedules with different consumers** — one runs unattended and writes where an operator can reach it, the other runs on a tenant's request under their own quota. **Build one, not two.** Stated explicitly rather than left to be noticed, because two mechanisms for one thing is exactly what `AGENTS.md` §4 forbids, and the idempotency rule already had to prevent this same drift once (`PHASE_2_BRIEF.md` §5: *"No module invents its own"*). Two independently-written extractors would drift in exactly the way that matters most — one of them would quietly stop covering a table the other covered.
+
+**5. Restore is asymmetric across table families. This is a property of the design, not a limitation to apologise for.**
+
+- **Mutable tenant-owned rows are restored** — replaced from the snapshot.
+- **Ledger-shaped tables are never rewound.** Verified against `PHASE_2_BRIEF.md` §5's list and Phase 1's own migration rather than recited: `subscription_periods`, `subscription_state_transitions`, `usage_ledger_entries`, `billing_payment_events`, `invoices`, `invoice_lines`, `outbox_events` (§5), plus `audit_events` (`20260822100100_audit__enforce_append_only.sql`). Each carries `REVOKE UPDATE, DELETE … FROM nexora_app`. **An invoice issued after the snapshot point stays issued.** If it must be undone, that is a **compensating entry** — which is what a financial record demands anyway, independently of this ADR. Rewinding a ledger would be the defect, not the feature.
+- **Therefore restore runs outside the application, under a role the application does not have.** The application role *cannot* delete a ledger row, by design, so restore is not something the running system can perform on itself. **It is an operator action with its own audit trail (ADR-034), never a tenant-facing capability** — which changes who may run it, how it is authorised, and what must be recorded when it happens.
+
+**6. A snapshot that has never been restored is not a backup.** A **periodic automated drill** restores a tenant into a sandbox and **verifies the result**, not merely that the restore command exited zero. This is the part of every backup design that is quietly dropped first and discovered missing at the worst possible moment, so it carries its own verification checkbox below rather than a sentence of prose here.
+
+### Retention
+
+**Snapshots are kept 30 days, matching ADR-020 rule 3's reversible-deletion waiting period — and the alignment is the reason, not a coincidence.** One retention number for the platform is one number to reason about, to document to a tenant, and to change; two numbers drift apart and nobody notices until a restore is attempted just outside one of them.
+
+**One precision worth keeping:** ADR-020 rule 3 says *"The waiting period **default** is 30 days"* — a default, not a constant. **If that default is ever changed, snapshot retention follows it**, because the alignment is the decision and 30 is only its current value.
+
+### What this ADR does not do
+
+- **It does not provide arbitrary point-in-time recovery.** Ruled out on cost by the maintainer on 2026-09-03. What it would have required is named in the ruling above — WAL archiving, a standby restore target, and full-cluster restore per incident — so that a later reader can price reopening it rather than re-deriving why it was declined.
+- **It does not address total cluster or server loss, and no phase owns that.** This is a **different risk with a different mechanism** — physical backup plus off-site replication — and per-tenant logical snapshots do not substitute for it, because snapshots stored on infrastructure that is itself lost are not a recovery path. **A reader must not close this ADR believing disaster recovery is solved.** It is not covered here and it is not covered anywhere. **Recommendation, not an action taken:** record it as its own risk row. This ADR recommends and deliberately does not open one, because the scope of a new row is the maintainer's to set.
+- **It does not choose a storage backend, a snapshot format, a scheduler, or a compression scheme.** Those are Phase 2.5's design work.
+- **It does not decide what a restore does to a tenant's *sessions*.** ADR-053 gives sessions a 30-day retention and `sessions` has no `tenant_id` at all, so it is not tenant-partitionable the way the snapshot mechanism assumes. Whether a restored tenant's users are logged out is a real question this ADR does not answer and does not assume — named here so an implementer reads this sentence as confirmation that no answer was given.
+- **It builds nothing.**
+
+### The prerequisite that has no owner
+
+**Snapshots have to be stored somewhere, and this platform has no object storage.** `PHASE_2_BRIEF.md` §4's exclusion list puts `files` out of Phase 2 with *"object storage, no phase owns it yet."* The gap is already tracked as **R-025**, which confirms it directly: no port exists (`platform/` contains only `clock.ts`, `config.ts`, `db/`, `http/`, `rate-limit/`), and no phase list delivers one. ADR-041 cites the same gap when it considers archival to cold storage, and ADR-050 declines to widen into it.
+
+**Nightly per-tenant snapshots cannot exist without somewhere to put them.** This is therefore recorded as a **named prerequisite of Phase 2.5**, not as an assumption buried inside the mechanism: if it is not resolved, this ADR's mechanism has nowhere to write, and the phase cannot deliver parts 1, 2 or 6 at all.
+
+**A consequence for R-025 that this ADR causes and must not leave unsaid:** R-025 is currently rated *"Low near-term — two full phases away from current work"* and *"Low today, Medium by Phase 3."* **This ADR makes object storage a prerequisite of the very next phase**, so that rating is superseded by this ADR's existence rather than by anything that changed in R-025 itself. R-025 carries a dated addendum recording it.
+
+### Verification
+
+- [ ] a restore of one tenant leaves every other tenant's data **bit-identical**, proven by a test against real PostgreSQL — asserted nowhere, measured here
+- [ ] a restore does not delete or alter any row in a ledger-shaped table, proven against all eight named in the ruling
+- [ ] the restore operation is audited with the operator identified (ADR-034), and is not reachable through any tenant-facing capability
+- [ ] a drill runs on a schedule and **its result is recorded, not merely its execution** — a drill that reports "ran" without reporting "verified" is the failure mode this checkbox exists for
+- [ ] the 24-hour RPO is documented in tenant-facing terms (ADR-020 rule 7)
+- [ ] a **measured** RTO replaces this ADR's deliberate absence of one, after the first drill
+- [ ] snapshot retention tracks ADR-020 rule 3's waiting period rather than a hard-coded 30
 
 ## 3. Open Items Deliberately Left Open
 
