@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `e437271` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `2f0f737` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 394 test cases in 43 files · 56 ADRs (45 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 394 test cases in 43 files · 57 ADRs (46 accepted)
 
 ## Modules
 
@@ -178,6 +178,7 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-051 | Error Code for a Membership Revoked Mid-Flight | ACCEPTED (was OPEN) | nothing in Phase 2 directly; the guard changes are a later slice, and R-008 closes on the proving test |
 | ADR-052 | Self-Serve Trial: Eligibility, Entry Point and Duration | ACCEPTED (new) | **Phase 2 items 1 and 2 — their creating migrations**, because trial eligibility and duration are plan-version columns and migrations are forward-only; then item 4 |
 | ADR-053 | Session Retention and Purge | ACCEPTED (new) | nothing today; `session.purge` is owed to Phase 2 item 12, which does not currently schedule it |
+| ADR-054 | Per-Tenant Recovery from Nightly Snapshots | ACCEPTED (new) | nothing in Phase 2; Phase 2.5 builds it, and **object storage (R-025) is a hard prerequisite** |
 | ADR-011 | Co-Pilot Cadence vs AI Credit Cost | DEFERRED | Phase 12 |
 | ADR-012 | Autonomous AI Execution Opt-In | DEFERRED | Phase 13 |
 | ADR-013 | Voice Input Retention | DEFERRED | Phase 14 |

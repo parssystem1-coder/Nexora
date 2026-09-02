@@ -483,3 +483,36 @@ Three things, ruled by the maintainer on 2026-09-03:
 **It defines scope. It designs nothing.** Which tables and capabilities belong to Phase 2.5 is decided here; the discount model, the referral attribution model, their tables, their capabilities and their contracts are **a later session's work and must not be started from this text.** No table is added to §4 for Phase 2.5 — §4 is Phase 2's scope list, and Phase 2.5 will need its own.
 
 It also does not set a date, a duration, or a position relative to Phase 3 beyond its name. The one hard sequencing fact is §9.2's deadline against Phase 2 item 13.
+
+### 9.6 Amendment, 2026-09-03 (second this date) — Phase 2.5 also carries per-tenant recovery
+
+**ADR-054** (`Per-Tenant Recovery from Nightly Snapshots`, ACCEPTED, ruled the same day) gives **R-038**'s restore half a mechanism and a phase, and that phase is this one. §9.3 above already assigned Phase 2.5 the *export* capability; this amendment adds the three operational items it shares a mechanism with, and the prerequisite all three depend on.
+
+**Added to §9.1's scope:**
+
+4. **Nightly per-tenant snapshot job** — one snapshot per tenant per day, written by a scheduled job.
+5. **Operator-run per-tenant restore** — restoring a named tenant from a named snapshot, **outside the application role**, because the application role cannot delete a ledger row by design and therefore cannot perform this on itself. An operator action with its own audit trail (ADR-034), never a tenant-facing capability.
+6. **The recovery drill** — a periodic automated restore into a sandbox that **verifies the result**, not merely that the restore ran. ADR-054 gives this its own verification checkbox because it is the part of every backup design that is dropped first.
+7. **Object storage** — the **named prerequisite of items 4, 5 and 6**, not an implementation detail of them. See §9.7.
+
+**Items 4–6 share a mechanism with §9.3's export capability, and that is a different statement from being the same item.** A nightly snapshot and a tenant's own data export are the same extraction on different schedules with different consumers — one unattended and written where an operator can reach it, the other on a tenant's request under their own quota. **ADR-054 rules that one mechanism is built, not two**, because two independently-written extractors drift in the way that matters most: one quietly stops covering a table the other covers, and nobody finds out until a restore. They are therefore **built together and remain separate deliverables** — the export is a capability with a quota, the snapshot is a job, and the restore is an operator action.
+
+**Order:** items 4–6 follow the discount and referral work only in the sense that §9.1's ordering constraint does not apply to them. **They have no dependency on discounts or referrals in either direction** and may be built in parallel; their only hard dependency is item 7.
+
+### 9.7 Object storage is a prerequisite, and it currently has no owner
+
+**This platform has no object storage, and snapshots have to be written somewhere.** §4's exclusion list records `files` as out of Phase 2 with *"object storage, no phase owns it yet"*, and `RISK_REGISTER.md` **R-025** confirms it directly: no port exists (`platform/` contains only `clock.ts`, `config.ts`, `db/`, `http/`, `rate-limit/`), and no phase list delivers one.
+
+**Nothing in §9.6 items 4–6 can be built before this is resolved.** It is recorded here as a named prerequisite rather than left inside ADR-054's mechanism, so that it is visible when the phase is planned rather than discovered when it is started.
+
+**R-025's own ratings are now stale as a consequence** — it reads *"two full phases away from current work"*, written 2026-08-28 and accurate then. R-025 carries a dated addendum recording that ADR-054 moved it to the next phase; **re-rating its Likelihood and Impact cells is left to the maintainer** rather than taken as a side effect of this amendment.
+
+### 9.8 What unifies this phase, restated — and one question left to the maintainer
+
+Phase 2.5 was created on 2026-09-03 as **Commercial Growth**, carrying discounts, referrals and tenant export. It now also carries snapshots, restore and drills. **Recording the unifying reading, because a phase whose name explains half its contents is a phase people will look in the wrong place for:**
+
+**Phase 2 makes the product sellable. Phase 2.5 makes it responsible to run for real customers** — you can price it flexibly (discounts, referrals) and you can be trusted with the data (export, restore, verified drills). Both halves are things a platform needs before it has customers who would be hurt by their absence, which is why they sit in one phase rather than two.
+
+**The honest caveat on that reading:** it is coherent, not forced. Nothing prevents selling at list price, so "must exist before the first paying tenant" is truer of the recovery half than of the discount half. The reading is recorded as the reason the phase holds together, not as a derivation.
+
+**One question this amendment deliberately does not answer: the name `Commercial Growth` now under-describes the phase**, and whether Phase 2.5 should be renamed, or split into a commercial phase and an operational one, **is a maintainer decision and is not taken here.** Recorded rather than acted on, because renaming or splitting a phase is a scope decision of exactly the kind §9.5 says this amendment does not make.

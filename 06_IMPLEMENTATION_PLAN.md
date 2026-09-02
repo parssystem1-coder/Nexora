@@ -91,6 +91,19 @@ Order:
 
 **One deadline reaches back into Phase 2:** the discount decision must land **before Phase 2 item 13's migration**, because `invoices` and `invoice_lines` are append-only and migrations are forward-only (ADR-021 item 8) — adding a discount line afterwards is a data migration, not a schema change. Item 13 builds no discounts; it must only avoid foreclosing them.
 
+**Amendment, 2026-09-03 (second this date) — ADR-054 adds per-tenant recovery to this phase.** `PHASE_2_BRIEF.md` §9.6–§9.8 carries the full statement.
+
+4. nightly per-tenant snapshot job (ADR-054)
+5. operator-run per-tenant restore, outside the application role, audited (ADR-054, ADR-034)
+6. the recovery drill — a periodic automated restore into a sandbox that verifies the result, not merely that it ran
+7. **object storage — the prerequisite of 4, 5 and 6**, which this platform does not have and no phase owns (R-025)
+
+Items 4-6 **share a mechanism with item 3's export** — a snapshot and a tenant export are the same extraction on different schedules with different consumers, and ADR-054 rules that one is built, not two. They remain separate deliverables. They have no dependency on 1 or 2 in either direction; their only hard dependency is 7.
+
+**Recovery granularity is the last nightly snapshot: a 24-hour RPO, with arbitrary per-tenant point-in-time recovery explicitly declined on cost.** RTO is deliberately unstated and owed to the first drill. Ledger-shaped tables are never rewound — an invoice issued after the snapshot point stays issued, and undoing it is a compensating entry.
+
+**Not covered by this phase or any other: total cluster or server loss**, which needs physical backup and off-site replication. ADR-054 recommends a risk row for it and does not open one.
+
 **Excluded, deliberately:** fraud scoring (ADR-052 accepts the trial abuse surface and names detection as the mitigation, owned by no current phase), marketplace and split payments, commerce coupons (a merchant's own coupons for their shoppers — `04` §3, Phase 3, a different subject), AI credit economy (D2-6).
 
 **Exit:** a discount applies to a subscription and appears as its own line on an invoice without rewriting an issued one; a referral is attributed to exactly one referrer and its credit reaches that referrer's next period; a tenant can export their own data through a quota'd capability rather than an operator script.

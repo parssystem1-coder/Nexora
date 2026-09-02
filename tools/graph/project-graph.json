@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "e437271",
+    "commit": "2f0f737",
     "dirty": true
   },
   "modules": [
@@ -655,6 +655,12 @@
       "blocks": "nothing today; `session.purge` is owed to Phase 2 item 12, which does not currently schedule it"
     },
     {
+      "id": "ADR-054",
+      "title": "Per-Tenant Recovery from Nightly Snapshots",
+      "status": "ACCEPTED (new)",
+      "blocks": "nothing in Phase 2; Phase 2.5 builds it, and **object storage (R-025) is a hard prerequisite**"
+    },
+    {
       "id": "ADR-011",
       "title": "Co-Pilot Cadence vs AI Credit Cost",
       "status": "DEFERRED",
@@ -985,7 +991,7 @@
     "routes": 11,
     "testFiles": 43,
     "testCases": 394,
-    "adrs": 56,
-    "adrsAccepted": 45
+    "adrs": 57,
+    "adrsAccepted": 46
   }
 }
