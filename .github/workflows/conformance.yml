@@ -76,6 +76,17 @@ jobs:
       - name: Conformance scan of real source tree
         if: always()
         run: npm run conformance
+      # RISK_REGISTER.md is one large Markdown table whose rows have broken its
+      # own rendering three times, by three different mechanisms, each caught
+      # only by a human remembering to run an ad-hoc awk check. AGENTS.md
+      # section 2: rules expressed only as prose are not enforceable on a long
+      # task. Deliberately NOT a conformance rule - ADR-030 scopes that harness
+      # to architecture and schema; this follows the graph/openapi/dist-deps
+      # convention for artifact-integrity checks instead.
+      - name: Risk register table integrity
+        if: always()
+        run: npm run check:register
+
       - name: Project graph up to date
         if: always()
         run: npm run graph -- --check
