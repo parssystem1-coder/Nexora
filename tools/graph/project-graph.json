@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "d11ce2a",
+    "commit": "e437271",
     "dirty": true
   },
   "modules": [
@@ -639,8 +639,20 @@
     {
       "id": "ADR-051",
       "title": "Error Code for a Membership Revoked Mid-Flight",
-      "status": "OPEN",
-      "blocks": "nothing in Phase 2; owns R-036 and is the last live thread of R-008"
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "nothing in Phase 2 directly; the guard changes are a later slice, and R-008 closes on the proving test"
+    },
+    {
+      "id": "ADR-052",
+      "title": "Self-Serve Trial: Eligibility, Entry Point and Duration",
+      "status": "ACCEPTED (new)",
+      "blocks": "**Phase 2 items 1 and 2 — their creating migrations**, because trial eligibility and duration are plan-version columns and migrations are forward-only; then item 4"
+    },
+    {
+      "id": "ADR-053",
+      "title": "Session Retention and Purge",
+      "status": "ACCEPTED (new)",
+      "blocks": "nothing today; `session.purge` is owed to Phase 2 item 12, which does not currently schedule it"
     },
     {
       "id": "ADR-011",
@@ -973,7 +985,7 @@
     "routes": 11,
     "testFiles": 43,
     "testCases": 394,
-    "adrs": 54,
-    "adrsAccepted": 42
+    "adrs": 56,
+    "adrsAccepted": 45
   }
 }

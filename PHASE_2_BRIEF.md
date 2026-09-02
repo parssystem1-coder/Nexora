@@ -143,6 +143,18 @@ Item 1 carries the review stop; item 4 carries the second one (§2).
 
 ## 4. Tables in scope
 
+**Amendment, 2026-09-03 — two tables added, 27 → 29. This is the first dated amendment to this brief, and it establishes the pattern here rather than following one** (the same note `04_DATABASE_BLUEPRINT.md` §8 made on 2026-09-02). Nothing below is removed or reworded; the superseded count is struck through where it appears.
+
+Both additions were **owed** rather than discovered. ADR-048 and ADR-050 were ruled on 2026-09-02, and each ruling requires a table this list did not contain. Both ADRs said so explicitly and both declined to add it, on the ground that **amending this list is a scope decision belonging to this file — `AGENTS.md` §1 authority #2 — and not to an ADR.** That fence was correct and this amendment is the other half of it.
+
+| Added | Required by | Item | Tenancy |
+|---|---|---|---|
+| the invoice-number counter | **ADR-048** — gap-free numbering allocated from a single-row counter locked `SELECT … FOR UPDATE` inside the issuing transaction | 13 | **platform-global** — see §5 for its RLS-exemption reason |
+| the outbox delivery table | **ADR-050** — delivery state lives outside `outbox_events`, which keeps its `REVOKE UPDATE, DELETE` with no column-level exception | 14 | tenant-owned |
+
+**Neither table's columns are specified here, deliberately.** The counter's shape is item 13's design work and the delivery table's is item 14's; ADR-050 says so in its own ruling. This amendment adds them to the scope list and states what each is for. The names below follow this section's existing convention, stated for the entitlement/quota split and applying equally here: **table names are indicative; membership of this list is binding.**
+
+
 **Only these. Creating anything else is out of scope.** Derived from `04_DATABASE_BLUEPRINT.md` §§2.3–2.6 by one rule: a table is in scope if `04` names it **and** a `06` Phase 2 item creates it.
 
 | Table | Owning module | Tenancy | Holds | Item |
@@ -170,12 +182,14 @@ Item 1 carries the review stop; item 4 carries the second one (§2).
 | `invoices` | billing | tenant-owned | references exact `plan_version` and `price_version` | 13 |
 | `invoice_lines` | billing | tenant-owned | invoice line items | 13 |
 | `billing_refunds` | billing | tenant-owned | refund records | 13 |
+| `invoice_number_counter` | billing | **platform-global** | the single counter row ADR-048's gap-free allocation locks inside the issuing transaction | 13 |
 | `outbox_events` | eventing | tenant-owned | domain events for out-of-request delivery | 14 |
+| `outbox_event_deliveries` | eventing | tenant-owned | ADR-050's delivery state — one row per attempt, keeping `outbox_events` strictly append-only | 14 |
 | `subscription_changes` | subscription | tenant-owned | direction, from/to versions, `effective_at`, prorated amount | 15 |
 | `notifications` | notification | tenant-owned | lifecycle notifications | 17 |
 | `notification_deliveries` | notification | tenant-owned | per-channel delivery attempts | 17 |
 
-**27 tables. Not sixty.** Phase 1 built 14 in 20 migrations.
+**29 tables. Not sixty.** Phase 1 built 14 in 20 migrations. ~~27 tables~~ — superseded by the 2026-09-03 amendment above, which adds ADR-048's invoice-number counter and ADR-050's delivery table.
 
 **On the five entitlement/quota tables** (D2-14): `04` §2.4 names three — `entitlements`, `entitlement_sources`, `quota_policies`. The split into five is deliberate and is not a departure from `04`, which describes itself as a "conceptual schema and ownership baseline" whose "exact columns are finalized per module during its slice." Splitting one conceptual table into a platform-global and a tenant-owned physical table is that finalization. **Table names above are indicative; the split itself is binding.**
 
@@ -205,6 +219,7 @@ Every table in §4 marked tenant-owned carries `tenant_id` and an RLS policy **i
 - **`plans`, `plan_versions`, `plan_features`, `prices`, `price_versions`, `plan_entitlements`, `plan_quota_policies`** — platform-authored reference data, identical for every tenant. `05` §4.2 scopes `plan.list` **global**, not tenant; a tenant-scoped plan catalogue would make `plan.list` unanswerable before a tenant context exists, the same bootstrap problem R-003 documents for `memberships`.
 - **`billing_provider_configs`** — no tenant to scope to; ADR-023 item 7 requires the platform's billing credentials never be resolvable from a store-scoped context. Exempt from `tenant_id`, not thereby less protected — see the credentials rule below.
 - **`scheduled_job_runs`** — operational record of the platform, not of any tenant; a sweep job's bookkeeping cannot be constrained by a tenant context it runs outside of.
+- **`invoice_number_counter`** (added 2026-09-03 by §4's amendment) — **the invoice series belongs to the platform as issuer, not to any tenant.** ADR-048 ruled the numbering global rather than per-tenant on exactly that ground: the issuer of these invoices is one legal entity, and a seller keeps one book, not one book per subscriber. A counter scoped to a tenant would be a different decision, not a safer version of this one. It holds no tenant data — a single integer and its lock — so there is nothing for a tenant predicate to protect, and giving it a `tenant_id` would misdescribe what it is.
 
 **The entitlement and quota split is structural, not stylistic (D2-14).** Plan-derived and tenant-override rows live in separate tables and must not be merged into one table with a nullable `tenant_id`. The mechanism, because it is the part that will be forgotten: this codebase's RLS policies compare `tenant_id::text = current_setting('app.tenant_id', true)`. For a row whose `tenant_id` is `NULL` that comparison evaluates to `NULL` — neither true nor false — so the row is invisible to **every** caller, including its intended reader, and the failure is silent rather than loud. ADR-035 rejected the closely related nullable-`tenant_id` approach for `audit_events` on exactly this ground.
 
@@ -422,3 +437,49 @@ A Phase 2 gate review must establish these independently:
 - **Anything about Phase 3 or later.** Commerce, storefront, domains, plugins, AI and MCP are out of scope and were not analysed.
 - **Whether the fourteen D2 answers are mutually consistent in implementation.** They were checked for contradiction as written (see `decisions/2026-08.md`, 2026-08-28); they have not been exercised against code, because none exists yet.
 - **Independent re-verification of the risk rows this brief relies on.** R-014 … R-033 were read as written. Only a sample of the earlier rows has ever been verified against code.
+
+---
+
+## 9. Amendment, 2026-09-03 — Phase 2.5 is created, and one of its decisions has a Phase 2 deadline
+
+**This section is an amendment, not original scope.** It is placed here rather than woven into §§1–8 so that what this brief said on the day Phase 2 opened stays legible. Phase 2's own scope is unchanged by it, with one exception stated in full below.
+
+**Phases are enumerated in `06_IMPLEMENTATION_PLAN.md`, and Phase 2.5 is recorded there too.** This brief describes one phase; it does not enumerate them. The two files were checked against each other before writing and they do not disagree — they have different jobs.
+
+### 9.1 Scope of Phase 2.5
+
+Three things, ruled by the maintainer on 2026-09-03:
+
+1. **Subscription discounts** — both **bulk** (every subscriber of a plan) and **individual** (one named subscriber).
+2. **Referral codes** — a subscriber's own code, attribution of who referred whom, credit that accumulates with the number of successful referrals, and application of that credit to the referrer's next period.
+3. **Tenant data export** — ADR-020 rule 6's capability, *"with its own quota, not an ad-hoc script"*, per `RISK_REGISTER.md` **R-038**.
+
+**Order inside the phase is fixed and is not a preference: discounts first, referral second.** The referral reward is paid **as a discount**, so the referral model cannot be designed before the discount model it depends on exists. Building them in the other order would mean designing a reward with no mechanism to pay it.
+
+### 9.2 Why the phase is defined now rather than when it is built
+
+**The discount decision must land before Phase 2 item 13's migration.** `invoices` and `invoice_lines` are append-only under §5's `REVOKE UPDATE, DELETE` list, and migrations are forward-only (ADR-021 item 8). Adding a discount line to an invoice after those tables exist is a **data migration**, not a schema change — the same trap ADR-041 names for ledger partitioning and ADR-046 names for `deleted_at`.
+
+**This is the one place Phase 2.5 reaches back into Phase 2, and it is a deadline rather than a scope change.** Item 13 does not build discounts. It must merely not foreclose them — which requires knowing, before its migration is written, whether an invoice can carry a discount line at all. That question belongs to the discount design session, and this amendment exists so the question is asked before the migration rather than after.
+
+### 9.3 Two accepted obligations that now have an owner
+
+`RISK_REGISTER.md` **R-038** recorded that two requirements inside ADR-020's own body were accepted and had **no owning phase**. Both are Phase 2.5's:
+
+- **Rule 6's tenant data-export capability.** Ruled posture: a **per-tenant logical export taken before the destructive phase of a deletion**, retained for the reversible window. This is the mechanism ADR-020 already requires — it is being given a phase, not invented, which is why **no ADR was written for it**: ADR-020 decided it, and what was missing was an owner, which lives here.
+- **Rule 7's tenant-facing retention documentation** — *"the retention window must be documented to the tenant."* Owed to whichever tenant-facing document Phase 2.5 produces. **That document does not exist yet and is named as owed rather than assigned a location invented here.**
+
+**A constraint that shapes whatever gets built, carried from R-038 rather than restated loosely.** Ledger-shaped tables carry `REVOKE UPDATE, DELETE … FROM nexora_app`, so the application role cannot delete a ledger row. Restoring one tenant is therefore **a restore for mutable state and a compensating entry for ledgers**, and it runs outside the application under a different role — which changes who may run it and how it is audited.
+
+### 9.4 What Phase 2.5 excludes — its own wall, in §4's sense
+
+- **No fraud scoring**, of referrals or of trials. ADR-052 accepts the self-serve trial's abuse surface explicitly and names detection rather than prevention as the mitigation; that detection belongs to no current phase and is not created here.
+- **No marketplace, and no split payments.**
+- **No commerce coupons.** These are a merchant's own coupons offered to *their* shoppers (`04` §3) and they are **Phase 3** — a different subject with a different tenant, and the name similarity is the only thing the two share. Recorded explicitly because it is the single most likely thing to be pulled into this phase by mistake.
+- **No AI credit economy** (D2-6's exclusion is unchanged).
+
+### 9.5 What this amendment does not do
+
+**It defines scope. It designs nothing.** Which tables and capabilities belong to Phase 2.5 is decided here; the discount model, the referral attribution model, their tables, their capabilities and their contracts are **a later session's work and must not be started from this text.** No table is added to §4 for Phase 2.5 — §4 is Phase 2's scope list, and Phase 2.5 will need its own.
+
+It also does not set a date, a duration, or a position relative to Phase 3 beyond its name. The one hard sequencing fact is §9.2's deadline against Phase 2 item 13.

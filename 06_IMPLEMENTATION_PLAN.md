@@ -77,6 +77,26 @@ Order:
 
 ---
 
+## Phase 2.5: Commercial Growth
+
+**Added 2026-09-03 by amendment — the first dated amendment to this file, establishing the pattern here rather than following one.** Created because one of its decisions has a deadline inside Phase 2 (below); the phases above it are unchanged. `PHASE_2_BRIEF.md` §9 carries the full scope statement and this entry is the enumeration of it.
+
+Order:
+
+1. subscription discounts, bulk (all subscribers of a plan) and individual (one named subscriber)
+2. referral codes: a subscriber's code, attribution, credit accumulating with successful referrals, applied to the referrer's next period
+3. tenant data export as a capability with its own quota (ADR-020 rule 6, R-038)
+
+**Order 1 before 2 is fixed, not a preference:** the referral reward is paid as a discount, so referral cannot be designed before the discount model exists.
+
+**One deadline reaches back into Phase 2:** the discount decision must land **before Phase 2 item 13's migration**, because `invoices` and `invoice_lines` are append-only and migrations are forward-only (ADR-021 item 8) — adding a discount line afterwards is a data migration, not a schema change. Item 13 builds no discounts; it must only avoid foreclosing them.
+
+**Excluded, deliberately:** fraud scoring (ADR-052 accepts the trial abuse surface and names detection as the mitigation, owned by no current phase), marketplace and split payments, commerce coupons (a merchant's own coupons for their shoppers — `04` §3, Phase 3, a different subject), AI credit economy (D2-6).
+
+**Exit:** a discount applies to a subscription and appears as its own line on an invoice without rewriting an issued one; a referral is attributed to exactly one referrer and its credit reaches that referrer's next period; a tenant can export their own data through a quota'd capability rather than an operator script.
+
+---
+
 ## Phase 3: Commerce
 
 Product, Variant, Category, Attribute, Brand, Pricing, Inventory with reservation, Customer with store-scoped identity, Cart, Checkout, Order with controlled lifecycle, Coupon, Shipping and Tax baseline, Commerce payment through the same port with store-scoped credentials.
