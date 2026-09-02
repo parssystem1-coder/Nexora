@@ -516,3 +516,16 @@ Phase 2.5 was created on 2026-09-03 as **Commercial Growth**, carrying discounts
 **The honest caveat on that reading:** it is coherent, not forced. Nothing prevents selling at list price, so "must exist before the first paying tenant" is truer of the recovery half than of the discount half. The reading is recorded as the reason the phase holds together, not as a derivation.
 
 **One question this amendment deliberately does not answer: the name `Commercial Growth` now under-describes the phase**, and whether Phase 2.5 should be renamed, or split into a commercial phase and an operational one, **is a maintainer decision and is not taken here.** Recorded rather than acted on, because renaming or splitting a phase is a scope decision of exactly the kind §9.5 says this amendment does not make.
+
+### 9.9 Amendment, 2026-09-03 (third this date) — the phase is renamed `Launch Readiness`, and deliberately not split
+
+§9.8 above left one question open: the name `Commercial Growth` under-described a phase that had just acquired recovery, restore and drills, and whether to rename or split was recorded as the maintainer's. **Ruled the same day: rename, do not split.** §9.8's text is left exactly as written — it is the record of the question, and this section is the answer.
+
+**`Phase 2.5: Launch Readiness`**, renamed in `06_IMPLEMENTATION_PLAN.md` in the same amendment.
+
+**Why not split, which is the part worth keeping.** The phase is one coherent thing — **what must exist before the first paying tenant.** Selling to them needs discounts and referrals; being trustworthy with what they hand over needs export, restore and verified drills. Both halves gate the same event, so splitting them would produce a Phase 2.6, a second set of exit criteria, and an ordering question between two things that have no dependency on each other in either direction (§9.6 records that items 4–6 do not depend on items 1–2 either way). That is administrative overhead bought with nothing.
+
+**What the new name fixes** is narrower than it looks and is worth stating precisely: nothing about the phase's scope, ordering, exclusions or deadlines changes here. The rename fixes **where a reader looks.** Someone searching for the platform's recovery story would not have opened a phase called `Commercial Growth`, and §9.8's own observation was that a phase whose name explains half its contents is a phase people look in the wrong place for.
+
+**Occurrences of the old name are not swept.** The two in §9.8 above and those in `decisions/2026-09.md` sit inside dated records, which say what was true when written; they are left alone deliberately, in the same convention this register-and-decision pack applies everywhere else. Only the live enumeration in `06_IMPLEMENTATION_PLAN.md` and the status line in `CLAUDE.md` were changed.
+

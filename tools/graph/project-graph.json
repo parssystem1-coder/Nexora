@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "2f0f737",
+    "commit": "815c29d",
     "dirty": true
   },
   "modules": [
@@ -658,7 +658,7 @@
       "id": "ADR-054",
       "title": "Per-Tenant Recovery from Nightly Snapshots",
       "status": "ACCEPTED (new)",
-      "blocks": "nothing in Phase 2; Phase 2.5 builds it, and **object storage (R-025) is a hard prerequisite**"
+      "blocks": "nothing in Phase 2; Phase 2.5 builds it, and **object storage (R-025) is a hard prerequisite** — amended 2026-09-03 (sessions on restore)"
     },
     {
       "id": "ADR-011",

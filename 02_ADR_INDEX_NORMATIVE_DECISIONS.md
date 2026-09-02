@@ -87,7 +87,7 @@ For each ADR, completion requires:
 | ADR-051 | Error Code for a Membership Revoked Mid-Flight | Identity / Contracts | **ACCEPTED (was OPEN)** | nothing in Phase 2 directly; the guard changes are a later slice, and R-008 closes on the proving test |
 | ADR-052 | Self-Serve Trial: Eligibility, Entry Point and Duration | Billing / Lifecycle | **ACCEPTED (new)** | **Phase 2 items 1 and 2 — their creating migrations**, because trial eligibility and duration are plan-version columns and migrations are forward-only; then item 4 |
 | ADR-053 | Session Retention and Purge | Identity / Data | **ACCEPTED (new)** | nothing today; `session.purge` is owed to Phase 2 item 12, which does not currently schedule it |
-| ADR-054 | Per-Tenant Recovery from Nightly Snapshots | Compliance / Ops | **ACCEPTED (new)** | nothing in Phase 2; Phase 2.5 builds it, and **object storage (R-025) is a hard prerequisite** |
+| ADR-054 | Per-Tenant Recovery from Nightly Snapshots | Compliance / Ops | **ACCEPTED (new)** | nothing in Phase 2; Phase 2.5 builds it, and **object storage (R-025) is a hard prerequisite** — amended 2026-09-03 (sessions on restore) |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -2866,6 +2866,39 @@ Ruled by the maintainer on 2026-09-03. **Recovery granularity is the last nightl
 **Nightly per-tenant snapshots cannot exist without somewhere to put them.** This is therefore recorded as a **named prerequisite of Phase 2.5**, not as an assumption buried inside the mechanism: if it is not resolved, this ADR's mechanism has nowhere to write, and the phase cannot deliver parts 1, 2 or 6 at all.
 
 **A consequence for R-025 that this ADR causes and must not leave unsaid:** R-025 is currently rated *"Low near-term — two full phases away from current work"* and *"Low today, Medium by Phase 3."* **This ADR makes object storage a prerequisite of the very next phase**, so that rating is superseded by this ADR's existence rather than by anything that changed in R-025 itself. R-025 carries a dated addendum recording it.
+
+### Amendment, 2026-09-03 — sessions on restore, the question this ADR named and did not answer
+
+This ADR's `What this ADR does not do` above states that it *"does not decide what a restore does to a tenant's sessions"* and names why: `sessions` carries no `tenant_id` and is therefore not tenant-partitionable the way the snapshot mechanism assumes. **Ruled by the maintainer the same day the ADR was accepted.** Recorded as a dated amendment rather than folded into the ruling above — the shape ADR-006 and ADR-010 already use — so the record shows a named gap being closed afterwards rather than a ruling that appears to have covered it all along.
+
+**1. `sessions` rows are excluded from the snapshot and are never restored. This half is security-relevant and is the reason for the ruling, not a consequence of it.**
+
+A session row is a **live credential**. Restoring one would resurrect a session that had been deliberately revoked in the window between the snapshot and the incident — a logout, a password change, a `membership.revoke`, or a response to a compromised account — and hand it back in working order. **A restore is an incident-recovery operation, and the incident is exactly the circumstance in which a session was most likely revoked on purpose.** Anyone reasoning about the snapshot only from completeness ("restore everything the tenant had") reaches the opposite conclusion, which is why this is stated first and stated as the reason.
+
+**2. A restore revokes the live sessions of that tenant's members.**
+
+After a restore, what a signed-in user's client believes no longer matches the database, and continuing the session shows stale state on top of rewound data. The rows are reachable without a `tenant_id` on `sessions`, and the join path was **verified against the two creating migrations before being asserted here**:
+
+```plain
+memberships.tenant_id = <restored tenant>      -- 20260822090300_tenant__create_memberships.sql
+  -> memberships.user_id
+  -> sessions.user_id                          -- 20260822090100_identity__create_sessions.sql
+```
+
+`memberships` carries `tenant_id uuid NOT NULL REFERENCES organizations (id)` and `user_id uuid NOT NULL`, with `UNIQUE (tenant_id, user_id)`; `sessions` carries `user_id uuid NOT NULL REFERENCES users(id)`. The path holds.
+
+**One consequence of that path which the ruling implies and does not state, recorded here rather than discovered by whoever builds it.** A session belongs to a **user**, not to an organization — `sessions.active_organization_id` is mutable session state (ADR-029 item 5) and `organization.switch` changes it. A user may hold memberships in several organizations. **So revoking "the sessions of that tenant's members" also signs those users out of every other organization they belong to.**
+
+That cost is accepted rather than overlooked, because the narrower alternative is unsafe: scoping the revocation to sessions whose `active_organization_id` matches the restored tenant would **miss** any session that had switched away and could switch back, leaving a live session pointed at rewound data. **A complete revocation with collateral logouts is the safe failure; a partial revocation with a live stale session is not.** If the collateral cost is later judged too high, that is a refinement for the maintainer and it requires a mechanism that does not exist today — not a narrowing of this ruling.
+
+**What this amendment does not touch, and why, since all three concern the same table.**
+
+- **ADR-053 (Session Retention and Purge) is untouched.** That is about **purging rows on a clock** — 30 days past the moment a session stops being usable, on a schedule, for growth. This is about **a one-off operator action** revoking currently-live sessions during a recovery. Different trigger, different rows, different reason.
+- **ADR-051 (`SESSION_INVALIDATED`/401) is untouched.** That is about **the code returned to a request already in flight** when its own session is revoked mid-request. This is about which sessions a restore revokes in the first place. ADR-051 would describe what a user's next request sees after this amendment's revocation, which is a consequence of both and a change to neither.
+
+**Three different things about one table, and the only reason to state it is that a later reader finding "sessions" in three ADRs will otherwise assume two of them are redundant.**
+
+**Still not decided here:** whether a restored tenant's users are notified that they were signed out, and through what channel. That is Phase 2.5's design work and ADR-024 item 10's notification obligation does not reach an operator-initiated recovery.
 
 ### Verification
 

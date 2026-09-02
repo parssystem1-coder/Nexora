@@ -77,7 +77,9 @@ Order:
 
 ---
 
-## Phase 2.5: Commercial Growth
+## Phase 2.5: Launch Readiness
+
+**Renamed 2026-09-03 (was `Commercial Growth`), by amendment.** The phase was created that morning carrying discounts, referrals and tenant export, and widened the same day by ADR-054 to also carry snapshots, restore and drills. The old name described half of it. **Ruled: rename, do not split.** It is one coherent thing — *what must exist before the first paying tenant*: selling needs discounts and referrals, being trustworthy with their data needs export, restore and verified drills. Splitting would produce a Phase 2.6 and a second set of exit criteria for no gain, and would separate two halves that gate the same event. `PHASE_2_BRIEF.md` §9.9 carries the full statement.
 
 **Added 2026-09-03 by amendment — the first dated amendment to this file, establishing the pattern here rather than following one.** Created because one of its decisions has a deadline inside Phase 2 (below); the phases above it are unchanged. `PHASE_2_BRIEF.md` §9 carries the full scope statement and this entry is the enumeration of it.
 
