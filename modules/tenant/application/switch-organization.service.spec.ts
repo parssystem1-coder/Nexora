@@ -8,6 +8,9 @@ const ORGANIZATION_ID = "22222222-2222-2222-2222-222222222222";
 function fakes() {
   const calls: Array<{ sessionId: string; organizationId: string }> = [];
   const sessions: SessionRepository = {
+    findById: async () => {
+      throw new Error("SwitchOrganizationService must not resolve a session by id.");
+    },
     findByTokenHash: async () => {
       throw new Error("SwitchOrganizationService must not read a session by token.");
     },

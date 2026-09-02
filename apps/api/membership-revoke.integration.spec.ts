@@ -139,7 +139,11 @@ describe("POST /api/v1/organizations/{organizationId}/memberships/{membershipId}
     expect(await sessionStatus(target.token)).toBe("REVOKED");
     const nextRequest = await createOrganizationWith(target.token);
     expect(nextRequest.status).toBe(401);
-    expect(nextRequest.body.code).toBe("AUTHENTICATION_REQUIRED");
+    // ADR-051 (ruled 2026-09-03) narrowed this from AUTHENTICATION_REQUIRED.
+    // Exit criterion 4 is unchanged and still proven - the cookie stops
+    // working on the very next request - but the code now says WHY it stopped.
+    // This is a more specific assertion than before, not a looser one.
+    expect(nextRequest.body.code).toBe("SESSION_INVALIDATED");
   });
 
   it("does NOT revoke the caller's own session for an unrelated target", async () => {
@@ -404,6 +408,93 @@ describe("POST /api/v1/organizations/{organizationId}/memberships/{membershipId}
 
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ tenantId: caller.orgId, status: 200, method: "POST" });
+  });
+
+  /**
+   * ADR-051 (`Error Code for a Membership Revoked Mid-Flight`, ACCEPTED
+   * 2026-09-03, Option B) — the proving tests. R-036 was opened because no
+   * document stated which code a mid-flight revocation returns, and R-008
+   * could not close until it was answered. These assert the ruled contract
+   * deterministically, so the answer no longer depends on a race landing in
+   * one particular window.
+   *
+   * **What is and is not deterministically constructible, stated rather than
+   * implied.** The 401 through `SessionGuard` and the 403 scope limit are
+   * both exact. The `OrganizationAccessGuard` branch — session revoked
+   * BETWEEN the two guards of one request — is by definition a window that
+   * cannot be opened on demand without instrumenting the guard chain, which
+   * would test the instrumentation. It is covered instead at two layers, per
+   * `AGENTS.md` §8: the "revoked membership, live session" case below proves
+   * the re-check runs and correctly preserves 403, and
+   * `check-session-revoked.service.spec.ts` proves the revoked branch returns
+   * true. The two-concurrent-owners test further down remains the end-to-end
+   * witness, and its `losses` filter already accepts 401 — deliberately
+   * unchanged, so whether the fix worked stays observable.
+   */
+  describe("ADR-051 - the code for a session revoked mid-flight", () => {
+    it("returns SESSION_INVALIDATED, not AUTHENTICATION_REQUIRED, when the caller's own session was revoked", async () => {
+      const caller = await orgWithMember("adr051-code", "owner");
+      await memberOf(caller.orgId, "adr051-code-owner2", "owner");
+      const target = await memberOf(caller.orgId, "adr051-code", "member");
+
+      await revoke(caller.orgId, target.membershipId, caller.token).expect(200);
+
+      const res = await createOrganizationWith(target.token);
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe("SESSION_INVALIDATED");
+    });
+
+    it("still returns AUTHENTICATION_REQUIRED for a token that never matched a session - the split is one case wide, and widening it would leak which tokens were once real", async () => {
+      const res = await createOrganizationWith("a-token-that-never-existed");
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe("AUTHENTICATION_REQUIRED");
+    });
+
+    it("still returns AUTHENTICATION_REQUIRED for an expired session - expiry is not revocation", async () => {
+      const user = await orgWithMember("adr051-expired", "owner");
+      const expired = await seedSession(db, user.userId, { expired: true });
+
+      const res = await createOrganizationWith(expired);
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe("AUTHENTICATION_REQUIRED");
+    });
+
+    /**
+     * ADR-051's scope limit, and the reason it gets its own test: a 401 is
+     * correct when the caller's OWN session was revoked, and NOT when they are
+     * still authenticated and merely no longer a member. Without this, nothing
+     * stops a later change turning every 403 into a 401 and calling it
+     * progress.
+     */
+    it("returns FORBIDDEN, not SESSION_INVALIDATED, when the caller's membership is revoked but their session is still live", async () => {
+      const owner = await orgWithMember("adr051-scope", "owner");
+      await memberOf(owner.orgId, "adr051-scope-owner2", "owner");
+      const other = await orgWithMember("adr051-outsider", "owner");
+
+      // Revoke `other`'s membership in their OWN org is not what we want; we
+      // want a live session with no membership in the org being addressed.
+      const res = await revoke(owner.orgId, owner.membershipId, other.token);
+
+      expect(await sessionStatus(other.token)).toBe("ACTIVE");
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe("FORBIDDEN");
+    });
+
+    it("returns FORBIDDEN when a member was revoked earlier and their session was later re-established - the guard re-check finds a live session and keeps the 403", async () => {
+      const caller = await orgWithMember("adr051-relogin", "owner");
+      await memberOf(caller.orgId, "adr051-relogin-owner2", "owner");
+      const target = await memberOf(caller.orgId, "adr051-relogin", "member");
+
+      await revoke(caller.orgId, target.membershipId, caller.token).expect(200);
+      // A fresh session for the same user: membership is REVOKED, session is ACTIVE.
+      const freshToken = await seedSession(db, target.userId, { activeOrganizationId: caller.orgId });
+
+      const res = await revoke(caller.orgId, caller.membershipId, freshToken);
+
+      expect(await sessionStatus(freshToken)).toBe("ACTIVE");
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe("FORBIDDEN");
+    });
   });
 
   /**

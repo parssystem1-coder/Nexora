@@ -46,6 +46,7 @@ export const membershipRoleAssignCapability: CapabilityDefinition = {
   outputSchema: membershipRoleOutputSchema,
   errorCodes: [
     "AUTHENTICATION_REQUIRED",
+    "SESSION_INVALIDATED",
     "VALIDATION_ERROR",
     "FORBIDDEN",
     "RESOURCE_NOT_FOUND",

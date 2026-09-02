@@ -35,3 +35,14 @@ export type { SessionRevocationRepository } from "../domain/session-revocation.r
  */
 export { SessionRepositoryPg } from "../infrastructure/session.repository.pg.js";
 export type { SessionRepository } from "../domain/session.repository.js";
+
+/**
+ * ADR-051. `modules/tenant`'s `OrganizationAccessGuard` must distinguish "your
+ * session was revoked mid-request" from "you are not a member of this
+ * organization" — 401 `SESSION_INVALIDATED` versus 403 `FORBIDDEN`. It cannot
+ * read `sessions` itself (`04` §1, `AGENTS.md` §4), so the one question it
+ * needs answered is exposed here, the same way the two ports above are. Not a
+ * second authentication path: it returns a boolean about an already-identified
+ * session and cannot admit anyone.
+ */
+export { CheckSessionRevokedService } from "../application/check-session-revoked.service.js";

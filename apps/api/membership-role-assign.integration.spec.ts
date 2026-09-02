@@ -164,7 +164,11 @@ describe("POST .../memberships/:membershipId/roles - session invalidation (08_PH
     // membership.role.assign themselves.
     const nextRequest = await assign(caller.orgId, target.membershipId, target.token, { roleKey: "member" });
     expect(nextRequest.status).toBe(401);
-    expect(nextRequest.body.code).toBe("AUTHENTICATION_REQUIRED");
+    // ADR-051 (ruled 2026-09-03): a session that was explicitly REVOKED now
+    // says so. Narrowed from AUTHENTICATION_REQUIRED, which still covers no
+    // cookie, no row, an expired row and a suspended user. A more specific
+    // assertion than before, not a looser one.
+    expect(nextRequest.body.code).toBe("SESSION_INVALIDATED");
   });
 
   it("does NOT revoke the caller's own session for an unrelated target", async () => {

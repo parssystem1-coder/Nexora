@@ -6,6 +6,7 @@ import { withTenantContext } from "../../../platform/db/tenant-context.js";
 import { APP_DB } from "../../../platform/db/connections.js";
 import { CapabilityError, resolvePathOrBodyValue } from "../../capability/contracts/index.js";
 import type { RequestWithTenantContext } from "./tenant-context.js";
+import { CheckSessionRevokedService, SessionRepositoryPg } from "../../identity/contracts/index.js";
 import { MembershipRepositoryPg } from "../infrastructure/membership.repository.pg.js";
 import { ResolveOrganizationAccessService } from "../application/resolve-organization-access.service.js";
 import { organizationScopeSchema } from "../application/organization-scope.input.js";
@@ -50,6 +51,21 @@ import { organizationScopeSchema } from "../application/organization-scope.input
  * organization exists: the only table consulted is `memberships`, so a
  * non-member cannot tell an organization they may not touch from one that
  * was never created.
+ *
+ * **ADR-051, and the one case that is not FORBIDDEN.** `membership.revoke`
+ * revokes the target's membership AND every session belonging to that user in
+ * ONE transaction. So a request already in flight can pass `SessionGuard`
+ * with a valid session and then, microseconds later, find its own membership
+ * revoked here — and the honest answer is not "you are not a member" but
+ * "your session was revoked", which is `SESSION_INVALIDATED` (401) per
+ * ADR-051's ruling. This guard therefore re-checks the caller's own session
+ * **on the refusal path only**, and only after it has already decided to
+ * refuse: a valid session still yields FORBIDDEN, unchanged, which is
+ * ADR-051's scope limit exactly. The happy path costs nothing extra.
+ *
+ * That window is what `RISK_REGISTER.md` R-008's two-concurrent-owners test
+ * has been failing on since 2026-08-26 — its loser received a 403 the test's
+ * classification did not anticipate.
  */
 @Injectable()
 export class OrganizationAccessGuard implements CanActivate {
@@ -83,7 +99,18 @@ export class OrganizationAccessGuard implements CanActivate {
 
     const access = await withTenantContext(this.db, { tenantId: null, userId: identity.userId, storeId: null }, (trx) =>
       new ResolveOrganizationAccessService(new MembershipRepositoryPg(trx)).execute(identity.userId, organizationId),
-    );
+    ).catch(async (err: unknown) => {
+      // ADR-051. Only FORBIDDEN is reinterpreted, and only into
+      // SESSION_INVALIDATED. Every other error - VALIDATION_ERROR, a driver
+      // failure, a concurrency conflict - propagates untouched, because this
+      // is a refinement of one refusal and not a general error handler.
+      if (!(err instanceof CapabilityError) || err.code !== "FORBIDDEN") throw err;
+      const revoked = await new CheckSessionRevokedService(new SessionRepositoryPg(this.db)).execute(
+        identity.sessionId,
+      );
+      if (!revoked) throw err;
+      throw new CapabilityError("SESSION_INVALIDATED", "This session has been revoked. Sign in again.");
+    });
 
     request.tenantContext = {
       tenantId: access.tenantId,

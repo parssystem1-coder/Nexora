@@ -37,5 +37,5 @@ export const authLogoutCapability: CapabilityDefinition = {
   },
   inputSchema: logoutInputSchema,
   outputSchema: logoutOutputSchema,
-  errorCodes: ["AUTHENTICATION_REQUIRED", "INTERNAL_ERROR"],
+  errorCodes: ["AUTHENTICATION_REQUIRED", "SESSION_INVALIDATED", "INTERNAL_ERROR"],
 };

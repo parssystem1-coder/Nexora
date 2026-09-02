@@ -193,7 +193,7 @@
             }
           },
           "401": {
-            "description": "AUTHENTICATION_REQUIRED",
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
             "content": {
               "application/json": {
                 "schema": {
@@ -247,7 +247,7 @@
             }
           },
           "401": {
-            "description": "AUTHENTICATION_REQUIRED",
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
             "content": {
               "application/json": {
                 "schema": {
@@ -365,7 +365,7 @@
             }
           },
           "401": {
-            "description": "AUTHENTICATION_REQUIRED",
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
             "content": {
               "application/json": {
                 "schema": {
@@ -501,7 +501,7 @@
             }
           },
           "401": {
-            "description": "AUTHENTICATION_REQUIRED",
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
             "content": {
               "application/json": {
                 "schema": {
@@ -661,7 +661,7 @@
             }
           },
           "401": {
-            "description": "AUTHENTICATION_REQUIRED",
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
             "content": {
               "application/json": {
                 "schema": {
@@ -802,7 +802,7 @@
             }
           },
           "401": {
-            "description": "AUTHENTICATION_REQUIRED",
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
             "content": {
               "application/json": {
                 "schema": {
@@ -886,7 +886,7 @@
             }
           },
           "401": {
-            "description": "AUTHENTICATION_REQUIRED",
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
             "content": {
               "application/json": {
                 "schema": {
@@ -1027,7 +1027,7 @@
             }
           },
           "401": {
-            "description": "AUTHENTICATION_REQUIRED",
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
             "content": {
               "application/json": {
                 "schema": {
@@ -1147,7 +1147,7 @@
             }
           },
           "401": {
-            "description": "AUTHENTICATION_REQUIRED",
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
             "content": {
               "application/json": {
                 "schema": {

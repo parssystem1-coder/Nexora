@@ -47,5 +47,12 @@ export const organizationSwitchCapability: CapabilityDefinition = {
   },
   inputSchema: switchOrganizationInputSchema,
   outputSchema: switchOrganizationOutputSchema,
-  errorCodes: ["AUTHENTICATION_REQUIRED", "VALIDATION_ERROR", "FORBIDDEN", "CONCURRENCY_CONFLICT", "INTERNAL_ERROR"],
+  errorCodes: [
+    "AUTHENTICATION_REQUIRED",
+    "SESSION_INVALIDATED",
+    "VALIDATION_ERROR",
+    "FORBIDDEN",
+    "CONCURRENCY_CONFLICT",
+    "INTERNAL_ERROR",
+  ],
 };

@@ -23,6 +23,7 @@ export const storeReadCapability: CapabilityDefinition = {
   outputSchema: storeOutputSchema,
   errorCodes: [
     "AUTHENTICATION_REQUIRED",
+    "SESSION_INVALIDATED",
     "VALIDATION_ERROR",
     "STORE_ACCESS_DENIED",
     "FORBIDDEN",

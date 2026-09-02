@@ -19,6 +19,13 @@ export type RequestWithIdentity = Request & { authenticatedIdentity?: Authentica
  * exempt (DECISION_LOG.md) — so this queries the plain pool, not
  * withTenantContext(). `db` is injected via the explicit APP_DB token, not
  * an implicitly-typed constructor parameter — see platform/db/connections.ts.
+ *
+ * ADR-051 splits this guard's single failure code in two: a session row that
+ * exists and was REVOKED raises `SESSION_INVALIDATED` (401); no cookie, no
+ * row, an expired row, or a suspended user all still raise
+ * `AUTHENTICATION_REQUIRED` (401). Same status, different code, and the
+ * difference is what lets a client tell "sign in again" from "something is
+ * wrong with your request."
  */
 @Injectable()
 export class SessionGuard implements CanActivate {
@@ -37,12 +44,21 @@ export class SessionGuard implements CanActivate {
       new UserRepositoryPg(this.db),
       systemClock,
     );
-    const identity = await validateSession.execute(rawToken);
-    if (!identity) {
-      throw new CapabilityError("AUTHENTICATION_REQUIRED", "Session is missing, expired or revoked.");
+    const validation = await validateSession.execute(rawToken);
+
+    // ADR-051 (ACCEPTED 2026-09-03, Option B). A session that was explicitly
+    // revoked is reported as such; everything else stays indistinguishable.
+    // The split is exactly two codes wide on purpose - see
+    // ValidateSessionService for why separating REVOKED does not weaken the
+    // token-enumeration property that keeps the other four cases collapsed.
+    if (validation.outcome === "REVOKED") {
+      throw new CapabilityError("SESSION_INVALIDATED", "This session has been revoked. Sign in again.");
+    }
+    if (validation.outcome === "INVALID") {
+      throw new CapabilityError("AUTHENTICATION_REQUIRED", "Session is missing or expired.");
     }
 
-    request.authenticatedIdentity = identity;
+    request.authenticatedIdentity = validation.identity;
     return true;
   }
 }

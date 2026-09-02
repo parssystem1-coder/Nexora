@@ -59,6 +59,9 @@ function fakes(options: { user?: User | null; credential?: Credential | null; pa
   };
   const sessions: SessionRepository = {
     findByTokenHash: async () => null,
+    findById: async () => {
+      throw new Error("LoginService must not resolve a session by id.");
+    },
     create: async (command) => {
       sessionsCreated.push(command);
     },
@@ -188,6 +191,9 @@ describe("LoginService", () => {
     };
     const sessions: SessionRepository = {
       findByTokenHash: async () => null,
+      findById: async () => {
+        throw new Error("LoginService must not resolve a session by id.");
+      },
       create: async () => {
         throw new Error("must not create a session");
       },

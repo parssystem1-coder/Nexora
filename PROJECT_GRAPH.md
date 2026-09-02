@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `815c29d` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `0701b1d` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 394 test cases in 43 files · 57 ADRs (46 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 406 test cases in 44 files · 57 ADRs (46 accepted)
 
 ## Modules
 
@@ -14,7 +14,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `authorization` | application, contracts, domain, infrastructure, migrations | 17 | `capability` | yes |
 | `calendar` | contracts, domain | 4 | — | — |
 | `capability` | contracts, domain, interfaces | 8 | `audit` | yes |
-| `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 40 | `audit`, `capability` | yes |
+| `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 42 | `audit`, `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
 | `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 67 | `audit`, `authorization`, `capability`, `identity` | yes |
 
@@ -67,11 +67,11 @@ Roles ADR-030 requires exactly one implementation of.
 
 | layer | files | cases |
 |---|---|---|
-| application | 13 | 72 |
+| application | 14 | 79 |
 | conformance | 2 | 29 |
 | domain | 3 | 48 |
 | infrastructure | 4 | 15 |
-| integration | 15 | 189 |
+| integration | 15 | 194 |
 | interfaces | 1 | 4 |
 | other | 3 | 22 |
 | platform | 2 | 15 |
@@ -85,10 +85,11 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/authorization/infrastructure/role-catalog-agreement.spec.ts` | infrastructure | 1 |
 | `modules/calendar/domain/business-calendar.spec.ts` | domain | 27 |
 | `modules/capability/interfaces/capability-attempt.spec.ts` | interfaces | 4 |
+| `modules/identity/application/check-session-revoked.service.spec.ts` | application | 4 |
 | `modules/identity/application/login.service.spec.ts` | application | 10 |
 | `modules/identity/application/logout-all.service.spec.ts` | application | 4 |
 | `modules/identity/application/logout.service.spec.ts` | application | 3 |
-| `modules/identity/application/validate-session.service.spec.ts` | application | 4 |
+| `modules/identity/application/validate-session.service.spec.ts` | application | 7 |
 | `modules/identity/domain/session.entity.spec.ts` | domain | 4 |
 | `modules/money/domain/money.vo.spec.ts` | domain | 17 |
 | `modules/money/infrastructure/currency-registry.spec.ts` | infrastructure | 7 |
@@ -111,7 +112,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `apps/api/error-contract.integration.spec.ts` | integration | 3 |
 | `apps/api/health.integration.spec.ts` | integration | 3 |
 | `apps/api/membership-invite.integration.spec.ts` | integration | 24 |
-| `apps/api/membership-revoke.integration.spec.ts` | integration | 24 |
+| `apps/api/membership-revoke.integration.spec.ts` | integration | 29 |
 | `apps/api/membership-role-assign.integration.spec.ts` | integration | 30 |
 | `apps/api/organization-create.integration.spec.ts` | integration | 13 |
 | `apps/api/organization-switch.integration.spec.ts` | integration | 12 |

@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "815c29d",
+    "commit": "0701b1d",
     "dirty": true
   },
   "modules": [
@@ -64,7 +64,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 40,
+      "files": 42,
       "dependsOn": [
         "audit",
         "capability"
@@ -736,6 +736,11 @@
       "cases": 4
     },
     {
+      "file": "modules/identity/application/check-session-revoked.service.spec.ts",
+      "layer": "application",
+      "cases": 4
+    },
+    {
       "file": "modules/identity/application/login.service.spec.ts",
       "layer": "application",
       "cases": 10
@@ -753,7 +758,7 @@
     {
       "file": "modules/identity/application/validate-session.service.spec.ts",
       "layer": "application",
-      "cases": 4
+      "cases": 7
     },
     {
       "file": "modules/identity/domain/session.entity.spec.ts",
@@ -868,7 +873,7 @@
     {
       "file": "apps/api/membership-revoke.integration.spec.ts",
       "layer": "integration",
-      "cases": 24
+      "cases": 29
     },
     {
       "file": "apps/api/membership-role-assign.integration.spec.ts",
@@ -989,8 +994,8 @@
     "tablesWithRls": 6,
     "capabilities": 10,
     "routes": 11,
-    "testFiles": 43,
-    "testCases": 394,
+    "testFiles": 44,
+    "testCases": 406,
     "adrs": 57,
     "adrsAccepted": 46
   }

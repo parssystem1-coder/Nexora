@@ -49,6 +49,7 @@ export const membershipRevokeCapability: CapabilityDefinition = {
   outputSchema: membershipOutputSchema,
   errorCodes: [
     "AUTHENTICATION_REQUIRED",
+    "SESSION_INVALIDATED",
     "VALIDATION_ERROR",
     "FORBIDDEN",
     "RESOURCE_NOT_FOUND",

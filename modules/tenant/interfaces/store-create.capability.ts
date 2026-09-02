@@ -49,6 +49,7 @@ export const storeCreateCapability: CapabilityDefinition = {
   outputSchema: storeOutputSchema,
   errorCodes: [
     "AUTHENTICATION_REQUIRED",
+    "SESSION_INVALIDATED",
     "VALIDATION_ERROR",
     "FORBIDDEN",
     "CONFLICT",

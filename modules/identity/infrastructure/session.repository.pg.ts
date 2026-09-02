@@ -29,6 +29,25 @@ export class SessionRepositoryPg implements SessionRepository {
     );
   }
 
+  /** ADR-051: the by-id counterpart of findByTokenHash, for a guard that holds an id rather than a cookie. Selects the same columns so both build an identical Session. */
+  async findById(sessionId: string): Promise<Session | null> {
+    const row = await this.conn
+      .selectFrom("sessions")
+      .select(["id", "user_id", "token_hash", "active_organization_id", "status", "created_at", "expires_at"])
+      .where("id", "=", sessionId)
+      .executeTakeFirst();
+    if (!row) return null;
+    return new Session(
+      row.id,
+      row.user_id,
+      row.token_hash,
+      row.active_organization_id,
+      row.status as "ACTIVE" | "REVOKED",
+      row.created_at,
+      row.expires_at,
+    );
+  }
+
   /**
    * Id and created_at supplied by the caller, matching every other insert in
    * this codebase — auth.login mints the id before it does anything else so

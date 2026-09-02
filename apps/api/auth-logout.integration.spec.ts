@@ -122,7 +122,11 @@ describe("POST /api/v1/auth/logout", () => {
 
     const after = await createOrganizationWith(cookie);
     expect(after.status).toBe(401);
-    expect(after.body.code).toBe("AUTHENTICATION_REQUIRED");
+    // ADR-051 (ruled 2026-09-03): a session that was explicitly REVOKED now
+    // says so. Narrowed from AUTHENTICATION_REQUIRED, which still covers no
+    // cookie, no row, an expired row and a suspended user. A more specific
+    // assertion than before, not a looser one.
+    expect(after.body.code).toBe("SESSION_INVALIDATED");
   });
 
   it("does NOT end the user's other sessions", async () => {
@@ -137,7 +141,7 @@ describe("POST /api/v1/auth/logout", () => {
     expect(stillWorks.status).toBe(201);
   });
 
-  it("a second logout with the same now-revoked cookie returns AUTHENTICATION_REQUIRED, not a repeated success (decision 4)", async () => {
+  it("a second logout with the same now-revoked cookie returns SESSION_INVALIDATED, not a repeated success (decision 4; code narrowed by ADR-051)", async () => {
     const { email } = await seedLoginableUser("logout-twice");
     const cookie = extractSidCookie(await login(email));
 
@@ -145,7 +149,11 @@ describe("POST /api/v1/auth/logout", () => {
     const second = await logout(cookie);
 
     expect(second.status).toBe(401);
-    expect(second.body.code).toBe("AUTHENTICATION_REQUIRED");
+    // ADR-051 (ruled 2026-09-03): a session that was explicitly REVOKED now
+    // says so. Narrowed from AUTHENTICATION_REQUIRED, which still covers no
+    // cookie, no row, an expired row and a suspended user. A more specific
+    // assertion than before, not a looser one.
+    expect(second.body.code).toBe("SESSION_INVALIDATED");
   });
 
   it("returns AUTHENTICATION_REQUIRED with no cookie at all", async () => {
@@ -230,7 +238,7 @@ describe("POST /api/v1/auth/logout-all", () => {
     expect(res.body).toEqual({ sessionsRevoked: 1 });
   });
 
-  it("a second logout-all with the same now-revoked cookie returns AUTHENTICATION_REQUIRED (decision 4, same as auth.logout)", async () => {
+  it("a second logout-all with the same now-revoked cookie returns SESSION_INVALIDATED (decision 4, same as auth.logout; code narrowed by ADR-051)", async () => {
     const { email } = await seedLoginableUser("logout-all-twice");
     const cookie = extractSidCookie(await login(email));
 
@@ -238,7 +246,11 @@ describe("POST /api/v1/auth/logout-all", () => {
     const second = await logoutAll(cookie);
 
     expect(second.status).toBe(401);
-    expect(second.body.code).toBe("AUTHENTICATION_REQUIRED");
+    // ADR-051 (ruled 2026-09-03): a session that was explicitly REVOKED now
+    // says so. Narrowed from AUTHENTICATION_REQUIRED, which still covers no
+    // cookie, no row, an expired row and a suspended user. A more specific
+    // assertion than before, not a looser one.
+    expect(second.body.code).toBe("SESSION_INVALIDATED");
   });
 
   it("records one SUCCESS audit event under the platform-scope sentinel, naming the user and how many sessions ended (decision 7)", async () => {

@@ -30,5 +30,12 @@ export const organizationCreateCapability: CapabilityDefinition = {
   route: { method: "post", path: "/api/v1/organizations", pathParams: [], successStatus: 201 },
   inputSchema: createOrganizationInputSchema,
   outputSchema: organizationOutputSchema,
-  errorCodes: ["AUTHENTICATION_REQUIRED", "VALIDATION_ERROR", "CONFLICT", "CONCURRENCY_CONFLICT", "INTERNAL_ERROR"],
+  errorCodes: [
+    "AUTHENTICATION_REQUIRED",
+    "SESSION_INVALIDATED",
+    "VALIDATION_ERROR",
+    "CONFLICT",
+    "CONCURRENCY_CONFLICT",
+    "INTERNAL_ERROR",
+  ],
 };

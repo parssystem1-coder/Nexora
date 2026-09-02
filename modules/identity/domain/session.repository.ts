@@ -19,6 +19,22 @@ export interface CreateSessionCommand {
 export interface SessionRepository {
   findByTokenHash(tokenHash: string): Promise<Session | null>;
 
+  /**
+   * Added for ADR-051. `SessionGuard` resolves a session by token; this
+   * resolves one by the id `SessionGuard` already put on
+   * `AuthenticatedIdentity`, which is what a LATER guard in the same request
+   * has to work with — it never sees the raw cookie, and hashing one inside
+   * another module would drag `hashSessionToken` across a module boundary
+   * for no gain.
+   *
+   * It exists because the interesting case is a session revoked BETWEEN two
+   * guards in one request: `SessionGuard` validated it, then a concurrent
+   * `membership.revoke` committed, and `OrganizationAccessGuard` must be able
+   * to tell "your session was revoked" from "you are not a member." Only a
+   * re-read can answer that, and only on the failure path.
+   */
+  findById(sessionId: string): Promise<Session | null>;
+
   /** Added for auth.login. Always creates an ACTIVE session — there is no other status a login can produce. */
   create(command: CreateSessionCommand): Promise<void>;
 
