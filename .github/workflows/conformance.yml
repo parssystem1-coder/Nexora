@@ -37,6 +37,16 @@ jobs:
       # of only when someone remembers to check it locally.
       - name: Apply migrations (also proves every migration applies cleanly from an empty database)
         run: npm run db:migrate
+      # RISK_REGISTER.md R-008 / ADR-039 (OPEN, pool sizing). R-008 burned four
+      # occurrences and 165 local reproduction attempts on a CI-only failure
+      # while the two numbers that separate CI from a developer machine -
+      # how many test workers run at once, and how many connections the server
+      # allows - were recorded nowhere for either environment. max_connections
+      # appeared nowhere in this repository at all. This step is diagnostic
+      # output only: it asserts nothing and cannot fail the build.
+      - name: Environment differential (R-008 / ADR-039 evidence)
+        run: npx tsx tools/diagnostics/environment-report.ts
+
       - name: Type check
         run: npm run typecheck
       - name: Build
@@ -47,8 +57,22 @@ jobs:
         run: npm run lint
       - name: Format check
         run: npm run format:check
+      # The sampler is the pg_stat_activity half of the falsifying test R-008's
+      # F-3 addendum named and nobody ran. It runs alongside the suite, prints a
+      # rolling peak, and is killed afterwards; `npm test`'s own exit status is
+      # what this step exits with, so the sampler can never turn a green suite
+      # red or a red one green.
       - name: Harness self-test (proves every rule detects its fixture, incl. against real PostgreSQL)
-        run: npm test
+        run: |
+          npx tsx tools/diagnostics/pg-activity-sample.ts &
+          sampler=$!
+          set +e
+          npm test
+          status=$?
+          set -e
+          kill "$sampler" 2>/dev/null || true
+          wait "$sampler" 2>/dev/null || true
+          exit $status
       - name: Conformance scan of real source tree
         if: always()
         run: npm run conformance

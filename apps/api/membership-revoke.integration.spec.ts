@@ -515,8 +515,21 @@ describe("POST /api/v1/organizations/{organizationId}/memberships/{membershipId}
       );
     }
 
-    expect(successes).toHaveLength(1);
-    expect(losses).toHaveLength(1);
+    // The message arguments are not decoration, and removing them undoes the
+    // finding that closed R-008's "unexplained" mode. Both assertions compare
+    // an empty array against a length of 1, so Vitest's default message -
+    // `expected [] to have a length of 1 but got +0` - is byte-identical for
+    // either one, and the ONLY thing distinguishing them in a CI log is the
+    // line number in the stack frame. That line number was misread once, and
+    // the misreading survived four occurrences, 165 local reproduction
+    // attempts and three investigations: R-008 recorded occurrences 1-3 as
+    // failing at `successes` (a world with no 200 at all, which is genuinely
+    // inexplicable) when every stack frame in fact pointed at `losses`
+    // (exactly one 200, and a loser whose status was neither 409 nor 401 -
+    // fully explicable). Naming the array in the message makes that class of
+    // error impossible to repeat.
+    expect(successes, "successes: statuses that were 200").toHaveLength(1);
+    expect(losses, "losses: statuses that were 409 or 401").toHaveLength(1);
 
     const activeOwners = [finalStatusA, finalStatusB].filter((s) => s === "ACTIVE");
     expect(activeOwners).toHaveLength(1);
