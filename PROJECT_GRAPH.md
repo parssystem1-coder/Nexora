@@ -1,6 +1,6 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `8e5a726` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `fda1528` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
@@ -166,7 +166,7 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-038 | Idempotency Composition at the Capability Boundary | ACCEPTED (new) | Phase 2 item 3, and every idempotent capability after it |
 | ADR-039 | Connection Pool Sizing and Query Timeouts | OPEN | first deployment carrying real traffic, or the first second instance |
 | ADR-040 | Observability Boundary | OPEN | nothing in Phase 2; owed before production |
-| ADR-041 | Ledger and Audit Table Growth | OPEN | nothing today; cheapest at Phase 2 ledger-table creation, expensive after |
+| ADR-041 | Ledger and Audit Table Growth | OPEN | nothing today; cheapest at Phase 2 ledger-table creation, expensive after. **Its four semantics questions were answered empirically 2026-09-03 and the ruling was withheld** — direct partition access bypasses a parent-only RLS policy (R-042) |
 | ADR-042 | Error Message Audience and Localization | ACCEPTED (new) | Phase 2, every capability that raises an error |
 | ADR-043 | Guarding `CapabilityDefinition` Against `05` §5 | ACCEPTED (new) | Phase 2 items 6–7 (the first slices that would add a declared field) |
 | ADR-044 | Localized Display Text in Phase 2 Tables | ACCEPTED (was OPEN) | Phase 2 item 1 (no display column) and item 13 (an invoice line carries its own description) |

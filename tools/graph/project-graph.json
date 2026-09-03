@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "8e5a726",
+    "commit": "fda1528",
     "dirty": true
   },
   "modules": [
@@ -580,7 +580,7 @@
       "id": "ADR-041",
       "title": "Ledger and Audit Table Growth",
       "status": "OPEN",
-      "blocks": "nothing today; cheapest at Phase 2 ledger-table creation, expensive after"
+      "blocks": "nothing today; cheapest at Phase 2 ledger-table creation, expensive after. **Its four semantics questions were answered empirically 2026-09-03 and the ruling was withheld** — direct partition access bypasses a parent-only RLS policy (R-042)"
     },
     {
       "id": "ADR-042",

@@ -74,7 +74,7 @@ For each ADR, completion requires:
 | ADR-038 | Idempotency Composition at the Capability Boundary | Platform / Integrity | **ACCEPTED (new)** | Phase 2 item 3, and every idempotent capability after it |
 | ADR-039 | Connection Pool Sizing and Query Timeouts | Platform / Data | **OPEN** | first deployment carrying real traffic, or the first second instance |
 | ADR-040 | Observability Boundary | Platform / Ops | **OPEN** | nothing in Phase 2; owed before production |
-| ADR-041 | Ledger and Audit Table Growth | Platform / Data | **OPEN** | nothing today; cheapest at Phase 2 ledger-table creation, expensive after |
+| ADR-041 | Ledger and Audit Table Growth | Platform / Data | **OPEN** | nothing today; cheapest at Phase 2 ledger-table creation, expensive after. **Its four semantics questions were answered empirically 2026-09-03 and the ruling was withheld** — direct partition access bypasses a parent-only RLS policy (R-042) |
 | ADR-042 | Error Message Audience and Localization | Platform / Contracts | **ACCEPTED (new)** | Phase 2, every capability that raises an error |
 | ADR-043 | Guarding `CapabilityDefinition` Against `05` §5 | Platform / CI | **ACCEPTED (new)** | Phase 2 items 6–7 (the first slices that would add a declared field) |
 | ADR-044 | Localized Display Text in Phase 2 Tables | Platform / Contracts | **ACCEPTED (was OPEN)** | Phase 2 item 1 (no display column) and item 13 (an invoice line carries its own description) |
@@ -1948,11 +1948,154 @@ This is the part that could silently weaken tenant isolation, so it is separated
 
 **No claim about these four is made here.** Whoever takes this decision must establish them empirically first — the same standard `RISK_REGISTER.md` R-002 met when it confirmed by direct test that a table's owning role bypasses RLS by default, rather than reasoning about it from documentation.
 
+### The four questions, answered empirically 2026-09-03 — and why the ruling was NOT written
+
+**This section answers this ADR's own verification item 1. It records no decision. ADR-041 remains `OPEN`**, and the reason is the finding below: a ruling adopting option 1 as drafted would have introduced a cross-tenant data-loss defect. That is not a reason to reject option 1 — it is a condition option 1 must carry.
+
+**Method, held to this ADR's own stated standard** (*"the same standard `RISK_REGISTER.md` R-002 met when it confirmed by direct test ... rather than reasoning about it from documentation"*): a throwaway schema on **PostgreSQL 17.5**, using the project's real role split — `nexora_migrate` owning, `nexora_app` (`NOSUPERUSER`, `NOBYPASSRLS`) reading and writing. The fixture is a partitioned parent carrying **the identical three lines** the `audit_events` migration uses (`ENABLE`, `FORCE`, one `USING` policy on `current_setting('app.tenant_id', true)`), on the parent only, with two monthly partitions and two tenants' rows in each. No migration file was written; both probe schemas were dropped and their absence proven.
+
+> **Environment deviation, recorded because it bounds the claim.** The session brief specified `docker compose up -d postgres`. **Docker is not installed on this machine** — `CLAUDE.md` already records this and the brief was wrong — so the probe ran against the native PostgreSQL **17.5** the test suite itself uses. CI runs `postgres:17-alpine` (**17.11**). Both are PostgreSQL 17 and nothing below is version-sensitive within a major release, but the transcripts are 17.5 and say so rather than claiming to be CI's exact build.
+
+#### Q0 — an obstacle neither this ADR nor the session brief anticipated, found before question 1
+
+`audit_events` declares `id uuid PRIMARY KEY`. Partitioning by `occurred_at` is **not compatible with that primary key**:
+
+```text
+ERROR:  unique constraint on partitioned table must include all partitioning columns
+DETAIL:  PRIMARY KEY constraint on table "pk_probe" lacks column "occurred_at" which is part of the partition key.
+```
+
+The obvious repair is a composite key, `PRIMARY KEY (id, occurred_at)`. The non-obvious part is that **uniqueness on `id` alone cannot be recovered afterwards**:
+
+```text
+ERROR:  unique constraint on partitioned table must include all partitioning columns
+DETAIL:  UNIQUE constraint on table "pk_probe2" lacks column "occurred_at" which is part of the partition key.
+```
+
+**So partitioning any of these tables permanently gives up a database-enforced guarantee that `id` is unique.** For `gen_random_uuid()` the practical collision risk is nil, and every lookup in this codebase is tenant-scoped, so nothing breaks — but it is a real constraint being surrendered, it applies to all four candidate tables, and it belongs in the ruling rather than being discovered by whoever writes the first migration.
+
+#### Q1 and Q2 — `FORCE ROW LEVEL SECURITY` on the parent, and direct partition access
+
+Run as `nexora_app`. Each row of the fixture belongs to tenant `1111…` or `2222…`; the probe sets a **wrong** tenant, then **no** tenant context, and finally the correct one as a control.
+
+```text
+### Q1/Q2 - SELECT: parent vs direct partition, WRONG tenant ###
+ via parent       |     0
+ direct partition |     2
+
+### Q1/Q2 - SELECT: parent vs direct partition, NO tenant context ###
+ via parent       |     0
+ direct partition |     2
+
+### Q1/Q2 - SELECT: parent vs direct partition, CORRECT tenant (control) ###
+ via parent       |     2
+ direct partition |     2
+
+### Q1 - INSERT via parent, row belonging to ANOTHER tenant ###
+ERROR:  new row violates row-level security policy for table "probe_events"
+
+### Q1 - INSERT DIRECTLY into a partition, row belonging to ANOTHER tenant ###
+INSERT 0 1
+
+### Q1 - UPDATE DIRECTLY on a partition, targeting ANOTHER tenant rows ###
+UPDATE 2
+
+### Q1 - DELETE DIRECTLY on a partition, targeting ANOTHER tenant rows ###
+DELETE 2
+
+### Q1 - INSERT via parent with NO tenant context at all ###
+ERROR:  new row violates row-level security policy for table "probe_events"
+
+### FINAL STATE - no cross-tenant row was created or destroyed ###
+ tenant 1 sees |     2
+ tenant 2 sees |     1
+```
+
+**Answer to Q1:** `FORCE ROW LEVEL SECURITY` declared on a partitioned parent applies to reads *and* writes **routed through the parent**, and to **neither** reads nor writes addressed **directly to a partition**. It is not "both".
+
+**Answer to Q2:** a policy created on the parent is **not enforced** for direct access to a partition. Not partially, not for writes only — not at all.
+
+**The last two lines are the finding, and they are worse than a read leak.** That final-state block is labelled optimistically because it was written before the result was known: tenant 2 began with two rows and ends with one. **The probe, running as the unprivileged application role with a deliberately wrong tenant context, read another tenant's rows, inserted a row on their behalf, updated their rows, and destroyed them** — every one of those through the partition rather than the parent, and every one silently successful.
+
+#### Q3 — `relrowsecurity` / `relforcerowsecurity` are per-relation, not inherited
+
+```text
+          relname          | relkind | relrowsecurity | relforcerowsecurity
+---------------------------+---------+----------------+---------------------
+ probe_events              | p       | t              | t
+ probe_events_2026_09      | r       | f              | f
+ probe_events_2026_10      | r       | f              | f
+```
+
+**Answer to Q3:** independent. The parent carries the flags; each partition's own `pg_class` row reads `f`/`f`. `pg_policies` confirms the same asymmetry — one policy row, on `probe_events`, and none on either partition. This is the mechanism behind Q1 and Q2: the partitions are ordinary tables with RLS switched off.
+
+#### Q4 — `information_schema.tables` reports parent and partitions identically
+
+The exact query `tools/conformance/rules/schema-live.ts` issues at lines 40–41:
+
+```text
+      table_name      | table_type
+----------------------+------------
+ probe_events         | BASE TABLE
+ probe_events_2026_09 | BASE TABLE
+ probe_events_2026_10 | BASE TABLE
+```
+
+**Answer to Q4:** a partitioned parent and every one of its partitions are all reported as `BASE TABLE`, indistinguishably. The `relkind` column in Q3 (`p` versus `r`) is the only thing that separates them, and `information_schema` does not expose it.
+
+#### What `schema-live.ts` would do, and which branch of this ADR's own two the project is in
+
+**It would enumerate all three** — the parent and both partitions. The deciding line is **`tools/conformance/rules/schema-live.ts:41`**, `WHERE table_schema = $1 AND table_type = 'BASE TABLE'`: the filter that is meant to exclude views does not distinguish a partition from a table, because PostgreSQL does not report the difference in that column.
+
+Each partition would then reach the `TENANT_EXEMPT` check at line 66, pass it (partitions are not on that list), be found to *have* a `tenant_id` column — partitions inherit columns — and then fail the check at line 87, because Q3 shows `relrowsecurity` is `f` and `pg_policies` returns nothing.
+
+**So the project is in this ADR's first branch, not the silent one: the harness flags every partition, loudly.** That is the better of the two branches it feared, and it is worth stating why the fear was misplaced — `schema-live.ts` reads `relrowsecurity` from `pg_class` per relation rather than trusting inheritance, so it cannot be fooled into passing a partition it never checked.
+
+**But the branch analysis in this ADR was aimed at the wrong problem.** Both branches it names are about whether the *harness* is accurate. Q1 shows the harness would be accurate and **right**: those partitions genuinely have no RLS, and the resulting violations are not false alarms. The alarm is the true finding, and the danger this ADR should have named is the obvious response to it — an `exceptions.json` entry to quiet the noise, which `CLAUDE.md`'s standing rule forbids and which would here suppress a real cross-tenant hole rather than a cosmetic one.
+
+#### Why the ruling was not written, and the condition that would let it be
+
+The session that produced these transcripts was to record a ruling adopting option 1. It did not, because the ruling as drafted assumed partitioning does not weaken tenant isolation, and **Q1 shows it does** — under this project's actual configuration, not a hypothetical one.
+
+That configuration is the reason, and it was verified rather than assumed. `platform/db/init/001_roles.sql` grants through `ALTER DEFAULT PRIVILEGES … IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO nexora_app`, whose own comment says it applies to *"every table/sequence `nexora_migrate` creates from now on … no per-migration `GRANT` needed."* **A partition is such a table.** Reproducing that grant shape in the probe schema and creating a partition with no explicit `GRANT` anywhere:
+
+```text
+    table_name    |             privs
+------------------+--------------------------------
+ g_events         | DELETE, INSERT, SELECT, UPDATE
+ g_events_2026_09 | DELETE, INSERT, SELECT, UPDATE
+```
+
+`nexora_app` receives full DML on every partition automatically, the moment it is created.
+
+**A mitigation exists and is proven.** Revoking the partition's privileges leaves access through the parent completely unaffected:
+
+```text
+### G3 - as nexora_app, AFTER the partition privileges were revoked ###
+--- direct partition SELECT with WRONG tenant (was 2 rows before the revoke) ---
+ERROR:  permission denied for table g_events_2026_09
+--- direct partition INSERT for ANOTHER tenant ---
+ERROR:  permission denied for table g_events_2026_09
+--- direct partition DELETE ---
+ERROR:  permission denied for table g_events_2026_09
+--- SELECT via the PARENT still works normally (control) ---
+ count | 1
+```
+
+**So option 1 remains viable, and acquires a hard precondition it did not have: no partition may be directly reachable by the application role.** Two shapes achieve that, and choosing between them is a decision this section does not take —
+
+1. **Revoke on every partition**, in the creating migration and in the ahead-creation job. Narrow, but it is a rule that must be obeyed every month forever: one missed revoke is one month-wide hole, and nothing would fail loudly.
+2. **Stop `ALTER DEFAULT PRIVILEGES` granting on new tables** and grant explicitly per table in each migration. Structurally safer — a partition is un-granted by default and a forgotten grant fails loudly rather than silently — but it changes `001_roles.sql` for every table in the platform, not just partitions, and every existing migration would need its grants made explicit.
+
+**Whichever is chosen, this ADR's verification list needs a new item that no drafted option covers: a live cross-tenant proof addressed *directly at a partition*, not only at the parent.** The existing item 3 says *"a cross-tenant read against a partitioned tenant-owned table"* — a phrasing that the parent alone satisfies, and which this probe shows is exactly the test that would have missed all of this.
+
+**Tracked as `R-042`.** Nothing is partitioned today, so nothing is currently exposed: this is a defect in a proposed design, caught before it was built, and that is the whole reason this ADR's verification list demanded the empirical answers before the ruling.
+
 ### Verification
 
-- [ ] the four PostgreSQL semantics questions above are answered empirically against PostgreSQL 17, and the answers recorded, **before** any partitioning migration is written
-- [ ] `tools/conformance/rules/schema-live.ts` is confirmed to enumerate partitions and parents as intended, with a deliberately failing fixture proving it still detects a partition missing RLS, FORCE or a policy (ADR-030's own standard)
-- [ ] a cross-tenant read against a partitioned tenant-owned table returns zero rows with no tenant context, and zero rows from a wrong tenant's context — proven live, not inferred
+- [x] the four PostgreSQL semantics questions above are answered empirically against PostgreSQL 17, and the answers recorded, **before** any partitioning migration is written — done 2026-09-03 against PostgreSQL 17.5; transcripts above
+- [ ] `tools/conformance/rules/schema-live.ts` is confirmed to enumerate partitions and parents as intended, with a deliberately failing fixture proving it still detects a partition missing RLS, FORCE or a policy (ADR-030's own standard) — **half met:** what it enumerates is now established from the Q4 transcript (parent and every partition, all as `BASE TABLE`, decided at `schema-live.ts:41`), but **no fixture was written**, so the ADR-030 standard is not satisfied and this stays unticked
+- [ ] a cross-tenant read against a partitioned tenant-owned table returns zero rows with no tenant context, and zero rows from a wrong tenant's context — proven live, not inferred. **Proven live and FAILED for direct partition access** (Q1/Q2): zero via the parent, two rows via the partition. **This item is also insufficient as worded** — it is satisfied by testing the parent alone, which is precisely the test that would have missed this. It needs a companion item naming the partition as the target
 - [ ] no `exceptions.json` entry is added to make the harness green over a partitioning change
 - [ ] whichever option is chosen, the decision is recorded before the first Phase 2 ledger table's creating migration merges
 
