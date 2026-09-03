@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "fda1528",
+    "commit": "fdfc0d0",
     "dirty": true
   },
   "modules": [
@@ -579,8 +579,8 @@
     {
       "id": "ADR-041",
       "title": "Ledger and Audit Table Growth",
-      "status": "OPEN",
-      "blocks": "nothing today; cheapest at Phase 2 ledger-table creation, expensive after. **Its four semantics questions were answered empirically 2026-09-03 and the ruling was withheld** — direct partition access bypasses a parent-only RLS policy (R-042)"
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "**Phase 2 items 4, 5, 9 and 12 — their creating migrations**, which must keep the append-only tables partition-*compatible* (no FK to a candidate table, no uniqueness excluding the event column). Nothing is partitioned; the trigger is 50M rows / 50 GB or R-025 closing"
     },
     {
       "id": "ADR-042",
@@ -929,6 +929,11 @@
       "file": "tools/register/register-integrity.spec.ts",
       "layer": "other",
       "cases": 10
+    },
+    {
+      "file": "tools/schema/partition-isolation.spec.ts",
+      "layer": "other",
+      "cases": 4
     }
   ],
   "routes": [
@@ -994,9 +999,9 @@
     "tablesWithRls": 6,
     "capabilities": 10,
     "routes": 11,
-    "testFiles": 44,
-    "testCases": 406,
+    "testFiles": 45,
+    "testCases": 410,
     "adrs": 57,
-    "adrsAccepted": 46
+    "adrsAccepted": 47
   }
 }

@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `fda1528` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `fdfc0d0` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 406 test cases in 44 files · 57 ADRs (46 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 410 test cases in 45 files · 57 ADRs (47 accepted)
 
 ## Modules
 
@@ -73,7 +73,7 @@ Roles ADR-030 requires exactly one implementation of.
 | infrastructure | 4 | 15 |
 | integration | 15 | 194 |
 | interfaces | 1 | 4 |
-| other | 3 | 22 |
+| other | 4 | 26 |
 | platform | 2 | 15 |
 
 <details><summary>Per file</summary>
@@ -124,6 +124,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `tools/graph/extract.spec.ts` | other | 5 |
 | `tools/openapi/openapi.spec.ts` | other | 7 |
 | `tools/register/register-integrity.spec.ts` | other | 10 |
+| `tools/schema/partition-isolation.spec.ts` | other | 4 |
 
 </details>
 
@@ -166,7 +167,7 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-038 | Idempotency Composition at the Capability Boundary | ACCEPTED (new) | Phase 2 item 3, and every idempotent capability after it |
 | ADR-039 | Connection Pool Sizing and Query Timeouts | OPEN | first deployment carrying real traffic, or the first second instance |
 | ADR-040 | Observability Boundary | OPEN | nothing in Phase 2; owed before production |
-| ADR-041 | Ledger and Audit Table Growth | OPEN | nothing today; cheapest at Phase 2 ledger-table creation, expensive after. **Its four semantics questions were answered empirically 2026-09-03 and the ruling was withheld** — direct partition access bypasses a parent-only RLS policy (R-042) |
+| ADR-041 | Ledger and Audit Table Growth | ACCEPTED (was OPEN) | **Phase 2 items 4, 5, 9 and 12 — their creating migrations**, which must keep the append-only tables partition-*compatible* (no FK to a candidate table, no uniqueness excluding the event column). Nothing is partitioned; the trigger is 50M rows / 50 GB or R-025 closing |
 | ADR-042 | Error Message Audience and Localization | ACCEPTED (new) | Phase 2, every capability that raises an error |
 | ADR-043 | Guarding `CapabilityDefinition` Against `05` §5 | ACCEPTED (new) | Phase 2 items 6–7 (the first slices that would add a declared field) |
 | ADR-044 | Localized Display Text in Phase 2 Tables | ACCEPTED (was OPEN) | Phase 2 item 1 (no display column) and item 13 (an invoice line carries its own description) |

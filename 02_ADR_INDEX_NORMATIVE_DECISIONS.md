@@ -74,7 +74,7 @@ For each ADR, completion requires:
 | ADR-038 | Idempotency Composition at the Capability Boundary | Platform / Integrity | **ACCEPTED (new)** | Phase 2 item 3, and every idempotent capability after it |
 | ADR-039 | Connection Pool Sizing and Query Timeouts | Platform / Data | **OPEN** | first deployment carrying real traffic, or the first second instance |
 | ADR-040 | Observability Boundary | Platform / Ops | **OPEN** | nothing in Phase 2; owed before production |
-| ADR-041 | Ledger and Audit Table Growth | Platform / Data | **OPEN** | nothing today; cheapest at Phase 2 ledger-table creation, expensive after. **Its four semantics questions were answered empirically 2026-09-03 and the ruling was withheld** — direct partition access bypasses a parent-only RLS policy (R-042) |
+| ADR-041 | Ledger and Audit Table Growth | Platform / Data | **ACCEPTED (was OPEN)** | **Phase 2 items 4, 5, 9 and 12 — their creating migrations**, which must keep the append-only tables partition-*compatible* (no FK to a candidate table, no uniqueness excluding the event column). Nothing is partitioned; the trigger is 50M rows / 50 GB or R-025 closing |
 | ADR-042 | Error Message Audience and Localization | Platform / Contracts | **ACCEPTED (new)** | Phase 2, every capability that raises an error |
 | ADR-043 | Guarding `CapabilityDefinition` Against `05` §5 | Platform / CI | **ACCEPTED (new)** | Phase 2 items 6–7 (the first slices that would add a declared field) |
 | ADR-044 | Localized Display Text in Phase 2 Tables | Platform / Contracts | **ACCEPTED (was OPEN)** | Phase 2 item 1 (no display column) and item 13 (an invoice line carries its own description) |
@@ -1899,9 +1899,9 @@ Named explicitly so it does not become the venue for every future observability 
 
 ## ADR-041 - Ledger and Audit Table Growth
 
-**OPEN**, new, depends on ADR-020 and ADR-021
+**ACCEPTED (was OPEN)**, ruled by the maintainer on 2026-09-03, depends on ADR-020 and ADR-021; the ruling is a fifth option, not one of the four below; owns **R-030**, and its precondition is tracked as **R-042**
 
-### Why this is OPEN rather than ACCEPTED
+### Why this was OPEN rather than ACCEPTED (recorded before the ruling; left as written)
 
 `PHASE_2_BRIEF.md` §5 settles how ledger tables are *protected* (`REVOKE UPDATE, DELETE` in each creating migration) and says nothing about how they are *bounded*. `RISK_REGISTER.md` R-030 rates the risk `UNMEASURED` and not urgent. No option below has been chosen, and choosing one silently would be exactly the kind of unrecorded architectural decision `AGENTS.md` §5 forbids. It is `OPEN` for that reason and not because it is unimportant — see the timing problem.
 
@@ -2091,15 +2091,129 @@ ERROR:  permission denied for table g_events_2026_09
 
 **Tracked as `R-042`.** Nothing is partitioned today, so nothing is currently exposed: this is a defect in a proposed design, caught before it was built, and that is the whole reason this ADR's verification list demanded the empirical answers before the ruling.
 
+### Ruling
+
+**Ruled by the maintainer on 2026-09-03, after reading the empirical section above. The ruling is none of the four options: it is a fifth.**
+
+> **Option 5 — keep the tables partition-*compatible*, and do not partition them.** The creating migrations of the Phase 2 append-only tables must not introduce anything that would make partitioning impossible later. No partitions are created, no `audit_events` conversion is performed, and no partition-maintenance machinery is built.
+
+**Inventing a fifth option inside a ruling is unusual enough to need justifying rather than slipping in.** The options above were drafted before anyone had run a single statement against a partitioned table. The empirical section is what changed, and it did not merely add caveats to option 1 — it moved the price.
+
+**Why the recommendation moved.** Option 1's case rested on one claim: *"the four Phase 2 ledger tables do not exist yet, which is the cheapest moment they will ever have."* Three things now known raise its cost, and each is recorded above with a transcript:
+
+1. **Partitioning weakens tenant isolation under this project's actual configuration** (**R-042**), and the remedy is a precondition that must hold for every partition, forever. A security property that depends on a step being repeated correctly every month is a worse asset than the disk it saves.
+2. **Partitioning permanently surrenders database-enforced uniqueness on `id`** (Q0), on every partitioned table, irreversibly — a separate `UNIQUE (id)` is refused for the same reason the primary key is.
+3. **A partition-creation job is not buildable as imagined.** `nexora_app` is `NOSUPERUSER`, owns nothing, and cannot `CREATE TABLE` — which is precisely the property ADR-021's role split exists to guarantee. Partitions can therefore only be created by **migrations**, so option 1 also commits the platform to a recurring migration obligation nobody had costed.
+
+**And the benefit does not arrive yet.** Partitioning bounds scan size and makes detaching a period cheap. **Detaching requires somewhere to put the detached data, and R-025 records that no object storage port exists and no phase item owns one** — the same prerequisite ADR-054 already declared for per-tenant recovery. Until Phase 2.5 buys that, partitioning frees no disk whatsoever.
+
+**The honest limit of option 5, stated so it is not oversold.** A table cannot be `ALTER`ed into a partitioned table; conversion always means creating a new partitioned table, copying every row, and swapping. **Option 5 therefore does not make the future row copy cheaper — not by one row.** What it preserves is narrower and worth more: **that the conversion, when it comes, will not also have to break a contract other code depends on.** The expensive part of a late conversion is not moving rows; it is discovering that a foreign key, or a uniqueness guarantee something relies on, cannot survive the partition key.
+
+#### Part 2 — Which tables this binds, by a rule rather than a list
+
+> A table is a **partitioning candidate** if its row count grows with platform **activity** — one row per attempt, per event, per interaction. It is **not** if its row count is bounded by **business volume** — one row per invoice, per period, per subscription.
+
+| Table | Candidate | Why |
+|---|---|---|
+| `audit_events` | **yes** | one row per capability attempt, success and failure (ADR-034 item 4) |
+| `usage_ledger_entries` | **yes** | growth is metering frequency, not customer count |
+| `billing_payment_events` | **yes** | one row per provider interaction, and ADR-023 item 4's reconciliation sweep re-verifies `PENDING` intents repeatedly |
+| `subscription_state_transitions` | **yes** | one row per transition, and ADR-024 item 8's jobs run on a schedule |
+| `invoices`, `invoice_lines` | no | ADR-048's ruling puts the volume on the record: *"thousands of invoices per year — not thousands per minute"* |
+| `subscription_periods` | no | one row per subscription per period, bounded by ADR-010's ≤5,000 organizations |
+| `outbox_events`, `outbox_event_deliveries` | no, **and unbounded** | short-lived by nature, but nothing states when a delivered event may be removed. Not partitioned and **not bounded either** — owed to Phase 2 item 14 |
+
+**This narrows the four-table list this ADR itself named, and the reason belongs on the record:** `invoice_lines` was grouped with the ledgers by **shape** (append-only), and **ADR-048's volume statement — written after this ADR — is the fact that separates them by growth.** Shape and growth rate are different properties, and only the second one is what partitioning addresses.
+
+#### Part 3 — What "partition-compatible" obliges
+
+Three rules, binding on the creating migrations of Phase 2 items 4, 5, 9 and 12. Each is cheap because each is a thing **not** done.
+
+1. **Every candidate table carries an immutable `timestamptz NOT NULL` event column** — the column a future partition key would use. Append-only tables have one anyway; this makes it a requirement rather than a coincidence.
+2. **No table may declare a foreign key referencing a candidate table.** PostgreSQL requires an FK's referenced columns to be covered by a unique constraint, and on a partitioned table every unique constraint must include the partition key — so an FK on `id` alone is exactly what a later conversion cannot keep. **Verified 2026-09-03 that none exists today**, statically across every `.sql` migration and live against `pg_constraint`: zero rows reference `audit_events`. This rule keeps it that way.
+3. **No uniqueness requirement on a candidate table may depend on a constraint that excludes the event column.**
+
+**Rule 3 has one foreseeable collision, and it is named here rather than left to be discovered — but it is conditional, not certain, and the difference matters.** ADR-023 item 4 requires that *"an intent may never be verified twice into two ledger entries"*, with a verification box reading *"double verification produces exactly one ledger entry"*. Phase 2 item 12 owns it (*"payment intent, verify, and the reconciliation sweep job"*).
+
+**Whether this collides depends on how item 12 enforces it.** A unique index on `billing_payment_events` that excludes the event column would permanently exclude that table from partitioning. But **ADR-023 item 4 does not ask for one** — its own first sub-bullet says *"the sweep is idempotent through ADR-009"*, and ADR-009's uniqueness lives on `idempotency_records`, not on the events table. A status transition on `billing_payment_intents` would also satisfy it without touching the events table.
+
+**So the likely outcome is no collision at all.** If item 12 nevertheless chooses a unique index on `billing_payment_events`, that is acceptable — and it must then **record the resulting permanent exclusion in this ADR** rather than silently create the conflict. Either outcome is fine; discovering it during a conversion is not.
+
+**`id uuid PRIMARY KEY` stays as it is** on `audit_events` and on the new tables. Uniqueness is kept while it is free; Q0's finding that partitioning surrenders it is a known price of the future conversion, recorded and not paid today.
+
+#### Part 4 — The revisit trigger, made observable
+
+Option 4's weakness was a trigger on a metric nobody would measure. These need no new tooling:
+
+- **any candidate table passing 50 million rows** (`SELECT count(*)`) or a total relation size passing **50 GB** (`pg_total_relation_size`)
+- **object storage landing** — R-025 closing — which is when detach-and-archive becomes possible and therefore when partitioning first pays for itself
+
+Whichever comes first reopens this ADR. **Both numbers are choices, not derivations**, and what they are for is the point: large enough that reaching one is a real event, small enough that the conversion is still a weekend rather than an incident.
+
+#### Part 5 — The precondition, recorded so a later session inherits the answer
+
+If this ADR is reopened and partitioning adopted, **R-042 becomes live on the first partitioning migration.** What was proved on 2026-09-03:
+
+- a parent-only `ENABLE`/`FORCE`/`USING` policy **does not protect a partition**; direct access to the partition bypasses it entirely
+- `001_roles.sql`'s `ALTER DEFAULT PRIVILEGES … IN SCHEMA public` grants `nexora_app` full DML on **every** table created there — a partition included — automatically, with no `GRANT` in any migration. **Re-confirmed on the live database 2026-09-03**: a table created in `public` with no explicit grant shows `DELETE, INSERT, SELECT, UPDATE` for `nexora_app`, and `pg_default_acl` carries exactly one entry, `{nexora_app=arwd/nexora_migrate}` scoped to `public`. (A test run in a *different* schema shows nothing, because the default privilege is schema-scoped — worth knowing before concluding the finding does not reproduce.)
+- the proven mitigation is `REVOKE ALL ON <partition> FROM nexora_app`, which leaves access **through the parent** untouched
+
+**Three candidate shapes, and a preference. This is guidance for a future decision and explicitly not a ruling** — nothing is partitioned, so there is nothing to rule on.
+
+| Shape | Failure direction |
+|---|---|
+| **A. Revoke on each partition** | forgetting is **silent** — a month-wide cross-tenant hole with nothing red |
+| **B. Give each partition its own RLS + FORCE + policy** | forgetting is **loud** — `schema-live.ts` already enumerates every partition (Q4, decided at its line 41), so a partition without RLS fails `npm run conformance` with no new rule needed |
+| **C. Stop `ALTER DEFAULT PRIVILEGES` granting on new tables, grant explicitly per table** | loud, but changes the grant model for every table in the platform to solve a partition-specific problem |
+
+**Preference: B as the primary guarantee, with A alongside it as depth. C is rejected** for blast radius, and because B already supplies the loud-failure property C was wanted for.
+
+**One thing B still owes verification on, recorded rather than assumed:** whether a policy on a partition and a policy on the parent are **both** applied when a row is reached through the parent, and whether that changes any result. Session 9 did not test it and neither did this one. It is owed to whoever reopens this ADR.
+
+**This is no longer only prose.** `npm run check:partitions` (`tools/schema/check-partition-isolation.ts`, in CI from 2026-09-03) fails the build if any relation with `relispartition = true` lacks its own `relrowsecurity`/`relforcerowsecurity`, lacks a `pg_policies` row of its own, or is directly reachable by the app role — Shape B plus Shape A, enforced. It matches nothing today and is therefore free; it fires on the first partitioning migration, before the merge.
+
+#### Part 6 — Retention windows, which ADR-020 owes and which are independent of all of the above
+
+ADR-020 rule 4 commits to retaining financial records *"per the legal retention window"* and never says what it is, which makes any archival job unimplementable. This ruling closes that gap whether or not anything is ever partitioned.
+
+| Class | Tables | Window | Source |
+|---|---|---|---|
+| Financial and tax | `invoices`, `invoice_lines`, `billing_payment_events`, `usage_ledger_entries`, `subscription_periods`, `subscription_state_transitions` | **10 years** from the end of the fiscal year the record belongs to | ماده ۱۳ قانون تجارت ایران — commercial books and their supporting documents kept at least ten years |
+| Security and audit | `audit_events` | **2 years**, then archived, never dropped | operational, not legal — recorded as a choice, not a derivation |
+| Never removed | audit events recording a deletion | indefinite | ADR-020 rule 5, verbatim: *"Audit events recording the deletion itself are never purged."* |
+
+**Epistemic status, in the house style this ADR and ADR-048 both established: the ten-year figure is the commonly cited reading of ماده ۱۳ قانون تجارت and was NOT verified against the primary published text in this pass.** It is recorded with that marker rather than presented as settled. Nothing in Parts 1–5 depends on the number.
+
+**No job implements any of this, and none can until R-025 closes.** These windows are a **target for a future archival job, not a behaviour of the system today.** A reader must not be able to mistake a recorded window for an enforced one: nothing is archived, nothing is deleted, and every one of these tables still grows without bound.
+
+#### Part 7 — What this ruling does not do
+
+- **it creates, alters and partitions no table, and writes no migration**
+- **it does not change `001_roles.sql`**
+- it does not authorise deleting anything ADR-020 excludes from purge
+- **it does not close R-042**, which describes a real property of PostgreSQL and of this project's grants that stays true whether or not anything is ever partitioned. R-042 is now *guarded* by the check above, which is a different thing from resolved
+- it does not reduce the growth **R-030** records. Growth is now **owned and bounded by a stated trigger**; it is **not reduced**, because nothing is archived and nothing is deleted
+
 ### Verification
 
-- [x] the four PostgreSQL semantics questions above are answered empirically against PostgreSQL 17, and the answers recorded, **before** any partitioning migration is written — done 2026-09-03 against PostgreSQL 17.5; transcripts above
-- [ ] `tools/conformance/rules/schema-live.ts` is confirmed to enumerate partitions and parents as intended, with a deliberately failing fixture proving it still detects a partition missing RLS, FORCE or a policy (ADR-030's own standard) — **half met:** what it enumerates is now established from the Q4 transcript (parent and every partition, all as `BASE TABLE`, decided at `schema-live.ts:41`), but **no fixture was written**, so the ADR-030 standard is not satisfied and this stays unticked
-- [ ] a cross-tenant read against a partitioned tenant-owned table returns zero rows with no tenant context, and zero rows from a wrong tenant's context — proven live, not inferred. **Proven live and FAILED for direct partition access** (Q1/Q2): zero via the parent, two rows via the partition. **This item is also insufficient as worded** — it is satisfied by testing the parent alone, which is precisely the test that would have missed this. It needs a companion item naming the partition as the target
-- [ ] no `exceptions.json` entry is added to make the harness green over a partitioning change
-- [ ] whichever option is chosen, the decision is recorded before the first Phase 2 ledger table's creating migration merges
+**Rewritten 2026-09-03. The original list is preserved verbatim below it, because one of its items was not merely unmet — it was *defective*, and deleting it would erase the evidence of how.**
 
----
+- [x] the four PostgreSQL semantics questions above are answered empirically against PostgreSQL 17, and the answers recorded, **before** any partitioning migration is written — done 2026-09-03 against PostgreSQL 17.5; transcripts above
+- [x] a check exists that fails on a partition lacking its own RLS, FORCE, policy, or holding a direct grant to the application role, **with a deliberately failing fixture proving it fails first** (ADR-030's own standard) — `npm run check:partitions`, `tools/schema/check-partition-isolation.ts`, fixture in `tools/schema/partition-isolation.spec.ts`, in CI from 2026-09-03. The fixture was run and observed red before the remedy and green after
+- [x] the ruling is recorded before the first Phase 2 append-only table's creating migration merges — done 2026-09-03, ahead of Phase 2 item 4
+- [ ] **a cross-tenant read and write addressed DIRECTLY AT A PARTITION** — not at the parent — returns zero rows and is refused, proven live against a real partitioned table. **Unmet and cannot be met today: nothing is partitioned.** Owed to the first partitioning migration
+- [ ] `nexora_app` holds no direct privilege on any partition, proven live against a real partitioned table. **Unmet for the same reason**; `check:partitions` enforces it the moment one exists
+- [ ] whether a policy on a partition and a policy on the parent are **both** applied when a row is reached through the parent — Part 5's owed verification. Neither session tested it
+- [ ] no `exceptions.json` entry is added to make the harness green over a partitioning change — **standing, never tickable**, and the reason `check:partitions` was placed outside the harness where that route does not exist
+
+**Superseded 2026-09-03, kept because of what it got wrong.** Item 3 below asked for *"a cross-tenant read against a partitioned tenant-owned table"* — a phrasing **the parent alone satisfies**, and testing the parent alone is precisely the test that returns zero rows while the partition beside it returns two. **The list as written would have passed the very configuration R-042 records.** It is replaced by two items naming *the partition* as the target, and by one demanding the privilege check the original never mentioned.
+
+- ~~[ ] the four PostgreSQL semantics questions above are answered empirically against PostgreSQL 17, and the answers recorded, **before** any partitioning migration is written~~
+- ~~[ ] `tools/conformance/rules/schema-live.ts` is confirmed to enumerate partitions and parents as intended, with a deliberately failing fixture proving it still detects a partition missing RLS, FORCE or a policy (ADR-030's own standard)~~ — what it enumerates is now established (Q4); the fixture requirement moved to the new list and is met by `check:partitions` rather than by a change to `schema-live.ts`, which needs none
+- ~~[ ] a cross-tenant read against a partitioned tenant-owned table returns zero rows with no tenant context, and zero rows from a wrong tenant's context — proven live, not inferred~~ — **the defective item**
+- ~~[ ] no `exceptions.json` entry is added to make the harness green over a partitioning change~~ — carried forward unchanged
+- ~~[ ] whichever option is chosen, the decision is recorded before the first Phase 2 ledger table's creating migration merges~~ — met
+
 
 ## ADR-042 - Error Message Audience and Localization
 

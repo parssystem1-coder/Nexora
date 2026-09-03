@@ -87,6 +87,20 @@ jobs:
         if: always()
         run: npm run check:register
 
+      # ADR-041's ruling keeps the append-only tables partition-COMPATIBLE and
+      # does not partition them, so this matches nothing today and is free. It
+      # exists because Session 9 proved (2026-09-03) that a partition is NOT
+      # protected by its parent's RLS policy, and that 001_roles.sql's ALTER
+      # DEFAULT PRIVILEGES hands nexora_app full DML on every partition in
+      # public automatically - so a partitioning migration that looks exactly
+      # like the correct audit_events migration opens a cross-tenant hole.
+      # Outside the conformance harness deliberately: exceptions.json is applied
+      # generically to every rule, and an entry silencing this one would silence
+      # a real cross-tenant hole. See the tool's doc comment.
+      - name: Partition tenant-isolation tripwire (ADR-041, R-042)
+        if: always()
+        run: npm run check:partitions
+
       - name: Project graph up to date
         if: always()
         run: npm run graph -- --check

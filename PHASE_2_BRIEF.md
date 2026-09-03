@@ -257,6 +257,20 @@ Every table in §4 marked tenant-owned carries `tenant_id` and an RLS policy **i
 
 **Every ledger-shaped table in §4 owes `REVOKE UPDATE, DELETE` in its own creating migration:** `subscription_periods`, `subscription_state_transitions`, `usage_ledger_entries`, `billing_payment_events`, `invoices`, `invoice_lines`, `outbox_events`. A comment asserting append-only is not append-only — the Phase 1 repair that produced this pattern exists precisely because the original `audit_events` migration said so only in prose.
 
+**Amendment, 2026-09-03 (third to this file) — ADR-041 is ruled, and it binds these tables' creating migrations without adding one.**
+
+ADR-041 (`ACCEPTED (was OPEN)`, 2026-09-03) ruled a **fifth** option: **keep the append-only tables partition-*compatible*, and do not partition them.** Nothing is partitioned, no `audit_events` conversion is performed, and no partition machinery is built — but three obligations bind the creating migrations of **items 4, 5, 9 and 12**, and each is cheap because each is a thing *not* done:
+
+1. **Every candidate table carries an immutable `timestamptz NOT NULL` event column** — the column a future partition key would use. These tables have one anyway; this makes it a requirement rather than a coincidence.
+2. **No table may declare a foreign key referencing a candidate table.** A partitioned table's every unique constraint must include the partition key, so an FK on `id` alone is exactly what a later conversion cannot keep. Verified 2026-09-03 that none exists today, statically and against `pg_constraint`.
+3. **No uniqueness requirement on a candidate table may depend on a constraint that excludes the event column.** **Item 12 must read this one before choosing how to satisfy ADR-023 item 4's *"an intent may never be verified twice into two ledger entries"*:** a unique index on `billing_payment_events` excluding the event column would permanently exclude that table from partitioning. ADR-023 item 4 does not ask for one — its own sub-bullet routes idempotency through ADR-009, whose uniqueness lives on `idempotency_records` — so the likely outcome is no conflict. If item 12 chooses otherwise, it records the resulting permanent exclusion in ADR-041 rather than creating it silently.
+
+**The candidates are `audit_events`, `usage_ledger_entries`, `billing_payment_events` and `subscription_state_transitions`** — a table whose row count grows with platform *activity*. **`invoices`, `invoice_lines` and `subscription_periods` are not**, being bounded by business volume; ADR-041's own four-table list included `invoice_lines` by shape, and ADR-048's *"thousands of invoices per year — not thousands per minute"* is what separates them by growth. `id uuid PRIMARY KEY` **stays** on all of them.
+
+**§4's table list gains no table from this amendment, and that is deliberate rather than an omission** — the ruling creates nothing. §4's scope list stands at 29 exactly as its 2026-09-03 amendment left it.
+
+**Enforced, not merely written:** `npm run check:partitions` (`tools/schema/check-partition-isolation.ts`, in CI) fails the build if any partition lacks its own RLS/FORCE/policy or is directly reachable by `nexora_app`. It matches nothing today and fires on the first partitioning migration — see `RISK_REGISTER.md` **R-042** for why a partition is not protected by its parent.
+
 ### Idempotency
 
 - Exactly one platform mechanism, owned by the `idempotency` module (item 3). No module invents its own — `AGENTS.md` §4, ADR-009; a module-local idempotency table is already a live-DB conformance violation (`SCHEMA-DUPLICATE-IDEMPOTENCY-TABLE`).

@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "conformance": "tsx --env-file-if-exists=.env tools/conformance/run.ts",
     "check:register": "tsx tools/register/check-register.ts",
+    "check:partitions": "tsx --env-file-if-exists=.env tools/schema/check-partition-isolation.ts",
     "graph": "tsx tools/graph/extract.ts",
     "openapi": "tsx tools/openapi/generate.ts",
     "test": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run",
