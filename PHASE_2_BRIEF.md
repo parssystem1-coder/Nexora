@@ -182,6 +182,7 @@ Both additions were **owed** rather than discovered. ADR-048 and ADR-050 were ru
 | `invoices` | billing | tenant-owned | references exact `plan_version` and `price_version` | 13 |
 | `invoice_lines` | billing | tenant-owned | invoice line items | 13 |
 | `billing_refunds` | billing | tenant-owned | refund records | 13 |
+| `tax_rates` | billing | **platform-global** | ADR-055's dated VAT rate history — rate in basis points, `effective_from`, actor, note; append-only, one row per rate period | 13 |
 | `invoice_number_counter` | billing | **platform-global** | the single counter row ADR-048's gap-free allocation locks inside the issuing transaction | 13 |
 | `outbox_events` | eventing | tenant-owned | domain events for out-of-request delivery | 14 |
 | `outbox_event_deliveries` | eventing | tenant-owned | ADR-050's delivery state — one row per attempt, keeping `outbox_events` strictly append-only | 14 |
@@ -189,7 +190,7 @@ Both additions were **owed** rather than discovered. ADR-048 and ADR-050 were ru
 | `notifications` | notification | tenant-owned | lifecycle notifications | 17 |
 | `notification_deliveries` | notification | tenant-owned | per-channel delivery attempts | 17 |
 
-**29 tables. Not sixty.** Phase 1 built 14 in 20 migrations. ~~27 tables~~ — superseded by the 2026-09-03 amendment above, which adds ADR-048's invoice-number counter and ADR-050's delivery table.
+**30 tables. Not sixty.** Phase 1 built 14 in 20 migrations. ~~27 tables~~ ~~29 tables~~ — superseded twice on 2026-09-03: first by the amendment above (ADR-048's invoice-number counter and ADR-050's delivery table), then by §9.10's (ADR-055's `tax_rates`).
 
 **On the five entitlement/quota tables** (D2-14): `04` §2.4 names three — `entitlements`, `entitlement_sources`, `quota_policies`. The split into five is deliberate and is not a departure from `04`, which describes itself as a "conceptual schema and ownership baseline" whose "exact columns are finalized per module during its slice." Splitting one conceptual table into a platform-global and a tenant-owned physical table is that finalization. **Table names above are indicative; the split itself is binding.**
 
@@ -220,6 +221,7 @@ Every table in §4 marked tenant-owned carries `tenant_id` and an RLS policy **i
 - **`billing_provider_configs`** — no tenant to scope to; ADR-023 item 7 requires the platform's billing credentials never be resolvable from a store-scoped context. Exempt from `tenant_id`, not thereby less protected — see the credentials rule below.
 - **`scheduled_job_runs`** — operational record of the platform, not of any tenant; a sweep job's bookkeeping cannot be constrained by a tenant context it runs outside of.
 - **`invoice_number_counter`** (added 2026-09-03 by §4's amendment) — **the invoice series belongs to the platform as issuer, not to any tenant.** ADR-048 ruled the numbering global rather than per-tenant on exactly that ground: the issuer of these invoices is one legal entity, and a seller keeps one book, not one book per subscriber. A counter scoped to a tenant would be a different decision, not a safer version of this one. It holds no tenant data — a single integer and its lock — so there is nothing for a tenant predicate to protect, and giving it a `tenant_id` would misdescribe what it is.
+- **`tax_rates`** (added 2026-09-03 by §9.10) — **a VAT rate is set by a tax authority, not by a tenant.** Every organization buying a subscription from this platform is charged under the same published rate, so there is no tenant to scope the row to and a `tenant_id` would assert a per-tenant rate that does not exist. It holds no tenant data — a rate, a date and an actor — so there is nothing for a tenant predicate to protect. ADR-055 part 5 records why it is a dated table rather than a settings value.
 
 **The entitlement and quota split is structural, not stylistic (D2-14).** Plan-derived and tenant-override rows live in separate tables and must not be merged into one table with a nullable `tenant_id`. The mechanism, because it is the part that will be forgotten: this codebase's RLS policies compare `tenant_id::text = current_setting('app.tenant_id', true)`. For a row whose `tenant_id` is `NULL` that comparison evaluates to `NULL` — neither true nor false — so the row is invisible to **every** caller, including its intended reader, and the failure is silent rather than loud. ADR-035 rejected the closely related nullable-`tenant_id` approach for `audit_events` on exactly this ground.
 
@@ -255,7 +257,7 @@ Every table in §4 marked tenant-owned carries `tenant_id` and an RLS policy **i
 
 `04` §1 requires audit and ledger records to be append-only, and Phase 1 established the enforcement pattern rather than leaving it to convention: `modules/audit/migrations/20260822100100_audit__enforce_append_only.sql` adds `REVOKE UPDATE, DELETE ON audit_events FROM nexora_app`, scoped to that one table. That migration's own comment predicted this phase: *"each ledger-shaped table Phase 2 adds — usage, payment — needs this same treatment in its own creating migration."*
 
-**Every ledger-shaped table in §4 owes `REVOKE UPDATE, DELETE` in its own creating migration:** `subscription_periods`, `subscription_state_transitions`, `usage_ledger_entries`, `billing_payment_events`, `invoices`, `invoice_lines`, `outbox_events`. A comment asserting append-only is not append-only — the Phase 1 repair that produced this pattern exists precisely because the original `audit_events` migration said so only in prose.
+**Every ledger-shaped table in §4 owes `REVOKE UPDATE, DELETE` in its own creating migration:** `subscription_periods`, `subscription_state_transitions`, `usage_ledger_entries`, `billing_payment_events`, `invoices`, `invoice_lines`, `outbox_events`. **`tax_rates` joins that list (2026-09-03, §9.10):** ADR-055 rules that a wrong rate is corrected by appending a superseding row, never by editing one, and a comment asserting that is not that — the same reasoning this paragraph already applies to every other table on the list. A comment asserting append-only is not append-only — the Phase 1 repair that produced this pattern exists precisely because the original `audit_events` migration said so only in prose.
 
 **Amendment, 2026-09-03 (third to this file) — ADR-041 is ruled, and it binds these tables' creating migrations without adding one.**
 
@@ -542,4 +544,21 @@ Phase 2.5 was created on 2026-09-03 as **Commercial Growth**, carrying discounts
 **What the new name fixes** is narrower than it looks and is worth stating precisely: nothing about the phase's scope, ordering, exclusions or deadlines changes here. The rename fixes **where a reader looks.** Someone searching for the platform's recovery story would not have opened a phase called `Commercial Growth`, and §9.8's own observation was that a phase whose name explains half its contents is a phase people look in the wrong place for.
 
 **Occurrences of the old name are not swept.** The two in §9.8 above and those in `decisions/2026-09.md` sit inside dated records, which say what was true when written; they are left alone deliberately, in the same convention this register-and-decision pack applies everywhere else. Only the live enumeration in `06_IMPLEMENTATION_PLAN.md` and the status line in `CLAUDE.md` were changed.
+
+### 9.10 Amendment, 2026-09-03 (fourth to this file) — ADR-055's tax rulings, and the `tax_rates` table
+
+**ADR-055 (`Tax on a Subscription Purchase`, ACCEPTED 2026-09-03) binds the creating migrations of items 12 and 13.** It is recorded here rather than only in the ADR because one of its consequences adds a table, and §4's list is this file's to amend — the fence ADR-048 and ADR-050 both observed and ADR-055 observes too.
+
+**§4 gains one table: `tax_rates`, platform-global, item 13. 29 → 30.** Its §5 RLS-exemption reason and its place on the append-only `REVOKE` list are both recorded above. Names are indicative; membership of §4's list is binding.
+
+**Two constraints on item 13's `invoices` migration, and they cannot be deferred to a later slice.** `invoices` is on §5's `REVOKE UPDATE, DELETE` list, so **a column can be added to it later but the rows already in it can never be filled in.** An invoice issued without a tax breakdown is permanently an invoice without one.
+
+1. **Four `NOT NULL` columns, created with the table:** `subtotal_minor` (`bigint`), `tax_rate_bp` (`integer`, basis points — an integer because ADR-022 item 2 forbids floating point on monetary columns and a rate carries the same hazard), `tax_amount_minor` (`bigint`), `total_minor` (`bigint`), with currency alongside per ADR-022 item 8. **A zero rate is `0`, never `NULL`** — on a table nothing may `UPDATE`, the ambiguity between "zero" and "not computed" would be permanent.
+2. **Tax is a header figure, not an invoice line.** ADR-044's ruling requires every line to carry its own denormalized description, and a tax line's description would be a computed artifact rather than a description of anything sold.
+
+**One constraint on item 12, and it is the one that fails loudly if missed.** **`billing_payment_intents.amount_minor` is the GROSS, tax-inclusive amount** — the figure the gateway is actually charged. ADR-023 item 2 persists the intent before the redirect and item 5 compares the provider-reported amount against it, calling a mismatch *"a hard failure and a security event, never an auto-accept."* **Persisting the net amount there makes every verification fail as a security event, on every purchase.** `04_DATABASE_BLUEPRINT.md` §2.5 lists that column without saying which figure it holds; ADR-055 says which.
+
+**And one on §5's Money rules, which this amendment extends rather than replaces:** **the published price in `price_versions` is net — tax is added at checkout.** No `tax_inclusive` flag is added; net is universal here and a flag would be a configuration point with exactly one value. The interface obligations that make this honest to a buyer — stating that tax will be added wherever a price is shown, and showing subtotal/rate/tax/total **before** the redirect — are ADR-055 part 1's and are not optional.
+
+**Not settled here, and named so it is owned rather than missed:** tax on a **mid-term plan change** (item 15's `plan.change.preview` returns `unusedCredit`, `newCharge` and `amountDue`, and whether those are net or gross is owed to that item), tax on a **refund or credit note**, and the buyer's own **tax identity**. ADR-055 fences all three.
 

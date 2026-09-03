@@ -88,6 +88,7 @@ For each ADR, completion requires:
 | ADR-052 | Self-Serve Trial: Eligibility, Entry Point and Duration | Billing / Lifecycle | **ACCEPTED (new)** | **Phase 2 items 1 and 2 — their creating migrations**, because trial eligibility and duration are plan-version columns and migrations are forward-only; then item 4 |
 | ADR-053 | Session Retention and Purge | Identity / Data | **ACCEPTED (new)** | nothing today; `session.purge` is owed to Phase 2 item 12, which does not currently schedule it |
 | ADR-054 | Per-Tenant Recovery from Nightly Snapshots | Compliance / Ops | **ACCEPTED (new)** | nothing in Phase 2; Phase 2.5 builds it, and **object storage (R-025) is a hard prerequisite** — amended 2026-09-03 (sessions on restore) |
+| ADR-055 | Tax on a Subscription Purchase | Billing / Money | **ACCEPTED (new)** | **Phase 2 items 12 and 13 — their creating migrations.** Item 12: `billing_payment_intents.amount_minor` is GROSS, or every ADR-023 item 5 verification fails as a security event. Item 13: four NOT NULL tax columns on `invoices`, which is append-only and cannot be backfilled |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -909,6 +910,36 @@ type Money = {
 
 8. **Ledger integrity.** Every ledger and invoice row stores currency alongside amount. A balance is only ever computed per currency.
 
+### Amendment, 2026-09-03 — `IRR` is the currency, Toman is a display unit, and machine-readable output carries neither interchangeably
+
+**Ruled by the maintainer on 2026-09-03.** Item 4 above already states the principle — *"Display is not storage… The presentation unit, its divisor and its symbol live in the currency configuration and are applied only in the interface layer"* — and is not restated here. This amendment makes it **specific to the platform's home market**, and adds the one case item 4 does not cover.
+
+**Most of what follows was already true before it was ruled, and saying so is the point.** Phase 1's `currencies` table (`20260822110000_money__create_currencies.sql`) already seeds `IRR` with `minor_units = 0`, `presentation_code = 'IRT'`, `presentation_divisor = 10` and `presentation_symbol = 'تومان'`, and its own comment already says *"amounts are stored in rial and shown in toman, a factor of 10 that must never appear as a literal in code."* Items 9, 10 and 12 below are therefore **a confirmation being made normative, not a change of behaviour.** Items 11 and 13 are genuinely new.
+
+**9. The platform's currency is `IRR`.** Every stored `amountMinor` is Rials; `minorUnits` is `0`, exactly as item 7's own example already shows.
+
+**10. The presentation unit is Toman, divisor 10, symbol تومان** — in the currency configuration, in one place, per item 4's existing verification bullet. **Verified 2026-09-03 that this is enforced structurally rather than by convention:** the `Currency` domain entity carries only `code`, `name` and `minorUnits`, and `CurrencyRepositoryPg` selects only `code, name, minor_units` — **the presentation columns are never read by any code path that exists today.** Domain and application code cannot reach a presentation unit even by accident, which is what item 4 asks for and what a comment alone would not deliver.
+
+**11. Machine-readable output carries the stored currency, never the display unit.** This is the case item 4 does not cover, and the reason this amendment was ruled rather than left implicit.
+
+Structured data for search engines (`schema.org` `Offer.price` and `priceCurrency`), Open Graph product tags, product feeds, and **every API response** emit **`IRR` and the Rial amount.**
+
+**The reasoning, because it is what makes this non-negotiable rather than a preference: "Toman" is not an ISO 4217 currency code.** There is no `IRT` in the standard — it is this platform's own presentation label, and the `currencies` table stores it as exactly that. A consumer receiving a Toman amount either rejects it as an unknown code or — far worse — **reads it as Rials and is wrong by a factor of ten, silently**, in a price a search engine then shows to a shopper. The failure has no error, no log line and no symptom until someone notices the number.
+
+This is Phase 4 territory (`04` §4's storefront read model, and `06` Phase 4's pages). It is recorded now so that **the first thing to emit structured data does not have to guess**, and so that guessing wrong is a contract violation rather than an oversight.
+
+**12. The divisor never crosses a boundary.** No API response, event payload, outbox record, database column or log line carries a Toman amount. Where a human-readable string is needed inside a message — a notification body, for instance — it is **rendered at the point of presentation from the Rial value**, never stored pre-rendered and never passed along as a number.
+
+**13. One deliberate exception, and it is the invoice document.** The UI shows Toman, because that is what an Iranian customer reads. **A rendered invoice is denominated in Rials**, because it is a financial document and its unit is the stored one — the same unit its `subtotal_minor`, `tax_amount_minor` and `total_minor` are in (ADR-055).
+
+**Recorded as an exception with its reason rather than left to be discovered**, because the inconsistency is real and visible: the same subscription shows one number in the account page and a number ten times larger on its invoice. Someone will eventually notice and "fix" it. **The correct direction is the invoice — the document whose figures must match the ledger — not the UI.**
+
+### Verification, added by this amendment
+
+- [ ] a test asserts that every structured-data block emits the **stored** currency code, and fails if a display unit reaches it
+- [ ] the presentation divisor still appears in exactly one place (item 4's existing bullet, now with a concrete value — 10, on `IRR` — to check it against)
+- [ ] a rendered invoice and the UI showing the same subscription differ by exactly the divisor, and the test names which of the two is in Rials
+
 ### Verification
 
 - [ ] schema test asserts no floating-point column holds money
@@ -971,6 +1002,8 @@ create PaymentIntent (persisted, our id, our amount, our currency)
    - it must handle: verified-paid, verified-failed, expired, and provider-unknown
    - `provider-unknown` after a bounded number of attempts escalates to a human queue, it does not silently fail
    - an intent may never be verified twice into two ledger entries
+
+> **Cross-reference, 2026-09-03:** ADR-055 rules that the persisted intent amount is the **gross, tax-inclusive** figure. A net amount here makes every verification below fail as a security event.
 
 5. **Amount and currency are ours, not the provider's.** Verify must compare the provider-reported amount and currency against the persisted intent. A mismatch is a hard failure and a security event, never an auto-accept.
 
@@ -2667,6 +2700,8 @@ The شماره منحصر به فرد مالیاتی required by سامانه م
 
 A nullable column reserved now and set by nothing is precisely the defect **ADR-046** was ruled to avoid — a permanent obligation on every reader of the table, enforced by nothing, for a capability no item delivers. The same argument that kept `deleted_at` out of twenty tables keeps this one out of `invoices`.
 
+**Cross-reference, 2026-09-03: ADR-055** adds the tax breakdown an invoice must carry, on the same append-only reasoning as this ADR's number and ADR-044's line description — three decisions, one principle.
+
 **Cross-reference ADR-044's ruling.** An invoice line must carry its own denormalized description text, captured at issuance, for the same reason an invoice carries its own number rather than a reference: an append-only financial record must be readable on its own years later, and must not change its wording when something it points at is renamed.
 
 **One obligation this ruling creates that this ADR cannot discharge.** Part 2's counter is **a table**, and `PHASE_2_BRIEF.md` §4's 27-table list — which describes itself as "the wall, not a suggestion" — does not contain it. This ADR's own recommendation above anticipated exactly this ("if B or C is chosen, add the required table to `PHASE_2_BRIEF.md` §4's list in the same ruling"). **That list is `AGENTS.md` §1 authority #2 and amending it is a scope decision belonging to `PHASE_2_BRIEF.md`, not to an ADR.** The counter is platform-global — one invoice book for one legal entity — so its §5 entry will also owe a stated RLS-exemption reason alongside the existing exemptions for `billing_provider_configs` and `scheduled_job_runs`. **Owed before item 13's migration; recorded in `decisions/2026-09.md` and not discharged here.**
@@ -3166,6 +3201,102 @@ That cost is accepted rather than overlooked, because the narrower alternative i
 - [ ] the 24-hour RPO is documented in tenant-facing terms (ADR-020 rule 7)
 - [ ] a **measured** RTO replaces this ADR's deliberate absence of one, after the first drill
 - [ ] snapshot retention tracks ADR-020 rule 3's waiting period rather than a hard-coded 30
+
+
+---
+
+## ADR-055 - Tax on a Subscription Purchase
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-03, depends on ADR-022, ADR-023 and ADR-048; **blocks the creating migrations of Phase 2 items 12 and 13**
+
+### Problem
+
+The platform sells a subscription to an Iranian organization and charges VAT on it, and **no document says how.** Not whether the published price includes tax, not what the payment gateway is asked to charge, not what an invoice records, and not where the rate lives.
+
+**Why this cannot wait for item 13's slice.** `PHASE_2_BRIEF.md` §5 puts `invoices` on the `REVOKE UPDATE, DELETE` list. **A column can be added to an append-only table later; the rows already in it can never be filled in.** An invoice issued without a tax breakdown is permanently an invoice without a tax breakdown — not a row awaiting a backfill. Migrations are forward-only besides (ADR-021 item 8), so the cheapest and only clean moment is before item 13's creating migration exists.
+
+### Decision
+
+Ruled by the maintainer on 2026-09-03.
+
+**1. The published price is net. Tax is added at checkout.**
+
+`price_versions` stores the amount the platform publishes, **excluding tax**. **No `tax_inclusive` flag is added** — net is universal here, and a flag would be a configuration point with exactly one value, which is the defect ADR-046's ruling describes for a column nothing varies. **Trigger to revisit: the platform selling into a jurisdiction that requires tax-inclusive display.**
+
+**Two obligations on the interface, stated here because otherwise this ruling reads as a licence to surprise the buyer:**
+
+- wherever a plan price is shown, it must **state that tax will be added.** A price presented bare that is not the price charged is misleading, and "the ADR said net" is not a defence to a customer.
+- the checkout step must show the **breakdown — subtotal, rate, tax, total — before the redirect**, not on the invoice afterwards.
+
+**2. The gateway is charged the gross amount. `billing_payment_intents` persists gross.**
+
+This is the part that breaks silently if it is got wrong, and it is not visible from either ADR alone.
+
+ADR-023 item 2 requires the `PaymentIntent` to be *"persisted, our id, our amount, our currency"* **before** the redirect. ADR-023 item 5 then requires verify to compare *"the provider-reported amount and currency against the persisted intent"*, and calls a mismatch *"a hard failure and a security event, never an auto-accept."*
+
+**So if the intent persists the net amount while the buyer is charged gross, every single verification fails — as a security event.** Not a rounding complaint: a hard failure on the happy path, on every purchase, escalating per ADR-023 item 4's `provider-unknown` handling into a human queue. **`billing_payment_intents.amount_minor` is the gross, tax-inclusive amount.** `04_DATABASE_BLUEPRINT.md` §2.5 lists that column without saying which it is; this ADR says which.
+
+**3. The invoice carries the arithmetic, not a reference to it.**
+
+`invoices` gains four columns, all `NOT NULL`, all created with the table by item 13:
+
+| Column | Type | Why it cannot wait |
+|---|---|---|
+| `subtotal_minor` | `bigint` | the net amount charged |
+| `tax_rate_bp` | `integer` — basis points, so 10% is `1000` | an integer, because ADR-022 item 2 forbids floating point on monetary columns and a rate carries the same hazard for the same reason |
+| `tax_amount_minor` | `bigint` | the computed tax |
+| `total_minor` | `bigint` | what was actually charged, and what the intent was for |
+
+Currency accompanies them, per ADR-022 item 8: *"Every ledger and invoice row stores currency alongside amount."*
+
+**A zero rate is `0`, never `NULL`.** A nullable rate cannot be distinguished from "not computed yet", and on a table nothing may ever `UPDATE` that ambiguity is permanent rather than temporary.
+
+**These are snapshots, and that is the whole point.** Because `UPDATE` and `DELETE` are revoked on `invoices`, an invoice's arithmetic can never be recomputed or corrected in place. **Every figure needed to reconstruct the charge must be on the row at insert time** — which is the same reasoning ADR-044's ruling applies to an invoice line's description and ADR-048's to its number. Three decisions, one principle: an issued financial document is self-contained or it is not trustworthy.
+
+**4. Tax is a header figure, not an invoice line.**
+
+Two reasons, and the first is not merely aesthetic. **ADR-044's ruling requires each line to carry its own denormalized description captured at issuance** — and a tax line's "description" would be a computed artifact, not a description of anything sold, so it would either be a fabricated string or a violation of that rule. Second, a single subscription carries **one** rate, so ADR-022 item 5's allocator has nothing to allocate across.
+
+**Trigger to revisit: the first document carrying more than one tax rate** — which is Phase 3 commerce, not Phase 2.
+
+**5. "Configurable" means a dated table, not a settings value.**
+
+The rate is configurable. The cheap reading of that — a row in a settings table, or an environment variable — is wrong, and the reasons are concrete rather than stylistic:
+
+- **Iran's VAT rate has actually changed within the platform's own planning horizon.** A single mutable value has no history, so *"what rate applied on the day this invoice was issued"* becomes unanswerable from the configuration. The invoice snapshot in part 3 answers it for one invoice; nothing would answer it for the platform.
+- A mutable value also carries **no record of who changed it and when** — the first question anyone asks after a wrong rate reaches a customer.
+
+**One new platform-global table, append-only**, one row per rate period: the rate in basis points, `effective_from` (`timestamptz`, per ADR-031 item 1), the actor, and a note. **Resolution rule: the row with the greatest `effective_from` that is not in the future.** A wrong rate is corrected by **appending a superseding row, never by editing one** — the discipline every other append-only table here already follows.
+
+Being platform-global it owes `PHASE_2_BRIEF.md` §5 **a stated RLS-exemption reason**, alongside `billing_provider_configs`, `scheduled_job_runs` and `invoice_number_counter`. It is added to §4's scope list by the same dated amendment that records this ADR — **an ADR may not amend that list itself**, the fence ADR-048 and ADR-050 both observed.
+
+**The redundancy is deliberate, and is named here because a reviewer will call it duplication.** The invoice snapshots the rate *and* the table records it. Those are different jobs: **the snapshot makes an issued invoice self-contained; the table makes the platform's rate history auditable.** Drop the snapshot and an invoice's meaning depends on a table that may have changed since; drop the table and the platform cannot say what it was charging last March. Losing either loses something the other does not supply.
+
+**6. Rounding is already ruled. This ADR points at it and does not re-rule it.**
+
+ADR-022 item 5 already says, verbatim: *"Proration (ADR-025) and tax must use the allocator, not independent rounding"*, and that *"every operation that can produce a fraction of a minor unit must declare its rounding mode. Default is half-up."* **Nothing here changes that.**
+
+The one thing it leaves to this ADR: **`IRR` has zero minor units** (`currencies` seeds it that way, and ADR-022 item 7's own example shows it), so tax on a net amount is a rounding **of whole Rials** — not of a sub-unit that later disappears. The mode must be declared at the one place tax is computed, and that place is item 13's.
+
+### What this ADR does not do
+
+- **Platform billing only.** A tenant's own store charging tax to *its* shoppers is Phase 3 commerce (`04` §3), an entirely separate subject with a different taxpayer, and this ADR does not touch it. Said explicitly because the two will otherwise be conflated by the first person who greps for "tax".
+- **Nothing is registered with سامانه مودیان.** ADR-048 part 5 already deferred the tax unique number with a named trigger; this ADR adds no column for it and does not reopen it. The *compliance* exposure that deferral leaves — the platform issuing invoices as a legal entity while registering none — is not an ADR question and is tracked as **R-043**.
+- **Tax on a refund or a credit note is not ruled here.** It belongs with the credit-note decision, which does not exist yet. `billing_refunds` is item 13's table and this ADR gives it no tax columns.
+- **The buyer's own tax identity — کد ملی، شناسه ملی، کد اقتصادی — is not ruled here.** Same reason. Both gaps are named so they are visibly owned rather than missed.
+- **Tax on a mid-term plan change is not ruled here, and this is the edge most likely to be hit first.** `05` §4.2's `plan.change.preview` returns `unusedCredit`, `newCharge` and `amountDue` as `MoneyDto`, and ADR-025 governs the proration. Whether those figures are net or gross, and where the breakdown appears in that response, is **owed to Phase 2 item 15** — which must read part 1's interface obligation and part 6's rounding rule together, because a prorated amount *and* a tax computation on the same figure are two roundings, and ADR-022 item 5 requires the allocator for both.
+- It creates no table, writes no migration and computes no tax.
+
+### Verification
+
+- [ ] a plan price shown anywhere states that tax will be added
+- [ ] checkout displays subtotal, rate, tax and total **before** the redirect
+- [ ] `billing_payment_intents.amount_minor` equals the invoice's `total_minor`, proven by a test that would fail if the net amount were persisted — the ADR-023 item 5 failure this ADR exists to prevent
+- [ ] an invoice row is self-contained: subtotal, rate, tax and total are all present and non-null, and the arithmetic reconciles
+- [ ] a zero-rate invoice stores `tax_rate_bp = 0`, and no code path writes `NULL`
+- [ ] the rate table resolves to the greatest `effective_from` not in the future, proven with a future-dated row present
+- [ ] a superseding rate does not alter any previously issued invoice
+- [ ] tax rounding is computed through ADR-022 item 5's allocator with a declared mode, proven against `IRR`'s zero minor units
 
 ## 3. Open Items Deliberately Left Open
 
