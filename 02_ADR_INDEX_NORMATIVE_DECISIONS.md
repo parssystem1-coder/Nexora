@@ -91,6 +91,7 @@ For each ADR, completion requires:
 | ADR-055 | Tax on a Subscription Purchase | Billing / Money | **ACCEPTED (new)** | **Phase 2 items 12 and 13 — their creating migrations.** Item 12: `billing_payment_intents.amount_minor` is GROSS, or every ADR-023 item 5 verification fails as a security event. Item 13: four NOT NULL tax columns on `invoices`, which is append-only and cannot be backfilled |
 | ADR-056 | Correction Documents: Credit Notes and the Shape `invoices` Must Carry | Billing / Money | **ACCEPTED (new)** | **Phase 2 item 13's creating migration** — `document_type NOT NULL` must exist at creation because every issued row would need `INVOICE` backfilled. No credit note is issuable in Phase 2 |
 | ADR-057 | The Buyer's Legal Identity on an Invoice | Billing / Compliance | **ACCEPTED (new)** | **Phase 2 item 13's creating migration** (snapshot columns) and **a new capability owed to `PHASE_2_BRIEF.md` §3**, discharged by its 2026-09-03 amendment. Removes one R-043 blocker; closes none |
+| ADR-058 | Automatic Renewal by Direct Debit: Not in V1 | Billing / Lifecycle | **ACCEPTED (new)** | nothing — it forecloses nothing and creates no table. `supportsDirectDebit` stays in the port and stays false; ADR-023 item 1's startup check does the enforcing |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -1023,6 +1024,77 @@ create PaymentIntent (persisted, our id, our amount, our currency)
 
 Adding a gateway must require exactly: one adapter implementing the port, one capability declaration, one credential schema, one fixture-based test suite, and one configuration entry. **Zero changes to Application, Domain, or any other adapter.** If a new gateway requires touching application code, the port is wrong and must be corrected by ADR.
 
+### Amendment, 2026-09-03 — the unit a provider speaks is declared, and what must be established about a gateway before its adapter exists
+
+**Ruled by the maintainer on 2026-09-03.** Two additions. Neither changes any of items 1–10 above; both make explicit something the port left to whoever wrote the first adapter.
+
+#### A. The wire unit, and why guessing it is a security event either way
+
+**Iranian gateways are split on whether an amount is denominated in Rials or in Tomans**, and some take a currency parameter that changes the meaning of the same number. ADR-022's 2026-09-03 amendment makes `IRR` the stored currency at zero minor units, so **the stored amount is Rials, always** — and nothing above says what crosses the wire.
+
+The two ways to get it wrong are not symmetric, and that is the point:
+
+- **Send Tomans while the intent holds Rials, and convert nothing on the way back.** Item 5's comparison fails on every successful payment. Loud, immediate, and it raises a security event for a transaction that was in fact correct.
+- **Convert on the way out but not on the way back — or convert both ways with the wrong factor.** The comparison compares equal and passes. **Silent, and it takes real money**, tenfold in either direction.
+
+The second is the one this amendment exists for. A test suite that only checks "verify succeeds" cannot see it.
+
+**The ruling:**
+
+1. **`PaymentProviderCapabilities` gains a declared wire unit** — the divisor between the stored minor unit and the unit the provider's protocol carries. `1` for a Rial-denominated gateway, `10` for a Toman-denominated one. **Named for the wire, not for display:** ADR-022 item 4's presentation divisor is a different number with a different consumer, and the whole reason to name this one carefully is that the two are both `10` for `IRR` and would be indistinguishable at a call site. **They must never be read from each other.**
+2. **The conversion happens in exactly one place: the adapter.** The port's own interface speaks `Money` in stored units only. Application and Domain never see a provider unit — the same fence item 9 already draws around provider SDKs, URLs and field names.
+3. **Verify compares in stored units.** The adapter converts the provider-reported amount back before returning it, so item 5's comparison is always Rial against Rial.
+4. **The divisor is never a literal in business code**, matching ADR-022 item 4's rule for its own factor.
+
+**Enforcement, because a rule with no test is a comment.** This ADR's verification list already requires *"adapter contract test suite runs against fixtures with no network."* It gains one assertion, and it is the one that catches the silent failure:
+
+> **Unit round-trip.** Given a `Money` of N Rials, the adapter's outgoing payload carries the value the declared divisor implies, **and** a provider response echoing that same value verifies back to exactly N Rials.
+
+Written once, run by every adapter. **A new adapter that gets the unit wrong fails on the shared suite rather than in production**, which is what item 9's testability requirement is for.
+
+**Epistemic status, in the house style ADR-041 and ADR-048 established: the claim that Iranian gateways differ on Rial versus Toman is drawn from general market knowledge and was NOT verified against any vendor's primary documentation.** It is recorded with that marker deliberately, and it does not weaken the ruling — **a port that declares its unit is correct whether or not any particular gateway is Toman-denominated.** It is precisely because the answer varies by vendor, and cannot be settled once for all of them, that the declaration exists rather than a constant.
+
+#### A4. A Toman-denominated gateway cannot charge every Rial amount
+
+A Toman-denominated provider takes whole Tomans, so **only amounts that are a multiple of 10 Rials are representable.** With ADR-055 in force the amount sent to the gateway is the **gross** figure — subtotal plus a percentage — and a percentage of a round number is routinely not a round number. **This is the normal case, not an edge case.**
+
+**It must not be resolved by rounding inside the adapter.** Silently altering an amount between the invoice and the charge is what ADR-022 exists to prevent, and it would break item 5's comparison by design — the adapter would be reporting a number the intent never held.
+
+**The ruling, and only the half that belongs to this ADR:**
+
+> **`PaymentProviderCapabilities` gains a declared charging granularity** — the smallest increment of stored minor units the provider can actually charge. `1` for a Rial gateway, `10` for a Toman gateway.
+>
+> **An amount that is not representable at the declared granularity, arriving at the adapter, is a hard failure.** Not a rounding, not a nearest-value substitution. If it reaches the adapter the port was used wrong, and the failure belongs at that boundary where it is attributable.
+
+**The other half — how the amount comes to land on the granularity in the first place — is tax arithmetic and belongs to ADR-055**, which carries it as its own dated amendment of the same date. Recorded in two places on purpose: the granularity is a **provider property** and the rounding is a **tax computation**, and putting both here because they were discovered together would couple ADR-055's arithmetic to this ADR's port.
+
+**One gap this exposes and does not close.** The checklist below asks for a provider's **minimum** transaction amount, and `PaymentProviderCapabilities` declares `maxAmountMinor` with no counterpart. That is noted rather than fixed: adding a field is cheap, and inventing one before an adapter needs it is the speculative shape `AGENTS.md` §4 warns against. **The first adapter whose provider has a minimum adds it.**
+
+#### C. The profile this ADR is titled for is a checklist, not a list of vendors
+
+This ADR is titled *"…and Iranian PSP Profile"* and profiles no PSP. That is corrected here — **and deliberately not by naming vendors.**
+
+**The reason is this ADR's own *Adding a new provider* section**, which requires a gateway to cost *"one adapter, one capability declaration, one credential schema, one fixture-based test suite, and one configuration entry"* with **"Zero changes to Application, Domain, or any other adapter."** A list of vendors inside an ADR is a list that goes stale, invites code written against it, and is exactly the coupling the port exists to prevent. **The ADR owns the questions; the adapter owns the answers.**
+
+**What must be established, from that vendor's own then-current primary documentation, before its adapter is written:**
+
+| Must be established | Why it is on the list |
+|---|---|
+| the wire unit — Rials or Tomans — and whether a currency parameter changes it | part A; the tenfold error, in its silent form |
+| the charging granularity | part A4; whether every gross amount is representable at all |
+| minimum and maximum amount per transaction | `maxAmountMinor` is declared above and never populated; there is no minimum field yet |
+| whether verify-by-reference exists, and whether it is idempotent under repeat calls | item 4's reconciliation sweep depends on it entirely, and sweeps repeat by construction |
+| whether a webhook exists, and whether it is authenticated | item 3 treats a callback as a hint regardless, but the answer changes the sweep's tuning |
+| refund support: full, partial, or none | item 10 requires a manual path with audit where it is absent |
+| settlement delay | `settlementDelayHours` is declared above and never populated |
+| the credential shape, and whether rotation invalidates history | item 8 forbids rotation from invalidating historical payment records |
+| whether a sandbox exists | this ADR requires fixture tests with no network, and fixtures have to be recorded from somewhere |
+| the mandate model | **only if** direct debit is ever reopened — ADR-058 rules it out of V1 |
+
+**Rule: each vendor's values are established when its adapter is written, from that vendor's own then-current documentation, and are recorded in the adapter's configuration and its fixture suite — never in this ADR.** A value written here would be a value nobody re-checks.
+
+**`RISK_REGISTER.md` R-015** records that provider selection has no settled phase and that *"modeling a first adapter's fixtures still means choosing"* a provider. This checklist is what that choice has to answer; it does not make the choice.
+
 ### Verification
 
 - [ ] adapter contract test suite runs against fixtures with no network
@@ -1085,6 +1157,8 @@ CANCELED -> terminal
 ```
 
 Any other transition is a domain error. Transitions are recorded in an append-only transition log with actor and reason.
+
+> **Cross-reference, 2026-09-03:** the lifecycle below is now the **only** branch by ruling rather than by omission — **ADR-058** rules direct debit out of V1, with ADR-037's deferral as the blocking reason and four named reopening conditions.
 
 4. **Renewal lifecycle, designed for gateways without recurring charge** (ADR-023 item 6):
 
@@ -3291,6 +3365,37 @@ The one thing it leaves to this ADR: **`IRR` has zero minor units** (`currencies
 - **Tax on a mid-term plan change is not ruled here, and this is the edge most likely to be hit first.** `05` §4.2's `plan.change.preview` returns `unusedCredit`, `newCharge` and `amountDue` as `MoneyDto`, and ADR-025 governs the proration. Whether those figures are net or gross, and where the breakdown appears in that response, is **owed to Phase 2 item 15** — which must read part 1's interface obligation and part 6's rounding rule together, because a prorated amount *and* a tax computation on the same figure are two roundings, and ADR-022 item 5 requires the allocator for both.
 - It creates no table, writes no migration and computes no tax.
 
+### Amendment, 2026-09-03 (second this date) — the gross total must land on the provider's charging granularity, and it is the tax that absorbs it
+
+**Ruled by the maintainer on 2026-09-03**, as the tax half of a consequence discovered with ADR-023's wire-unit amendment of the same date. **The provider half — the declared charging granularity — lives in ADR-023 and is not restated here.** Two homes on purpose: granularity is a provider property, rounding is tax arithmetic.
+
+**The problem.** A Toman-denominated gateway charges whole Tomans, so only amounts that are a multiple of 10 stored minor units are representable. Part 1 above makes the charged figure the **gross** amount, and **a percentage of a round number is routinely not a round number.** This is the ordinary case.
+
+**It must not be fixed by rounding the total**, and it must not be fixed inside the adapter. An invoice whose `subtotal_minor + tax_amount_minor` does not equal its `total_minor` is a broken financial record, and `invoices` is append-only — it cannot be corrected afterwards.
+
+**The ruling: the tax absorbs the granularity, and the identity holds exactly.**
+
+> `tax_amount_minor` is chosen as **the value nearest the nominal tax such that `subtotal_minor + tax_amount_minor` lands on the provider's declared charging granularity**, with ties resolved by ADR-022 item 5's declared mode (half-up by default). `total_minor` is then their sum, and `subtotal_minor + tax_amount_minor = total_minor` is exact by construction.
+
+**Stated that precisely because the obvious shorter reading is wrong.** "Round the tax to the granularity" is *not* the rule and does not work: with a subtotal of 59,999,999 and a 10% rate, rounding the nominal tax of 5,999,999.9 to the nearest 10 gives 6,000,000 and a total of 65,999,999 — **not a multiple of 10, and the charge fails.** The rule is about where the **total** lands; the tax is merely the term that moves.
+
+**Worked, not asserted.** Computed 2026-09-03 against a 10% rate and a granularity of 10:
+
+| Subtotal (IRR) | Nominal tax | Tax charged | Deviation | Total | `sub+tax=total` | On granularity |
+|---:|---:|---:|---:|---:|:-:|:-:|
+| 60,000,000 | 6,000,000 | 6,000,000 | 0 | 66,000,000 | yes | yes |
+| 59,999,990 | 5,999,999 | 6,000,000 | 1 | 65,999,990 | yes | yes |
+| 59,999,999 | 5,999,999.9 | 6,000,001 | 1.1 | 66,000,000 | yes | yes |
+| 85,000,000 @ 9% | 7,650,000 | 7,650,000 | 0 | 92,650,000 | yes | yes |
+
+**The deviation is bounded by the granularity and is a fraction of one Toman.** It is a real deviation from the nominal rate and is accepted deliberately: **an invoice that reconciles exactly and a charge the gateway can actually take are both required, and the nominal rate is a computation basis rather than a figure the customer is owed to the Rial.** The rate stored in `tax_rate_bp` remains the true rate; part 3's four columns record what was actually charged, which is what an append-ively stored document must do.
+
+**Row 2 is the everyday case**, and worth naming: prices are published in Toman, so a stored subtotal is normally already a multiple of 10, and only the tax needs to move. **Row 3 is the awkward one** — a subtotal not on the granularity — and it is included to show the rule still holds there, not because it is expected.
+
+**Where it is computed:** the domain, at the one place ADR-055 part 6 already puts tax rounding, using ADR-022 item 5's allocator and mode. **Not the adapter** — ADR-023's amendment of the same date rules that an amount arriving at an adapter off-granularity is a hard failure, because by then it is too late to change it honestly.
+
+**One consequence for item 13, recorded so it is not discovered in a test:** because the tax absorbs the granularity, **two invoices with the same subtotal and the same rate can carry different `tax_amount_minor` if they are charged through providers with different granularities.** That is correct, it is why the figure is snapshotted per invoice rather than recomputed, and it is one more reason part 3's columns are `NOT NULL` at creation.
+
 ### Verification
 
 - [ ] a plan price shown anywhere states that tax will be added
@@ -3473,6 +3578,75 @@ So on tenant deletion: **the profile row goes; the snapshot stays, reduced.** *"
 - [ ] an invoice's snapshot columns do not change when the profile they were copied from is edited — proven by editing it
 - [ ] the snapshot is explicit columns, not JSON, and a schema check can see each field
 - [ ] a tenant purge removes the profile row and leaves the invoice snapshot present and reduced per the split above
+
+
+---
+
+## ADR-058 - Automatic Renewal by Direct Debit: Not in V1
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-03, depends on ADR-023, ADR-024 and ADR-037; **blocks nothing** — it forecloses nothing and creates no table
+
+### Problem
+
+ADR-023 item 1 declares `supportsDirectDebit` in `PaymentProviderCapabilities`, and item 6 says *"No recurring where recurring does not exist… The billing domain must never assume a card can be charged again."* ADR-024 item 4 then designs the entire renewal lifecycle around invoice-and-notify: an invoice at T-30d, reminders at T-14d and T-3d, grace after `period_end`.
+
+**Nothing anywhere says whether direct debit is a mode this platform will ever use.** The flag exists, no flow sits behind it, and the renewal lifecycle has exactly one branch. **That is a decision made by omission, which `AGENTS.md` §5 forbids** — and it is a decision about pulling money out of a customer's bank account, which is not a good one to make by accident.
+
+**What is actually on the table.** An Iranian direct-debit mandate (پرداخت خودکار / برداشت مستقیم) is **not a stored card.** It is an authorization the payer grants **at their own bank**, carrying an identifier, a per-transaction ceiling, a count-per-period ceiling and an expiry — and **revocable by the payer at any time without telling the merchant.** The merchant learns it is gone by trying to use it.
+
+### Decision
+
+**Direct debit is not used in V1. No adapter declares `supportsDirectDebit` true.**
+
+**The flag stays in the port**, and ADR-023 item 1's existing rule does the enforcing without anything new being written: *"Any code path that assumes an unavailable capability must fail at startup with a configuration error, not at runtime with a customer-facing failure."*
+
+**Three reasons, and the second is the blocking one.**
+
+**1. The product does not need it.** The plans are annual (ADR-024 item 4's worked lifecycle; ADR-052's trial converts into one). Invoice-and-notify at T-30d with reminders at T-14d and T-3d is the correct shape for a once-a-year charge — a customer expects to be asked before a yearly sum leaves their account. **Direct debit earns its complexity on monthly billing, which this platform does not sell.**
+
+**2. ADR-037's deferral, and the reason is what the credential can *do* rather than how secret it is.**
+
+ADR-037 guarantees something strong and defers something specific, and the distinction matters here. **What it guarantees:** the database never holds credential material at all — `billing_provider_configs` stores a `secret_ref`, an opaque locator, and *"No plaintext secret is ever written to this table, by any code path — including a stub adapter, a seed, a fixture, or a test."* **What it defers:** the resolver behind that reference. Item 4: *"Until a resolver exists, a `secret_ref` resolves from configuration"* — a thin read from `platform/config.ts`, i.e. **an environment variable.** The mechanism is owed *"before the first live provider credential is stored."*
+
+**That trade is right for a gateway API key and wrong for a mandate.** A gateway key authorizes *asking* a provider to take a payment the customer is at that moment approving in a redirect. **A mandate authorizes pulling money out of a customer's bank account with nobody watching.** Holding the first in an environment variable while the real mechanism is deferred is a reasonable Phase 2 trade that ADR-037 made deliberately and bounded with a trigger. **Holding the second there is a different question, and it was never asked.**
+
+This is not a claim that ADR-037 is inadequate — it is a claim that **its deferral was scoped to a class of credential that a mandate is not in**, and that adopting direct debit would silently widen that scope.
+
+**3. It would change ADR-024's state machine, not merely add a job.** A mandate that is **revoked or expired between periods** is a new failure mode that is neither `PAST_DUE` (nothing was attempted, so nothing failed) nor a payment failure (nothing was charged). ADR-024 item 3's transition list has no arc for it. **Adding that arc later is an ADR; adding it accidentally is a bug**, and the accidental version silently expires paying customers whose bank simply let a mandate lapse.
+
+### Nothing needs a column today, and this is the test rather than an assurance
+
+`PHASE_2_BRIEF.md` §5 revokes `UPDATE`/`DELETE` on `billing_payment_events`, so this deferral gets the question ADR-056 and ADR-057 now put to every column: **does anything need a field today that could not be added later?**
+
+**No, and both halves point the same way:**
+
+- **`billing_payment_events` is append-only, and a mandate identifier is legitimately empty on every redirect-flow payment.** By the test ADR-056 states — *a column must exist at creation if old rows would need a real value in it; it may wait if old rows are legitimately empty* — it may wait. That is the same reading that sent `corrects_invoice_id` to a later slice, applied consistently.
+- **The table that would need a *discriminator* — `billing_payment_intents`, to say whether a charge was redirect or mandate — is not on §5's append-only list.** It is mutable by design (ADR-045 gives it a `version` column, because *"the verify callback and the reconciliation sweep both write status"*), so a `charge_source` column added later **can be backfilled** to `REDIRECT` for every existing row. This is exactly the case `document_type` on `invoices` was **not**, and the difference is the `REVOKE`.
+
+**So this deferral costs nothing that cannot be recovered**, and that is stated as a checked result rather than an assumption.
+
+### Reopening conditions, written now while they are cheap
+
+Recorded so the next reader inherits an answer rather than an argument. **All four, not any one:**
+
+- **ADR-037's mechanism exists** — built, not deferred, with a real secret store behind the resolver
+- **a plan is sold on a period shorter than a year**, or annual invoice-and-notify is **measurably** losing renewals — measured, not suspected
+- **ADR-024's state machine gains an explicit transition** for a mandate revoked or expired **outside** a payment attempt, and that transition **falls back to invoice-and-notify rather than toward expiry** — a lapsed mandate must not cost a paying customer their subscription
+- **the mandate's own lifecycle is designed before any table is created** — grant, per-transaction and per-period ceilings, expiry, revocation discovery, and the bounded idempotent retry policy under ADR-009 — not alongside it
+
+### What this ADR does not do
+
+- **It removes nothing.** `supportsDirectDebit` stays in `PaymentProviderCapabilities`; removing it would make reopening a port change rather than a configuration one.
+- **It does not touch ADR-024's lifecycle**, which stays the only branch. A dated cross-reference was added there recording that this is now a ruling rather than an omission.
+- **It does not rule on `supportsRecurring`** — true stored-credential recurring, a different capability with a different trust model. ADR-023 item 6 already governs it, and no adapter declares it either.
+- It creates no table, writes no migration, and adds no column.
+
+### Verification
+
+- [ ] no adapter declares `supportsDirectDebit: true`, asserted in the shared adapter contract suite
+- [ ] a configuration that would enable a direct-debit path fails **at startup**, per ADR-023 item 1, and not at a customer-facing runtime failure
+- [ ] renewal follows ADR-024 item 4's invoice-and-notify in every test, with no branch on a mandate
+- [ ] the reopening conditions above are checked as a set when this ADR is next opened — the ADR is not reopened on the product reason alone
 
 ## 3. Open Items Deliberately Left Open
 
