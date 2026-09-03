@@ -129,6 +129,8 @@ Assignments are marked **EXPLICIT** where `06`'s item text names the work and **
 | 14 | `billing.payment.initiate` | tenant / HIGH_WRITE | 12 — payment intent, verify, sweep | EXPLICIT |
 | 15 | `billing.payment.verify` | tenant / HIGH_WRITE | 12 — payment intent, verify, sweep | EXPLICIT |
 
+**Amendment, 2026-09-03 — a sixteenth capability, `billing.profile.set` (tenant / MEDIUM_WRITE), owned by item 13.** ADR-057 rules that an invoice must snapshot the buyer's legal identity and that a subscription purchase cannot reach the gateway without one. **None of the fifteen above can collect it** — checked one by one against `05` §4.2, and against Phase 1's own list, where `organization.create` takes only a name and a slug. An ADR may not add a capability, exactly as ADR-048 could not add a table; this amendment is the other half of that ruling and discharges the obligation ADR-057 states. **It is a write, so `PHASE_2_BRIEF.md` §5's permission rule binds it: `owner` and `admin` only** (D2-8), which is right for a capability that sets the organization's legal and tax identity. `05` §4.2 itself is a dated document and is not edited; this mapping is where Phase 2's capability set is ratified, and it now ratifies sixteen.
+
 Every capability now has an owning item. **`subscription.renew` → item 14, not item 12** (D2-12): item 12 is payment intent/verify/reconciliation, and routing renew there would put a subscription-domain invariant inside the payment slice. See §5's module-boundary rule.
 
 **Items that surface no capability — infrastructure, and correct:** 2 (price and price version), 3 (shared idempotency service), 7 (quota policies), 10 (payment provider port), 11 (first adapter + stub), 17 (notification flows), 18 (concurrency and reconciliation tests). Seven infrastructure items, eleven capability-surfacing items.
@@ -183,6 +185,7 @@ Both additions were **owed** rather than discovered. ADR-048 and ADR-050 were ru
 | `invoice_lines` | billing | tenant-owned | invoice line items | 13 |
 | `billing_refunds` | billing | tenant-owned | refund records | 13 |
 | `tax_rates` | billing | **platform-global** | ADR-055's dated VAT rate history — rate in basis points, `effective_from`, actor, note; append-only, one row per rate period | 13 |
+| `billing_profiles` | billing | tenant-owned | ADR-057's legal billing identity — legal type (حقیقی/حقوقی), legal name, national identifier (کد ملی / شناسه ملی), economic code, registration number, postal code, address, phone. **Mutable**, and by ADR-045's own terms it takes **no** `version` column: it has one Phase 2 writer | 13 |
 | `invoice_number_counter` | billing | **platform-global** | the single counter row ADR-048's gap-free allocation locks inside the issuing transaction | 13 |
 | `outbox_events` | eventing | tenant-owned | domain events for out-of-request delivery | 14 |
 | `outbox_event_deliveries` | eventing | tenant-owned | ADR-050's delivery state — one row per attempt, keeping `outbox_events` strictly append-only | 14 |
@@ -190,7 +193,7 @@ Both additions were **owed** rather than discovered. ADR-048 and ADR-050 were ru
 | `notifications` | notification | tenant-owned | lifecycle notifications | 17 |
 | `notification_deliveries` | notification | tenant-owned | per-channel delivery attempts | 17 |
 
-**30 tables. Not sixty.** Phase 1 built 14 in 20 migrations. ~~27 tables~~ ~~29 tables~~ — superseded twice on 2026-09-03: first by the amendment above (ADR-048's invoice-number counter and ADR-050's delivery table), then by §9.10's (ADR-055's `tax_rates`).
+**31 tables. Not sixty.** Phase 1 built 14 in 20 migrations. ~~27 tables~~ ~~29 tables~~ ~~30 tables~~ — superseded three times on 2026-09-03: first by the amendment above (ADR-048's invoice-number counter and ADR-050's delivery table), then by §9.10's (ADR-055's `tax_rates`), then by §9.11's (ADR-057's `billing_profiles`).
 
 **On the five entitlement/quota tables** (D2-14): `04` §2.4 names three — `entitlements`, `entitlement_sources`, `quota_policies`. The split into five is deliberate and is not a departure from `04`, which describes itself as a "conceptual schema and ownership baseline" whose "exact columns are finalized per module during its slice." Splitting one conceptual table into a platform-global and a tenant-owned physical table is that finalization. **Table names above are indicative; the split itself is binding.**
 
@@ -258,6 +261,8 @@ Every table in §4 marked tenant-owned carries `tenant_id` and an RLS policy **i
 `04` §1 requires audit and ledger records to be append-only, and Phase 1 established the enforcement pattern rather than leaving it to convention: `modules/audit/migrations/20260822100100_audit__enforce_append_only.sql` adds `REVOKE UPDATE, DELETE ON audit_events FROM nexora_app`, scoped to that one table. That migration's own comment predicted this phase: *"each ledger-shaped table Phase 2 adds — usage, payment — needs this same treatment in its own creating migration."*
 
 **Every ledger-shaped table in §4 owes `REVOKE UPDATE, DELETE` in its own creating migration:** `subscription_periods`, `subscription_state_transitions`, `usage_ledger_entries`, `billing_payment_events`, `invoices`, `invoice_lines`, `outbox_events`. **`tax_rates` joins that list (2026-09-03, §9.10):** ADR-055 rules that a wrong rate is corrected by appending a superseding row, never by editing one, and a comment asserting that is not that — the same reasoning this paragraph already applies to every other table on the list. A comment asserting append-only is not append-only — the Phase 1 repair that produced this pattern exists precisely because the original `audit_events` migration said so only in prose.
+
+**`invoices` gains `document_type` and the buyer-identity snapshot columns at creation (2026-09-03, §9.11), and `billing_profiles` is NOT on this append-only list** — it is deliberately mutable, which is the whole point of ADR-057's split: the profile changes when a company renames or moves, and the invoice must not.
 
 **Amendment, 2026-09-03 (third to this file) — ADR-041 is ruled, and it binds these tables' creating migrations without adding one.**
 
@@ -561,4 +566,28 @@ Phase 2.5 was created on 2026-09-03 as **Commercial Growth**, carrying discounts
 **And one on §5's Money rules, which this amendment extends rather than replaces:** **the published price in `price_versions` is net — tax is added at checkout.** No `tax_inclusive` flag is added; net is universal here and a flag would be a configuration point with exactly one value. The interface obligations that make this honest to a buyer — stating that tax will be added wherever a price is shown, and showing subtotal/rate/tax/total **before** the redirect — are ADR-055 part 1's and are not optional.
 
 **Not settled here, and named so it is owned rather than missed:** tax on a **mid-term plan change** (item 15's `plan.change.preview` returns `unusedCredit`, `newCharge` and `amountDue`, and whether those are net or gross is owed to that item), tax on a **refund or credit note**, and the buyer's own **tax identity**. ADR-055 fences all three.
+
+### 9.11 Amendment, 2026-09-03 (fifth to this file) — ADR-056 and ADR-057: two shapes `invoices` cannot gain later
+
+**One rule decides both, and it is worth carrying rather than re-deriving.** §5 revokes `UPDATE` and `DELETE` on `invoices` from `nexora_app`. A column can still be **added** to that table later; what can never happen is **filling it in for rows that already exist**.
+
+> **A column must exist at table creation if old rows would need a real value in it. A column may wait if old rows are legitimately empty.**
+
+**§4 gains one table: `billing_profiles`, tenant-owned, item 13. 30 → 31.** Names are indicative; membership of §4's list is binding.
+
+**§3 gains one capability: `billing.profile.set` (tenant / MEDIUM_WRITE), item 13** — recorded in §3's own amendment above. **None of the fifteen could collect a legal billing identity**, and ADR-057 could not add one itself: amending this file is a scope decision belonging to this file, the fence ADR-048 established and ADR-057 observed. This amendment is the other half of that ruling.
+
+**Three constraints on item 13's `invoices` migration:**
+
+1. **`document_type`, `NOT NULL`, values `INVOICE` and `CREDIT_NOTE`** (ADR-056). **Phase 2 issues only `INVOICE`** and no capability writes a credit note. It must exist at creation because every issued row would need `INVOICE` backfilled and nothing can write it. It is a **discriminator, not a reservation** — which is why it does not contradict ADR-046's refusal to reserve `deleted_at`: that column was nullable and set by nothing, this one is `NOT NULL` and set by every row.
+2. **Explicit buyer-identity snapshot columns, not a JSON blob** (ADR-057). An append-only financial record wants a fixed, inspectable shape; a JSON column's advantage is that it can change without a migration, which is the wrong property for a row nothing may update.
+3. **Amounts are always positive on both document types** (ADR-056). The document type carries the sign, because negative amounts make every aggregate ambiguous about whether a sign has already been applied.
+
+**Not added now, by the same test:** `corrects_invoice_id` is legitimately empty on every invoice that corrects nothing, so it waits for the slice that issues the first credit note — which is the slice that gives `billing_refunds` a capability, and does not exist.
+
+**One constraint on item 12:** **a subscription purchase cannot reach the gateway without a billing profile** (ADR-057). Together with ADR-055 part 1's requirement that the tax breakdown be shown before the redirect, **two things now happen before ADR-023 item 2's redirect**, and item 12's implementer meets them in one place here rather than discovering them separately. **A trial is exempt** — ADR-052 requires no payment, so there is nothing to invoice and no profile is needed until the first charge.
+
+**`billing_profiles` takes no `version` column**, and this is deliberate rather than an oversight: ADR-045's ruling is a named list of four tables, and its Tier 2 position is that a mutable table with no second Phase 2 writer gets no column, *"a field is added in the same slice that adds its enforcement, never ahead of it."* This table has one writer. **Reopening trigger: the first slice that gives it a second** — an import, an operator correction path, or an accounting sync.
+
+**Not settled, and named so it is owned:** the **seller's** own registration identity (owed to the سامانه مودیان slice), the national-identifier validation algorithms (the implementing slice's), refund documents as distinct from credit notes, and the ADR-020 rule 4 purge reduction — ADR-057 proposes which snapshot fields survive and **marks the split explicitly as unverified against the Iranian legal minimum**.
 

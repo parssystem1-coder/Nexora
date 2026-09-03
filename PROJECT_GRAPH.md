@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `17fd72e` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `980ce9c` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 410 test cases in 45 files · 58 ADRs (48 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 410 test cases in 45 files · 60 ADRs (50 accepted)
 
 ## Modules
 
@@ -182,6 +182,8 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-053 | Session Retention and Purge | ACCEPTED (new) | nothing today; `session.purge` is owed to Phase 2 item 12, which does not currently schedule it |
 | ADR-054 | Per-Tenant Recovery from Nightly Snapshots | ACCEPTED (new) | nothing in Phase 2; Phase 2.5 builds it, and **object storage (R-025) is a hard prerequisite** — amended 2026-09-03 (sessions on restore) |
 | ADR-055 | Tax on a Subscription Purchase | ACCEPTED (new) | **Phase 2 items 12 and 13 — their creating migrations.** Item 12: `billing_payment_intents.amount_minor` is GROSS, or every ADR-023 item 5 verification fails as a security event. Item 13: four NOT NULL tax columns on `invoices`, which is append-only and cannot be backfilled |
+| ADR-056 | Correction Documents: Credit Notes and the Shape `invoices` Must Carry | ACCEPTED (new) | **Phase 2 item 13's creating migration** — `document_type NOT NULL` must exist at creation because every issued row would need `INVOICE` backfilled. No credit note is issuable in Phase 2 |
+| ADR-057 | The Buyer's Legal Identity on an Invoice | ACCEPTED (new) | **Phase 2 item 13's creating migration** (snapshot columns) and **a new capability owed to `PHASE_2_BRIEF.md` §3**, discharged by its 2026-09-03 amendment. Removes one R-043 blocker; closes none |
 | ADR-011 | Co-Pilot Cadence vs AI Credit Cost | DEFERRED | Phase 12 |
 | ADR-012 | Autonomous AI Execution Opt-In | DEFERRED | Phase 13 |
 | ADR-013 | Voice Input Retention | DEFERRED | Phase 14 |

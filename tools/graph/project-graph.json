@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "17fd72e",
+    "commit": "980ce9c",
     "dirty": true
   },
   "modules": [
@@ -667,6 +667,18 @@
       "blocks": "**Phase 2 items 12 and 13 — their creating migrations.** Item 12: `billing_payment_intents.amount_minor` is GROSS, or every ADR-023 item 5 verification fails as a security event. Item 13: four NOT NULL tax columns on `invoices`, which is append-only and cannot be backfilled"
     },
     {
+      "id": "ADR-056",
+      "title": "Correction Documents: Credit Notes and the Shape `invoices` Must Carry",
+      "status": "ACCEPTED (new)",
+      "blocks": "**Phase 2 item 13's creating migration** — `document_type NOT NULL` must exist at creation because every issued row would need `INVOICE` backfilled. No credit note is issuable in Phase 2"
+    },
+    {
+      "id": "ADR-057",
+      "title": "The Buyer's Legal Identity on an Invoice",
+      "status": "ACCEPTED (new)",
+      "blocks": "**Phase 2 item 13's creating migration** (snapshot columns) and **a new capability owed to `PHASE_2_BRIEF.md` §3**, discharged by its 2026-09-03 amendment. Removes one R-043 blocker; closes none"
+    },
+    {
       "id": "ADR-011",
       "title": "Co-Pilot Cadence vs AI Credit Cost",
       "status": "DEFERRED",
@@ -1007,7 +1019,7 @@
     "routes": 11,
     "testFiles": 45,
     "testCases": 410,
-    "adrs": 58,
-    "adrsAccepted": 48
+    "adrs": 60,
+    "adrsAccepted": 50
   }
 }

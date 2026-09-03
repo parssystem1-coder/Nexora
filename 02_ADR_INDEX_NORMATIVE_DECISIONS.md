@@ -89,6 +89,8 @@ For each ADR, completion requires:
 | ADR-053 | Session Retention and Purge | Identity / Data | **ACCEPTED (new)** | nothing today; `session.purge` is owed to Phase 2 item 12, which does not currently schedule it |
 | ADR-054 | Per-Tenant Recovery from Nightly Snapshots | Compliance / Ops | **ACCEPTED (new)** | nothing in Phase 2; Phase 2.5 builds it, and **object storage (R-025) is a hard prerequisite** — amended 2026-09-03 (sessions on restore) |
 | ADR-055 | Tax on a Subscription Purchase | Billing / Money | **ACCEPTED (new)** | **Phase 2 items 12 and 13 — their creating migrations.** Item 12: `billing_payment_intents.amount_minor` is GROSS, or every ADR-023 item 5 verification fails as a security event. Item 13: four NOT NULL tax columns on `invoices`, which is append-only and cannot be backfilled |
+| ADR-056 | Correction Documents: Credit Notes and the Shape `invoices` Must Carry | Billing / Money | **ACCEPTED (new)** | **Phase 2 item 13's creating migration** — `document_type NOT NULL` must exist at creation because every issued row would need `INVOICE` backfilled. No credit note is issuable in Phase 2 |
+| ADR-057 | The Buyer's Legal Identity on an Invoice | Billing / Compliance | **ACCEPTED (new)** | **Phase 2 item 13's creating migration** (snapshot columns) and **a new capability owed to `PHASE_2_BRIEF.md` §3**, discharged by its 2026-09-03 amendment. Removes one R-043 blocker; closes none |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -2700,6 +2702,8 @@ The شماره منحصر به فرد مالیاتی required by سامانه م
 
 A nullable column reserved now and set by nothing is precisely the defect **ADR-046** was ruled to avoid — a permanent obligation on every reader of the table, enforced by nothing, for a capability no item delivers. The same argument that kept `deleted_at` out of twenty tables keeps this one out of `invoices`.
 
+**Cross-reference, 2026-09-03: ADR-056** rules the credit note this ADR fenced out — one series, this same counter, no change here.
+
 **Cross-reference, 2026-09-03: ADR-055** adds the tax breakdown an invoice must carry, on the same append-only reasoning as this ADR's number and ADR-044's line description — three decisions, one principle.
 
 **Cross-reference ADR-044's ruling.** An invoice line must carry its own denormalized description text, captured at issuance, for the same reason an invoice carries its own number rather than a reference: an append-only financial record must be readable on its own years later, and must not change its wording when something it points at is renamed.
@@ -3297,6 +3301,178 @@ The one thing it leaves to this ADR: **`IRR` has zero minor units** (`currencies
 - [ ] the rate table resolves to the greatest `effective_from` not in the future, proven with a future-dated row present
 - [ ] a superseding rate does not alter any previously issued invoice
 - [ ] tax rounding is computed through ADR-022 item 5's allocator with a declared mode, proven against `IRR`'s zero minor units
+
+
+---
+
+## ADR-056 - Correction Documents: Credit Notes and the Shape `invoices` Must Carry
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-03, depends on ADR-022, ADR-048 and ADR-055; **blocks the creating migration of Phase 2 item 13**
+
+### Problem
+
+ADR-048 ruled invoice numbering and fenced this out in its own words: *"It does not rule on credit notes, voiding of issued invoices, or refund documents."* The fence was correct — that ADR was about numbering. But one part of what it fenced **cannot wait for the slice that needs it**, and that part is a column.
+
+**The rule that decides it, stated once because both this ADR and ADR-057 are the same test applied twice.** `PHASE_2_BRIEF.md` §5 revokes `UPDATE` and `DELETE` on `invoices` from `nexora_app`. A column can still be **added** to that table by a later migration; what can never happen is **filling it in for rows that already exist**.
+
+> **A column must exist at table creation if old rows would need a real value in it. A column may wait if old rows are legitimately empty.**
+
+Applied here: `document_type` must exist now, because every invoice already issued would need `INVOICE` backfilled into it and nothing can write it. `corrects_invoice_id` may wait, because it is legitimately empty on every invoice that corrects nothing.
+
+**This test is the reusable part of this ADR**, and it is recorded so that the next person proposing a column on an append-only table can answer the question themselves instead of guessing.
+
+### Decision
+
+**1. A correction is a row in `invoices`, discriminated by type.**
+
+`invoices` carries `document_type`, `NOT NULL`, values `INVOICE` and `CREDIT_NOTE`. **Phase 2 issues only `INVOICE`.**
+
+**The ADR-046 objection, answered here because a reviewer will raise it and will be right to.** ADR-046's ruling refused to reserve `deleted_at` on ~20 tables, on the ground that a nullable column set by nothing is *"a permanent query-correctness obligation no conformance rule catches"* for a capability no item delivers. **`document_type` is not that, and the distinction is precise:**
+
+| | `deleted_at` (ADR-046 refused) | `document_type` (ruled here) |
+|---|---|---|
+| Nullability | nullable | **`NOT NULL`** |
+| Set by Phase 2 | nothing | **every row, to a true value** |
+| A reader that ignores it | is **wrong** — it returns deleted rows | is **correct** — it reads a real invoice |
+| Backfillable later | yes, `NULL` is the right value for old rows | **no** — old rows would need `INVOICE` |
+
+It is a **discriminator**, not a reservation. Without that line the two rulings look contradictory; with it they are the same principle — *do not add a column nothing can set* — reaching opposite conclusions on different facts.
+
+**2. One number series, not two. `invoice_number_counter` does not change.**
+
+ADR-048 part 1 ruled a **global** sequence and gave a reason that settles this question too: *"the issuer of these invoices is one legal entity — the platform — and a seller keeps one invoice book."* **A credit note is issued by that same seller into that same book.** So it takes the next number from the same counter, and `invoice_number_counter` stays exactly as ADR-048 ruled it: a single row, locked `SELECT … FOR UPDATE` inside the issuing transaction, gap-free.
+
+**The rejected alternative and its reopening trigger, recorded rather than omitted:** a separate series per document type is the conventional accounting shape and is what many filing systems expect. **If a two-way accounting integration or a tax filing requires one, that is a change to the numbering scheme**, and ADR-048's own *"Why this blocks any two-way accounting integration"* applies in full — an external ledger keys on the number, so the series cannot be split after documents exist under the old scheme.
+
+**3. Amounts are always positive. The document type carries the sign.**
+
+A credit note stores positive amounts and means the opposite **by being a credit note**. ADR-022 item 5 requires a remainder-distributing allocator whose *"sum of parts equals the whole exactly"*, and **negative amounts make every aggregate in the system ambiguous about whether a sign has already been applied.** One rule in one place beats a sign convention that every report, every sum and every export must remember independently.
+
+**4. Tax on a correction follows the invoice it corrects.**
+
+ADR-055 deferred this here explicitly. Ruled:
+
+> A credit note carries the same four tax columns ADR-055 put on `invoices` — `subtotal_minor`, `tax_rate_bp`, `tax_amount_minor`, `total_minor` — and snapshots **the rate of the invoice it corrects**, not the rate in effect on the day the correction is issued.
+
+**The reason is not obvious and is exactly the kind of thing that gets got wrong: a correction must reverse the arithmetic that actually happened.** A credit note issued after a VAT rate change, carrying the new rate, would reverse an amount that was never charged — leaving a residue on the books that reconciles against nothing. ADR-055's `tax_rates` table makes the historical rate recoverable, but the corrected invoice's own snapshot is the authority, because it is what the customer was actually billed.
+
+**5. Voiding an issued invoice is not a thing this platform can do, and that is a consequence rather than a choice.**
+
+`PHASE_2_BRIEF.md` §5 revokes `UPDATE` and `DELETE` on `invoices` from `nexora_app`. **The application role therefore cannot void an issued invoice in place at all** — not as a policy, but as a database privilege. **The correction path is a new document, necessarily.** This ADR does not choose that; it records that the choice was already made when `invoices` was put on the append-only list, and names the consequence so nobody looks for a void operation that cannot exist.
+
+### What this ADR does not do
+
+- **No credit note is issuable in Phase 2.** No capability, no service, no endpoint, no `06` item. **Only the shape is settled.** **Trigger: the slice that gives `billing_refunds` a capability** — `billing_refunds` is item 13's table and `05` §4.2 contains no refund capability, so that slice does not exist yet.
+- **`corrects_invoice_id` is not added now.** By the test above it is in the "later" column: legitimately empty on every invoice that corrects nothing. It arrives with the slice that issues the first credit note, together with whatever else that slice needs.
+- **It does not touch ADR-048's ruling.** A one-line dated cross-reference was added there and nothing more.
+- It does not rule **refund documents** as distinct from credit notes, nor the relationship between a credit note and a `billing_refunds` row. Both belong to the issuing slice.
+- **Nothing is registered with سامانه مودیان** (**R-043**), and a credit note is a document that filing systems treat specially. That is R-043's territory, not this ADR's.
+
+### Verification
+
+- [ ] `document_type` is `NOT NULL` and every Phase 2 invoice writes `INVOICE`
+- [ ] no code path writes `CREDIT_NOTE` in Phase 2, proven by a test that would fail if one did
+- [ ] a credit note and an invoice drawn from the same counter never share a number, and the series has no gap across a mix of both
+- [ ] every stored amount on both document types is positive, proven with an adversarial input
+- [ ] a credit note against an invoice issued under a superseded VAT rate carries **that** rate, not the current one — proven with a `tax_rates` row that changed in between
+- [ ] no void, update or delete of an issued invoice is reachable by the application role, proven against the database privilege and not only by reading code
+
+---
+
+## ADR-057 - The Buyer's Legal Identity on an Invoice
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-03, depends on ADR-020, ADR-044, ADR-045, ADR-052 and ADR-055; **blocks the creating migration of Phase 2 item 13**, and **owes Phase 2 a capability** (discharged by `PHASE_2_BRIEF.md`'s 2026-09-03 amendment, not by this ADR)
+
+### Problem
+
+ADR-055 fenced the buyer's tax identity — کد ملی، شناسه ملی، کد اقتصادی — out of its own scope and named the gap so it would be owned rather than missed. **R-043** then recorded it as the one part of the سامانه مودیان problem that *is* a schema question. This ADR closes it, and it closes it now for the same reason ADR-056 exists: the shape cannot be added to `invoices` afterwards.
+
+**Two independent reasons, and neither alone would be enough to justify the timing.**
+
+**1. ADR-044's principle, which ADR-048 already applied to this table.** ADR-044's ruling requires an invoice line to carry its own denormalized description *"captured at issuance"*, because an append-only financial record *"must be readable on its own years later, and must not change its own wording when something it points at is renamed."* **Who the invoice was issued *to* is part of what the invoice *is*.** A foreign key to a mutable billing profile is not a substitute — the profile changes when a company renames or moves, and the invoice must not. This is the third application of one principle: ADR-048 for the number, ADR-044 for the line description, this ADR for the buyer.
+
+**2. R-043.** An invoice registered with سامانه مودیان carries the buyer's legal identity. **Every invoice this platform issues without one is permanently unregisterable**, because the row cannot be updated. **This does not close R-043** — registration remains an unowned regulatory decision that no code discharges — it removes one of its blockers, and R-043's addendum records exactly which.
+
+### Decision
+
+**1. A mutable profile table, and an immutable snapshot on the invoice.**
+
+**One new tenant-owned table** holds the tenant's legal billing identity. It is mutable — a company moves, renames, or registers an economic code it did not have. It carries at least:
+
+| Field | Notes |
+|---|---|
+| legal type | natural person or legal entity — حقیقی / حقوقی |
+| legal name | |
+| national identifier | **کد ملی** for a natural person, **شناسه ملی** for a legal entity — one column, with the legal type discriminating |
+| economic code (کد اقتصادی) | **genuinely nullable** — it applies to legal entities, and not to every one of them |
+| registration number | nullable, legal entities only |
+| postal code, address, phone | |
+
+**The national identifier column needs one warning on it, and it belongs here rather than in a code comment nobody reads: کد ملی and شناسه ملی are different identifiers with different lengths and different check-digit algorithms.** Validating one with the other's rule accepts garbage and rejects valid input, and the failure is silent because both are digit strings. **The algorithms themselves are domain validation and belong to the implementing slice**, not to this ADR — what this ADR fixes is that the column is discriminated, so the slice cannot fail to notice there are two rules.
+
+**`invoices` gains explicit snapshot columns, not a single JSON blob.** The reason to record: an append-only financial record wants a **fixed, inspectable shape** that a schema conformance check and a human reader can both see. A JSON column's advantage is that its shape can change without a migration — **which is precisely the wrong property for a row nothing may ever update.** The flexibility would be purchased against a table that can never use it.
+
+**2. No `version` column on the profile table — and this is a correction to what this ADR was drafted to say.**
+
+The session brief specified a `version` column *"per ADR-045 (it is a mutable Phase 2 row, so ADR-045 applies by its own terms)"*, and instructed that this be confirmed from ADR-045 rather than taken on trust. **It was confirmed, and it does not hold.**
+
+ADR-045's ruling is **a named list of four tables**, not a rule about mutability. It states its Tier 2 position explicitly: six named mutable tables **get no column**, *"on ADR-046's logic applied to columns — a field is added in the same slice that adds its enforcement, never ahead of it"*, with the reopening trigger *"the first slice that gives any one of them a second writer."* Each Tier 1 justification names two concrete writers — *"the verify callback and the reconciliation sweep both write status"*, *"the usage recorder and the over-limit evaluator both write it."*
+
+**The billing profile has exactly one writer in Phase 2: the capability that sets it.** Nothing else writes it — item 12 and item 13 *read* it. By ADR-045's own terms it is a **Tier 2-shaped table and gets no `version` column now.** Adding one because the table happens to be mutable would depart from a ruled ADR while appearing to comply with it, which is worse than either following it or overruling it openly.
+
+**The accepted cost, stated rather than glossed:** two administrators editing the profile concurrently can lose one another's update. That is a real possibility and it is accepted on ADR-045's own reasoning — the same reasoning that accepted it for `billing_refunds` and the two override tables. **Reopening trigger, checkable rather than rhetorical: the first slice that gives this table a second writer** — an import, an operator correction path, or a sync from an external accounting system.
+
+**3. No invoice without a profile.**
+
+An invoice is a legal document addressed to somebody. **Issuing one to an unidentified buyer is not a degraded mode — it is an invalid document.** So:
+
+> A subscription purchase cannot reach the payment gateway without a billing profile.
+
+**Which means the buyer supplies it before the redirect ADR-023 item 2 describes.** Two things now happen at that step and they are stated together here so item 12's implementer meets them in one place rather than discovering them separately: **ADR-055 part 1 requires the tax breakdown — subtotal, rate, tax, total — to be shown before the redirect, and this ADR requires the billing profile to exist before it.**
+
+**The one case this does not touch, named because it is the first question anyone will ask: a trial.** ADR-052 rules that `plan.subscribe` starts a trial with **no payment required**, and its verification list asks that it *"produces a subscription in `TRIALING` with no payment."* An invoice is the record of a charge; a trial charges nothing, so it has nothing to invoice. **Stated as an inference, because it is one: ADR-052 says "no payment", not "no invoice", in those words.** A trial therefore begins without a billing profile, and the profile is required at the point of first charge — which is conversion, or the T-30d renewal invoice of ADR-024 item 4, whichever comes first.
+
+**4. The scope obligation, and where it is discharged.**
+
+Something must collect this data, and **Phase 2's capability list is a wall.** §4 describes its table list as *"the wall, not a suggestion"* and §3's capability mapping has the same standing.
+
+**Checked, not assumed: none of Phase 2's fifteen capabilities can collect a billing profile.** `05` §4.2's list — `plan.list`, `plan.subscribe`, `plan.change.preview`, `plan.change`, `plan.change.cancel_scheduled`, `subscription.read`, `subscription.renew`, `subscription.cancel`, `subscription.reactivate`, `entitlement.resolve`, `overlimit.read`, `usage.record`, `invoice.list`, `billing.payment.initiate`, `billing.payment.verify` — contains no capability that writes tenant profile data of any kind, and neither does Phase 1's (`organization.create` takes a name and a slug).
+
+**So this ruling owes Phase 2 a capability, and an ADR may not add one.** ADR-048 set the precedent exactly: it required a table §4's list did not contain, declined to add it because *"amending this list is a scope decision belonging to this file — `AGENTS.md` §1 authority #2 — and not to an ADR"*, and the brief's amendment was made as the other half of the same change. **The same is done here: this ADR states the obligation, and `PHASE_2_BRIEF.md`'s 2026-09-03 amendment discharges it in the same commit.**
+
+**5. The purge interaction, which is a real tension and not a footnote.**
+
+The profile is tenant-owned data and falls under ADR-020's purge. **The invoice snapshot does not** — ADR-020 rule 4 excludes financial records from purge **and, in the same sentence, requires that they be *"reduced to the minimum fields required."***
+
+So on tenant deletion: **the profile row goes; the snapshot stays, reduced.** *"Minimum fields required"* is not self-executing, and whoever implements the purge will otherwise decide it alone and unrecorded. **Proposed split:**
+
+| Snapshot field | On purge | Why |
+|---|---|---|
+| legal name | **kept** | a financial document with no addressee is not a record of anything |
+| legal type | **kept** | one character, and it discriminates the identifier that is kept or dropped |
+| national identifier (کد ملی / شناسه ملی) | **kept for a legal entity, dropped for a natural person** | a شناسه ملی identifies a company and is public register data; a کد ملی identifies a person and is the most sensitive field here |
+| economic code, registration number | **kept** | entity-level, not personal |
+| postal code, address | **reduced to city or dropped** | a full address is personal data and is not what a filing needs |
+| phone | **dropped** | personal, and no tax purpose |
+
+**Epistemic status, in the house style ADR-041 and ADR-048 established: this split is a PROPOSAL and is not verified against the Iranian legal minimum.** It is written down so the purge slice starts from a reasoned position rather than an invented one, and so a reviewer with actual tax-law knowledge has something concrete to correct. **The natural-person row is the one most likely to be wrong** — if a کد ملی turns out to be a required field on a registered صورتحساب, it must be kept and this table changes. **R-043 carries the legal-verification dimension**, and its owner is the maintainer plus an accountant, not this repository.
+
+### What this ADR does not do
+
+- **The seller's own identity is not ruled here** — the platform's own registration details, which a صورتحساب also carries. **Trigger: the سامانه مودیان slice**, where it becomes a submitted field rather than a stored one. Named so the gap is visibly owned.
+- **No validation algorithm is specified** for either national identifier.
+- **Nothing is registered with any tax authority**, and this ADR does not make the platform compliant. It removes one blocker.
+- **R-043 is not closed.** Its addendum records which blocker this removes and which remain.
+- It creates no table, writes no migration and collects no data.
+
+### Verification
+
+- [ ] a billing profile can be created for both a natural person and a legal entity, and the national identifier is validated by the rule matching the legal type — proven with an identifier valid under one rule and invalid under the other
+- [ ] `plan.subscribe` on a trial-offering plan version succeeds with **no** billing profile (ADR-052)
+- [ ] a subscription purchase that would reach the gateway without a billing profile is refused **before** the intent is persisted, not after
+- [ ] an invoice's snapshot columns do not change when the profile they were copied from is edited — proven by editing it
+- [ ] the snapshot is explicit columns, not JSON, and a schema check can see each field
+- [ ] a tenant purge removes the profile row and leaves the invoice snapshot present and reduced per the split above
 
 ## 3. Open Items Deliberately Left Open
 
