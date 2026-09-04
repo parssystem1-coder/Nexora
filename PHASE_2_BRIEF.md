@@ -529,6 +529,8 @@ It also does not set a date, a duration, or a position relative to Phase 3 beyon
 
 **R-025's own ratings are now stale as a consequence** — it reads *"two full phases away from current work"*, written 2026-08-28 and accurate then. R-025 carries a dated addendum recording that ADR-054 moved it to the next phase; **re-rating its Likelihood and Impact cells is left to the maintainer** rather than taken as a side effect of this amendment.
 
+**Amendment, 2026-09-03 (second to this section) — the prerequisite now has a port shape, and still has no adapter.** **ADR-060 (`Object Storage Port`) shapes the contract**, designed against four named consumers rather than none: this phase's recovery archive, ADR-041 Part 6's ledger archival, **ADR-061's WAL archive**, and Phase 3 media. **Nothing in §9.6 items 4–6 is unblocked by it.** A port shape is not an adapter and neither is a bucket — no provider is chosen and nothing can write an object, so **R-025 stays open** and this section's statement that object storage is a prerequisite is unchanged. What changed is that whoever builds the adapter now has a contract to build against rather than a blank page. **§4 gains no table; `files` stays on its out-of-scope list.**
+
 ### 9.8 What unifies this phase, restated — and one question left to the maintainer
 
 Phase 2.5 was created on 2026-09-03 as **Commercial Growth**, carrying discounts, referrals and tenant export. It now also carries snapshots, restore and drills. **Recording the unifying reading, because a phase whose name explains half its contents is a phase people will look in the wrong place for:**

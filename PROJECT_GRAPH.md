@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `b163168` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `cf6e637` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 413 test cases in 46 files · 62 ADRs (54 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 413 test cases in 46 files · 64 ADRs (56 accepted)
 
 ## Modules
 
@@ -187,6 +187,8 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-057 | The Buyer's Legal Identity on an Invoice | ACCEPTED (new) | **Phase 2 item 13's creating migration** (snapshot columns) and **a new capability owed to `PHASE_2_BRIEF.md` §3**, discharged by its 2026-09-03 amendment. Removes one R-043 blocker; closes none |
 | ADR-058 | Automatic Renewal by Direct Debit: Not in V1 | ACCEPTED (new) | nothing — it forecloses nothing and creates no table. `supportsDirectDebit` stays in the port and stays false; ADR-023 item 1's startup check does the enforcing |
 | ADR-059 | What a Resolving Host Returns When the Store Behind It Is Not Serving | ACCEPTED (new) | **Phase 4's storefront delivery**; nothing in Phase 2. 503 while revivable, 410 once the reactivation window closes, never a 200 and never a redirect to a platform hostname |
+| ADR-060 | Object Storage Port | ACCEPTED (new) | nothing in Phase 2 — `files` stays out of §4 and no table is created. The **adapter** arrives with its first consumer: ADR-054's recovery archive or ADR-061's WAL archive |
+| ADR-061 | Cluster Recovery: Backup Policy, Targets and the Drill | ACCEPTED (new) | nothing in Phase 2; **owns R-041** and depends on ADR-060. Targets are ADR-010's (RPO 15 min, RTO 4 h) and none is invented here; R-041 closes on the first drill, not on configuration |
 | ADR-011 | Co-Pilot Cadence vs AI Credit Cost | DEFERRED | Phase 12 |
 | ADR-012 | Autonomous AI Execution Opt-In | DEFERRED | Phase 13 |
 | ADR-013 | Voice Input Retention | DEFERRED | Phase 14 |

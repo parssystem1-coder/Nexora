@@ -93,6 +93,8 @@ For each ADR, completion requires:
 | ADR-057 | The Buyer's Legal Identity on an Invoice | Billing / Compliance | **ACCEPTED (new)** | **Phase 2 item 13's creating migration** (snapshot columns) and **a new capability owed to `PHASE_2_BRIEF.md` §3**, discharged by its 2026-09-03 amendment. Removes one R-043 blocker; closes none |
 | ADR-058 | Automatic Renewal by Direct Debit: Not in V1 | Billing / Lifecycle | **ACCEPTED (new)** | nothing — it forecloses nothing and creates no table. `supportsDirectDebit` stays in the port and stays false; ADR-023 item 1's startup check does the enforcing |
 | ADR-059 | What a Resolving Host Returns When the Store Behind It Is Not Serving | Storefront / Lifecycle | **ACCEPTED (new)** | **Phase 4's storefront delivery**; nothing in Phase 2. 503 while revivable, 410 once the reactivation window closes, never a 200 and never a redirect to a platform hostname |
+| ADR-060 | Object Storage Port | Platform / Ports | **ACCEPTED (new)** | nothing in Phase 2 — `files` stays out of §4 and no table is created. The **adapter** arrives with its first consumer: ADR-054's recovery archive or ADR-061's WAL archive |
+| ADR-061 | Cluster Recovery: Backup Policy, Targets and the Drill | Platform / Ops | **ACCEPTED (new)** | nothing in Phase 2; **owns R-041** and depends on ADR-060. Targets are ADR-010's (RPO 15 min, RTO 4 h) and none is invented here; R-041 closes on the first drill, not on configuration |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -1464,7 +1466,48 @@ Certificate private material is never stored in PostgreSQL. Only metadata and a 
 
 **Not settled here, because it is a decision and not a clarification**, and this session was not given it. **ADR-059's rule that the ACME challenge path answers on a non-serving host is required under either reading**, so nothing is blocked by leaving it open. **Recommendation: settle it, and if renewal continues, say so in item 10 so that "left to expire naturally" is read as "not revoked" rather than "not renewed."**
 
+#### Amendment, 2026-09-03 (second this date) — certificate renewal continues while a subscription can still be revived
+
+**Ruled by the maintainer on 2026-09-03**, settling the question ADR-059 surfaced the same day and deliberately declined to answer.
+
+#### It is not a contradiction, and reading it as one gets the reasoning backwards
+
+Item 4 requires *"automatic renewal starting at a configured margin before expiry, default 30 days"* with no exception for a non-serving store. Item 10 says the certificate is *"left to expire naturally rather than being revoked."* Those look opposed, and ADR-059 recorded them as a tension — correctly, because nothing said which applied to a store whose renewal window arrives while it is dark.
+
+**Read item 10's own rationale and the answer is already implied by it.** Its stated purpose is *"so that reactivation within the window restores service **without re-issuance where possible**."* **That purpose only works if the certificate is still valid during the window.** If renewal stopped the moment a subscription became non-serving, a certificate whose 90-day life ended inside ADR-024 item 6's 30-day reactivation window would expire — and reactivation would require re-issuance, which is exactly what item 10 says it is trying to avoid.
+
+**So this amendment completes item 10 rather than overriding it.** Item 10 is about **not revoking**; it was never about not renewing, and its heading — *"Subscription coupling"* — and its opening clause — *"On transition to a non-serving state (ADR-024)"* — confirm it is written about a subscription lapse and not about domain removal, which is ADR-028 item 8's subject.
+
+#### The ruling
+
+> **Certificate renewal continues for as long as the subscription can still be revived** — through ADR-024 item 4's grace window and item 6's reactivation window (default 30 days).
+>
+> **It stops at the moment the subscription becomes `CANCELED`.** From then on item 10 applies exactly as written: the certificate is left to expire naturally, and is not revoked.
+
+**This is the same lifecycle boundary two other rules already use, and that is worth saying rather than leaving to be noticed.** ADR-059 turns **503 into 410** at it. ADR-028's 2026-09-03 amendment makes a **platform subdomain permanently reserved** at it. Now certificate renewal stops at it. **One boundary with three consequences is something a person can hold in their head; three boundaries that nearly coincide is how they drift apart** and how a store ends up serving 410 with a valid certificate, or 503 with an expired one.
+
+#### Three reasons
+
+1. **A 503 needs a valid certificate to be seen at all.** ADR-059 rules that a suspended store returns `503` with `Retry-After` — a considered answer that tells a crawler to back off and a customer to come back. **A visitor whose browser refuses the connection over an expired certificate never receives it.** An expired certificate converts a designed response into a browser interstitial, which is a worse outcome for the tenant *and* for the platform, and it happens at precisely the moment the tenant is deciding whether to pay.
+2. **Reactivation must be instant.** ADR-024 item 6 promises that reactivation restores *"the same store, domains and data."* A tenant who pays and then waits for certificate issuance and DNS propagation has not been restored — they have been queued.
+3. **It costs nothing.** ADR-059 already requires the ACME `HTTP-01` challenge path to answer while a store is non-serving, so the mechanism is in place and no new work is created by this ruling.
+
+#### The condition reason 3 depends on — the only thing that makes this ruling contingent
+
+**Reason 3 holds only while certificates come from an automated, free issuer.** ADR-027 item 4 assumes ACME, and ACME issuance is free.
+
+> **Revisit trigger: the platform buying certificates per hostname from a commercial CA.** At that point renewing for a non-paying tenant through a 30-day reactivation window is a real, recurring, per-tenant cost, and the trade this ruling makes silently becomes a different trade.
+
+Recorded here rather than in a footnote, because it is the single assumption the ruling rests on and the one a future reader is least likely to reconstruct.
+
 #### Verification, added by this amendment
+
+- [ ] a certificate whose renewal margin falls inside the grace or reactivation window is renewed, proven with a simulated clock rather than reasoned from the schedule
+- [ ] renewal stops on transition to `CANCELED`, and the certificate is **not** revoked
+- [ ] a suspended store presents a valid certificate and ADR-059's `503`, not a browser interstitial
+- [ ] reactivation within the window serves immediately, with no re-issuance step on the critical path
+
+### Verification, added by this amendment
 
 - [ ] the published apex address resolves to an edge, and no origin address appears in any tenant-facing instruction
 - [ ] the origin refuses a request that did not arrive through the edge, proven with a direct request
@@ -2270,6 +2313,8 @@ Partitioning an empty or small table is a schema change. Partitioning a large po
 
 1. **Native declarative partitioning by time** (`PARTITION BY RANGE (occurred_at)` or equivalent per table). No extension dependency. Requires a partition-creation policy — a migration per period, or a job. Bounds per-partition scan size and makes detaching a period for archival cheap.
 2. **`pg_partman`.** Automates partition creation and retention. A further extension dependency for automation that, at ADR-010's assumed V1 scale (≤5,000 organizations, 50 admin RPS peak), native declarative partitioning covers without it. *(Extension behaviour understood at 2026-09-01, not verified against upstream in this pass.)*
+> **Cross-reference, 2026-09-03:** the port this option waits on is now shaped — **ADR-060**. The adapter is still unbuilt and **R-025 stays open**, so this option's dependency is narrowed rather than met.
+
 3. **Archival to cold storage.** Detach or export old rows to object storage. Interacts with **R-025**: no object storage port exists, and no phase item owns one.
 4. **Accept unbounded growth with a stated trigger** — for example a row count or table size at which option 1 is revisited. Honest and cheap now, and it forfeits the cheap moment described above.
 
@@ -3461,6 +3506,8 @@ Ruled by the maintainer on 2026-09-03. **Recovery granularity is the last nightl
 ### What this ADR does not do
 
 - **It does not provide arbitrary point-in-time recovery.** Ruled out on cost by the maintainer on 2026-09-03. What it would have required is named in the ruling above — WAL archiving, a standby restore target, and full-cluster restore per incident — so that a later reader can price reopening it rather than re-deriving why it was declined.
+> **Cross-reference, 2026-09-03:** the gap named in the bullet below now has an owner — **ADR-061** rules the backup policy, cites ADR-010's existing targets rather than inventing new ones, and carries `RUNBOOK_DISASTER_RECOVERY.md`. It does **not** close **R-041**, which stays open until the first restore drill. The object-storage prerequisite this ADR names now has a port shape in **ADR-060**.
+
 - **It does not address total cluster or server loss, and no phase owns that.** This is a **different risk with a different mechanism** — physical backup plus off-site replication — and per-tenant logical snapshots do not substitute for it, because snapshots stored on infrastructure that is itself lost are not a recovery path. **A reader must not close this ADR believing disaster recovery is solved.** It is not covered here and it is not covered anywhere. **Recommendation, not an action taken:** record it as its own risk row. This ADR recommends and deliberately does not open one, because the scope of a new row is the maintainer's to set.
 - **It does not choose a storage backend, a snapshot format, a scheduler, or a compression scheme.** Those are Phase 2.5's design work.
 - **It does not decide what a restore does to a tenant's *sessions*.** ADR-053 gives sessions a 30-day retention and `sessions` has no `tenant_id` at all, so it is not tenant-partitionable the way the snapshot mechanism assumes. Whether a restored tenant's users are logged out is a real question this ADR does not answer and does not assume — named here so an implementer reads this sentence as confirmation that no answer was given.
@@ -3956,6 +4003,154 @@ Item 4's exception above depends on whether certificates are renewed at all whil
 - [ ] the ACME challenge path answers on a non-serving host, proven with a simulated renewal
 - [ ] `robots.txt` returns 503 on a non-serving host — asserted deliberately, so a later "fix" has to argue with a test
 - [ ] no response on a non-serving host carries status 200 or a 3xx to a platform hostname
+
+
+---
+
+## ADR-060 - Object Storage Port
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-03, depends on ADR-023 and ADR-037; **blocks nothing in Phase 2** — `files` stays on `PHASE_2_BRIEF.md` §4's out-of-scope list and no table is created
+
+### Problem
+
+`03_TECHNICAL_BLUEPRINT.md` §9 has listed object storage among the things to *"keep behind contracts from day one"* since the pack was written, and **no such contract exists.** `RISK_REGISTER.md` **R-025** records it directly: no port, no adapter, and no phase list delivering one.
+
+**What changed is not the gap but the consumers.** A port designed against zero known consumers is a guess; this one now has four, all named in accepted decisions:
+
+| Consumer | Where |
+|---|---|
+| per-tenant recovery archives | **ADR-054**, which calls object storage *"a hard prerequisite"* it does not own |
+| ledger archival | **ADR-041**'s ruling Part 6, deferred **explicitly because there is nowhere to put an archive** |
+| the WAL archive | **ADR-061**, ruled the same day, which cannot meet its RPO without it |
+| store media | Phase 3 (`04` §3) |
+
+Two of those are recovery mechanisms whose absence R-025 and **R-041** already track. **This ADR is the contract only. No adapter, no vendor, no bucket, no credential, no table.**
+
+### Decision
+
+**1. The port's semantics are S3's — and that is a choice of market intersection, not of supplier.**
+
+Every candidate this platform could realistically use speaks the S3 API: the Iranian cloud providers that would host it, and the S3-compatible servers used for local development alike. **Adopting those semantics is adopting the intersection of what is available, which is the opposite of a vendor commitment** — a port shaped around one vendor's proprietary model would have to be rewritten to reach any other, while a port shaped around the intersection reaches all of them.
+
+Written down because *"we picked S3"* reads like a supplier decision unless the reason is on the page, and a later reader who mistakes it for one will believe the platform is locked in when it is not.
+
+**2. Capability flags, on ADR-023's discipline.** ADR-023 item 1 established that a port *declares what a provider can do* and that *"application code branches on declared capability, never on provider name"*; item 9 confines every SDK, URL and field name to the adapter. Both apply here unchanged. Declared at minimum:
+
+```plain
+supportsPresignedUrls
+supportsMultipartUpload
+supportsVersioning
+supportsLifecycleRules
+supportsServerSideEncryption
+supportsObjectImmutability     -- object lock / WORM
+```
+
+**3. `supportsObjectImmutability` is the flag that carries weight, and the ADR says why.** **A backup that a compromised credential can delete is not a backup.** ADR-061 depends on this flag existing, and ransomware against a cloud account deletes backups before it announces itself.
+
+**A provider that lacks it is legal**, and that is the point of declaring rather than requiring: the platform then *knows* its backups are deletable and can say so in ADR-061's runbook, which is strictly better than assuming they are not. A capability flag turns an unexamined assumption into a stated fact.
+
+**4. Keys are tenant-prefixed, and a tenant never controls a key segment unsanitised.** Stated as a rule with its failure named, because the failure is not obvious from the happy path: **a filename a tenant supplies, concatenated into a key, is how one tenant reads or overwrites another's objects.** A `../` or an absolute-looking segment in a user-supplied name crosses the prefix that was the whole isolation mechanism. This is ADR-028 item 4's treatment of the `Host` header applied to a different attacker-controlled string — *"must never be interpolated ... without normalization"*.
+
+**5. Two registries, platform-scoped and store-scoped**, exactly as ADR-023 item 7 requires for payment providers and for the same reason: *"they must never be resolvable from the same context."* The platform's recovery archives and a merchant's product images are not the same trust boundary and must not share a credential.
+
+**Credentials live under ADR-037's rules** — a `secret_ref` and never the material, and item 3's prohibition on writing a plaintext secret *"by any code path — including a stub adapter, a seed, a fixture, or a test"*, **which ADR-040's 2026-09-03 ruling extended to logs.**
+
+### What this ADR does not do
+
+- **It creates no table.** `files` is on `PHASE_2_BRIEF.md` §4's out-of-scope list and stays there; §4's list is unchanged by this ADR.
+- **It chooses no vendor, buys nothing, and configures no bucket.** Per ADR-023 item 6's precedent, per-provider constraints are *"verified against the chosen provider at integration time and recorded in `PROVIDER_MATRIX.md`"* — not asserted here.
+- **It does not decide retention or lifecycle policy for anything stored.** ADR-041 Part 6 owns ledger retention windows; ADR-054 owns snapshot retention at 30 days; ADR-061 owns WAL retention. This port carries the flag that says whether lifecycle rules are available, not what they should be.
+- **It does not build a resolver for its credentials** — ADR-037's deferral applies unchanged, and until it is lifted a storage credential resolves from configuration like every other secret.
+- **It does not close R-025.** A port shape is not a port implementation and neither is a bucket; R-025 closes when a consumer can actually write an object.
+
+**Trigger for the adapter: the first consumer to be built** — ADR-054's Phase 2.5 recovery archive or ADR-061's WAL archive, whichever comes first. **The ADR is the contract; the adapter arrives with its consumer**, which is the same sequencing ADR-023 uses for payment providers.
+
+### Verification
+
+- [ ] no storage SDK, URL or bucket name appears outside an adapter, enforced by the existing `FORBIDDEN-IMPORT-DOMAIN` rule's provider-SDK pattern
+- [ ] a second provider is added in a test with no change outside its adapter and configuration (ADR-023's *Adding a new provider* standard)
+- [ ] a tenant-supplied filename containing `../` or a leading separator cannot escape its tenant prefix, proven with an adversarial input
+- [ ] a platform-scoped storage credential is unreachable from a store-scoped context, and the reverse
+- [ ] a provider declaring `supportsObjectImmutability: false` is usable, and the fact is surfaced rather than silently assumed away
+
+---
+
+## ADR-061 - Cluster Recovery: Backup Policy, Targets and the Drill
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-03, depends on ADR-010, ADR-037, ADR-054 and ADR-060; **owns R-041**; blocks nothing in Phase 2
+
+### Problem
+
+**ADR-054 rules per-tenant recovery from nightly snapshots and explicitly disclaims this:**
+
+> *"It does not address total cluster or server loss, and no phase owns that. This is a **different risk with a different mechanism** — physical backup plus off-site replication — and per-tenant logical snapshots do not substitute for it, because snapshots stored on infrastructure that is itself lost are not a recovery path. **A reader must not close this ADR believing disaster recovery is solved.** It is not covered here and it is not covered anywhere."*
+
+That gap is **R-041**, opened on ADR-054's own recommendation. This ADR owns it.
+
+#### The finding that makes this urgent rather than tidy, and it is an arithmetic one
+
+**A nightly snapshot means up to twenty-four hours of writes can be lost.** Apply that to what this platform actually stores.
+
+**A payment verified at 23:50 and a cluster lost at 23:55 is money received with no record of it on our side.** The customer was charged. The provider has the record. The platform has nothing — no `billing_payment_intents` row, no `billing_payment_events` row, no invoice. **Every one of those tables is append-only** (`PHASE_2_BRIEF.md` §5), so there is nothing to reconcile *from*: the reconstruction has to come from the payment provider, and until someone does it the platform's books and the provider's disagree by exactly the transactions in the lost window.
+
+**And the platform already committed to better than that, which is the part nobody noticed.** **ADR-010's assumptions table states `RPO | 15 minutes` and `RTO | 4 hours`** — and both `01_ARCHITECTURE_BASELINE_RFC.md` and `03_TECHNICAL_BLUEPRINT.md` gate production on *"backups plus a completed restore drill meeting the ADR-010 RPO and RTO."* **The only recovery mechanism the platform has delivers 24 hours for a single tenant and nothing at all for the cluster, against a stated 15 minutes.** The targets have existed since ADR-010; the mechanism to meet them has never been designed.
+
+### Decision
+
+**1. The targets are ADR-010's. This ADR states none of its own.**
+
+> **RPO 15 minutes. RTO 4 hours.** Both from ADR-010's assumptions table, unchanged.
+
+**This is deliberate and it is a correction to how this ADR was nearly written.** A draft proposed ruling "RPO ≤ 5 minutes, RTO ≤ 4 hours" as fresh choices — which would have **tightened an accepted ADR's number without amending it** and restated the other as though it were new. **Inventing a second, stricter RPO in a second document is how two numbers end up in circulation and the looser one gets quoted.** If 15 minutes is wrong, ADR-010 is where it changes.
+
+**Their epistemic status travels with them, per ADR-010's 2026-08-28 amendment:** every number in that table is *"an unverified design assumption, not a measured requirement and not a contractual SLO"*, and that amendment's own verification bars any document from citing one *"as a met or measured figure before Phase 4 item 9 has run."* **This ADR cites them as targets to design against, which is exactly their stated purpose, and claims no compliance with either.**
+
+**2. Nightly snapshot plus continuous WAL archiving.** The snapshot alone cannot meet a 15-minute RPO and **no amount of scheduling makes it** — a nightly snapshot's RPO is the interval, and shortening the interval to 15 minutes is not a snapshot policy, it is continuous archiving with extra steps. **The WAL archive goes to object storage, so this ruling depends on ADR-060** and cannot be implemented before that port has an adapter.
+
+**3. At least one copy outside the account that runs the cluster.** A compromised or mistakenly closed provider account holding both the database and its backups has **no recovery path at all** — the failure this ADR exists for is precisely the one where the primary infrastructure is gone. **Where the provider offers immutability (ADR-060's `supportsObjectImmutability`), the off-account copy uses it**, because ransomware deletes backups before it announces itself.
+
+**4. Backups are encrypted, and the key does not live with the backup.** A backup and its key in one place is one compromise, not two.
+
+**ADR-037's deferral applies here and is stated rather than glossed:** until a resolver exists, this key lives in configuration like every other secret — *"a thin read from `platform/config.ts`"*. **That is a real limitation of the current state, not a property of this ruling**, and it is named so that whoever provisions the backup knows what protects the key today.
+
+**5. A backup is a hypothesis until a restore has been performed.**
+
+> **Quarterly restore drill**, against a scratch environment, with **the result written down** — including the **measured** restore time against ADR-010's 4-hour RTO.
+>
+> **Until the first drill has run, the platform does not claim a recovery path, and R-041 stays open regardless of what has been configured.**
+
+This is the item every backup design drops first, and ADR-054 already gives the precedent in its own words — a snapshot never restored is not a backup. The difference here is that the drill also produces the **first measurement** of a number ADR-010 has only ever assumed.
+
+### The runbook
+
+**`RUNBOOK_DISASTER_RECOVERY.md`, at the repository root**, written now while nobody is under pressure. It answers who declares an incident, where the snapshot and WAL archive are, the restore sequence **including the role bootstrap** (`platform/db/init/001_roles.sql` creates the `nexora_migrate`/`nexora_app` split the entire RLS model depends on — **a restore that omits it produces a database the application cannot safely use**), how completeness is verified, how payments in the lost window are recovered, and what tenants are told.
+
+**Two verification checks the append-only tables give for free**, and the runbook names both: **the last invoice number** — ADR-048's counter is gap-free, so a gap after restore is detectable arithmetic rather than a judgement — and the **newest `audit_events` timestamp** against the moment of loss, which bounds the lost window directly since ADR-034 item 4 writes one row per capability attempt.
+
+**Payments in the lost window are recovered with a mechanism the platform already owes rather than a recovery-only one:** ADR-023 item 4's reconciliation sweep exists to *"sweep every `PENDING` intent older than a configured threshold and verify it against the provider"*, and that is exactly the right tool. **Reusing it means the recovery path is exercised by ordinary operation rather than only in an incident.**
+
+### What is deferred, and what deliberately is not
+
+**Procurement is deferred.** No provider is chosen, nothing is bought, no bucket exists, and the maintainer has said this happens at launch.
+
+**The policy, the targets and the runbook are not deferred**, and the reason is the ordering: **they are what the procurement decision will be judged against.** Choosing a provider before knowing the RPO you need is how a platform ends up owning the wrong product — a nightly-snapshot service is cheaper and would have looked adequate right up until someone read ADR-010.
+
+### What this ADR does not do
+
+- **It does not close R-041**, and cannot until the first drill. A configured backup with no restore behind it is the state this ADR exists to distinguish from a recovery path.
+- **It does not change ADR-010's numbers**, and any future change to them belongs there.
+- **It does not supersede ADR-054.** Per-tenant logical recovery and cluster recovery remain the two different mechanisms ADR-054 said they were; this ADR adds the second and takes nothing from the first.
+- **It does not design multi-region or hot standby.** ADR-010 states *"single-node PostgreSQL with a read replica is assumed sufficient for V1"* and puts multi-region out of scope; a 4-hour RTO does not require a standby.
+- **It builds nothing**, and installs nothing.
+
+### Verification
+
+- [ ] a restore drill has run, its result is recorded, and the measured restore time is compared against ADR-010's RTO — **the first drill is what allows R-041 to close**
+- [ ] the measured RPO of the configured mechanism is compared against ADR-010's 15 minutes, and any shortfall is recorded rather than rounded
+- [ ] at least one backup copy is outside the account running the cluster, verified by attempting a restore using only that copy
+- [ ] the restore sequence includes the role bootstrap, proven by a restore into an empty environment that then passes the tenant-isolation suite
+- [ ] payments inside a simulated lost window are recovered through ADR-023 item 4's reconciliation sweep, not a bespoke script
+- [ ] the backup encryption key is not recoverable from the backup or from the account holding it
 
 ## 3. Open Items Deliberately Left Open
 

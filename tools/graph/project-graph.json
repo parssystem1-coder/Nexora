@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "b163168",
+    "commit": "cf6e637",
     "dirty": true
   },
   "modules": [
@@ -691,6 +691,18 @@
       "blocks": "**Phase 4's storefront delivery**; nothing in Phase 2. 503 while revivable, 410 once the reactivation window closes, never a 200 and never a redirect to a platform hostname"
     },
     {
+      "id": "ADR-060",
+      "title": "Object Storage Port",
+      "status": "ACCEPTED (new)",
+      "blocks": "nothing in Phase 2 — `files` stays out of §4 and no table is created. The **adapter** arrives with its first consumer: ADR-054's recovery archive or ADR-061's WAL archive"
+    },
+    {
+      "id": "ADR-061",
+      "title": "Cluster Recovery: Backup Policy, Targets and the Drill",
+      "status": "ACCEPTED (new)",
+      "blocks": "nothing in Phase 2; **owns R-041** and depends on ADR-060. Targets are ADR-010's (RPO 15 min, RTO 4 h) and none is invented here; R-041 closes on the first drill, not on configuration"
+    },
+    {
       "id": "ADR-011",
       "title": "Co-Pilot Cadence vs AI Credit Cost",
       "status": "DEFERRED",
@@ -1036,7 +1048,7 @@
     "routes": 11,
     "testFiles": 46,
     "testCases": 413,
-    "adrs": 62,
-    "adrsAccepted": 54
+    "adrs": 64,
+    "adrsAccepted": 56
   }
 }
