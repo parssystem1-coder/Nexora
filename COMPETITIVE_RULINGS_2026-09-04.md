@@ -1,15 +1,17 @@
 # Competitive Rulings — ruled by the maintainer on 2026-09-04
 
-> **سند غیرنرمتیو.** این فایل متنِ خامِ احکام است. در ترتیب خواندنِ `AGENTS.md` §۱
-> نیست و هیچ چیزی را خودش تصمیم نمی‌گیرد.
+> **سند غیرنرمتیو، ولی نگه‌داشته می‌شود.** این فایل متنِ خامِ احکام است. **بخش‌های
+> الف تا چ در ۴ شهریور ۱۴۰۵ ثبت شدند** و اکنون نُه ارجاع نرمتیو این فایل را
+> به‌عنوان منشأ تصمیم نام می‌برند — پس حذف نمی‌شود، همان‌طور که
+> `EXTERNAL_ARCHITECTURE_REVIEW_2026-08-28.md` و
+> `PHASE_2_DOCUMENTATION_GAPS_2026-08-28.md` نگه داشته شده‌اند. قاعده این نیست که
+> «پرامپت‌ها پاک می‌شوند»؛ این است که «سندی که چیزی به آن ارجاع ندهد مصرف‌شده است».
 >
-> **ثبت شد در ۲۰۲۶-۰۹-۰۴ — و برخلاف آنچه اینجا در ابتدا نوشته شده بود، این فایل
-> نگه داشته می‌شود.** هر ۴۴ حکم در اسناد نرمتیو ثبت شد، و آن ثبت‌ها **نُه بار به
-> همین فایل ارجاع می‌دهند**: هفت اصلاحیهٔ ADR، اصلاحیهٔ `06_IMPLEMENTATION_PLAN.md`،
-> اصلاحیهٔ `PHASE_2_BRIEF.md`، سطر R-044 و `decisions/2026-09.md`. حذفِ آن، هر نُه
-> ارجاع را می‌شکند. همان قاعده‌ای که برای `EXTERNAL_ARCHITECTURE_REVIEW_2026-08-28.md`
-> به کار رفته اینجا هم صدق می‌کند: **یک سندِ منبعِ تاریخ‌دار نگه داشته می‌شود و به آن
-> ارجاع داده می‌شود؛ یک پرامپت، مصرف‌شدنی است.**
+> **بخش‌های ح و خ در ۵ سپتامبر ۲۰۲۶ ثبت شدند.** یازده حکم که پس از سشنِ ثبت
+> اضافه شده بودند — دو تا دربارهٔ پرداخت کرایه و مدیریت قیمت، نُه تا دربارهٔ نرخ
+> حمل. **هیچ ADR تازه‌ای نوشته نشد**؛ ح-۲ در فاز ۲.۵ و ح-۱ به‌همراه هر نُه حکمِ خ
+> در فاز ۳ ثبت شدند (`06_IMPLEMENTATION_PLAN.md`، دومین اصلاحیهٔ ۲۰۲۶-۰۹-۰۴)، و
+> R-032 صاحب و مهلت گرفت. **اکنون هیچ بخشی از این فایل ثبت‌نشده نیست.**
 
 **Source.** These rulings come from a review of a live competitor — a trial
 account inside the Webzi admin panel (`mywebzi.ir`), its public pricing page (all
@@ -25,9 +27,9 @@ depends on such a claim says so in its own text.
 
 **How to use this file — it is a record now, not an instruction.** Each ruling has
 an id and an anchor naming where it is recorded, and the normative documents cite
-those ids back to here. The prompt that drove the recording
-(`SESSION_18_COMPETITIVE_RULINGS_PROMPT.md`) was spent and removed on 2026-09-04;
-what it produced is in `decisions/2026-09.md` under that date.
+those ids back to here. **Every section is recorded:** الف through چ on 2026-09-04,
+ح and خ on 2026-09-05. The two prompts that drove those recordings were spent and
+deleted; what they produced is in `decisions/2026-09.md` under those two dates.
 
 ---
 
@@ -298,3 +300,189 @@ it can be said at all.
 3. **"Renew late and your ranking survives."** — ADR-059, ADR-027's amendment
 4. **"We will put your store back to yesterday."** — ADR-054
 5. **"Gateways, shipping and Torob are all free. Zero commission."** — پ-2, پ-3, پ-4
+
+---
+
+## ح — Addendum, ruled 2026-09-04 (second this date)
+
+Two rulings added after the first forty-four, in the same session and by the same
+maintainer. **The total is 46 before section خ, and 55 with it.**
+
+**ح-1. A shipping method declares who bears the freight cost, and only a prepaid
+method contributes money to the order.**
+
+Iranian storefronts sell under three distinct arrangements, and they are not three
+payment methods — they are three answers to *who pays the carrier*:
+
+| Mode | Goods | Freight |
+|---|---|---|
+| **پیش‌کرایه** (prepaid) | paid online | paid online, a line on our order |
+| **پس‌کرایه** (collect) | **paid online** | paid by the buyer to the carrier at delivery |
+| **پرداخت در محل** (COD) | paid at delivery | paid at delivery |
+
+The ruling, in four parts:
+
+1. **A shipping method carries a cost-bearer attribute** with those three values.
+   It is an attribute of the shipping method, **not** of the payment method, and it
+   must not be modelled as a payment provider capability.
+2. **Only a prepaid method puts a freight amount into the order total or onto the
+   invoice.** For پس‌کرایه the platform never receives the freight money, so an
+   amount for it must never appear in a total, a payment intent, or an invoice
+   line. `invoices` is append-only; a figure we never collected cannot be corrected
+   out of it later.
+3. **Where the freight is collected at delivery, any figure shown at checkout is an
+   estimate and is labelled as one.** It never enters `Money` arithmetic and never
+   crosses the payment port. Carriers price by weight and destination at handover,
+   so the true figure does not exist at checkout — presenting it as a price would
+   be wrong twice over.
+4. **The shipping port declares which modes each carrier supports.** Same
+   discipline as ADR-023's payment port: a capability flag per carrier, application
+   code branching on the declared capability and never on a carrier's name. An
+   intra-city courier that has no collect-on-delivery arrangement simply declares
+   `false`, and the storefront does not offer the option.
+
+**Why this is worth recording now, two phases early:** پس‌کرایه is the *simplest*
+of the three for us — the goods still flow through the ordinary
+redirect-and-verify path and only the freight sits outside — while COD is the hard
+one, because the money arrives through the carrier rather than through any payment
+provider and ADR-023's intent model does not describe it at all. **Recording the
+distinction now prevents the common mistake of building COD's machinery for
+پس‌کرایه, or of treating پس‌کرایه as a payment method and pushing it through the
+payment port.**
+
+*Anchor: `06_IMPLEMENTATION_PLAN.md` Phase 3 (shipping) alongside ث-5; the
+cost-bearer attribute recorded in `decisions/2026-09.md` so that the first shipping
+ADR inherits it.*
+
+**ح-2. Plan and price administration is a Phase 2.5 deliverable.**
+
+`00_PLATFORM_OVERVIEW.md` §4.2 promises "multiple plan tiers, configurable without
+a code deployment", and **R-032 records that nothing delivers it and no phase owns
+it.** Phase 2 seeds plans by migration and D2-11 rules that no capability creates or
+edits one — correctly, because item 1 is a read slice.
+
+The ruling: **an operator-facing capability to publish a new plan version and a new
+price version lands in Phase 2.5, before the platform runs on a real server.**
+
+Three constraints it inherits and must not violate:
+
+- **ADR-047** — publishing a new price version does not touch existing
+  subscriptions; each is re-priced at its own next renewal invoice, at T-30d.
+- **`plan_versions` is immutable** — administration means *publishing a new
+  version*, never editing one. The word "edit" must not appear in the capability's
+  contract.
+- **ب-5** — a term length is its own price version, so the administration surface
+  publishes a price per term, not a price plus a discount.
+
+Until it exists, a price change is a migration. That is acceptable before launch
+and unacceptable after it, which is exactly why the deadline is Phase 2.5 rather
+than "later".
+
+*Anchor: `06_IMPLEMENTATION_PLAN.md` Phase 2.5; a dated addendum to **R-032**
+naming its owner and deadline.*
+
+---
+
+## خ — Shipping rates, ruled 2026-09-04 (third this date)
+
+Nine rulings that complete ح-1. **ح-1 answered *who pays* the freight; this section
+answers *how much it is* and *who the carrier may be*.** The total is 55.
+
+**The market this is designed against.** Iranian storefronts ship through the
+national post's tiers (پیشتاز، ویژه، اکسپرس), through private carriers (تیپاکس،
+چاپار، ماهکس، باکسیت), through intra-city couriers (اسنپ‌باکس، الوپیک), through
+aggregators that front several of these behind one integration (پدرو، تاپین،
+پستکس), and — for a very large share of real merchants — through **a local
+باربری with no API at all.** A model that only serves the integrated ones is
+unusable for the merchants who most need a store builder.
+*Carrier names are recorded as market context, verified only as names in current
+use on 2026-09-04, and no ruling depends on any particular one existing.*
+
+**خ-1. Any carrier can be defined by the merchant. A carrier with no integration is
+first-class, not a fallback.**
+Two classes exist: an **integrated** carrier, bound to an adapter, and a **manual**
+carrier, which is a name the merchant types and a rate table they fill in
+themselves. Both produce a shipping method the storefront can offer.
+A manual carrier carries a name, and optionally a **tracking URL template with a
+placeholder for the consignment code** — so "track my parcel" works for a carrier
+the platform has never heard of.
+**No application code branches on a carrier's name**, integrated or not — the same
+fence ADR-023 item 9 draws around payment providers.
+*Anchor: `06_IMPLEMENTATION_PLAN.md` Phase 3; the shipping port's ADR inherits it.*
+
+**خ-2. Rate rules are data, not code.**
+A merchant composing "50,000 within Tehran, 90,000 elsewhere, free above
+2,000,000" must not require a deployment. This is the shipping analogue of
+ADR-023's "adding a gateway costs one adapter and one config entry" — here it costs
+**zero code**.
+
+The composable shape, per shipping method and per zone:
+
+| Part | Values |
+|---|---|
+| **Rate source** | `TABLE` · `CARRIER_QUOTE` (an integrated adapter returns it) · `FREE` · `COLLECT` (ح-1 — no amount exists) |
+| **Bracket dimension**, for `TABLE` | `NONE` (a flat rate) · `WEIGHT` · `SUBTOTAL` · `ITEM_COUNT` |
+| **Rows** | ordered `(from, to, amount)` brackets |
+| **Modifiers** | free above a threshold; an optional maximum |
+
+That composes to every model in common use: flat, free, conditional free, weight
+tiers, per-item, زون‌بندی تهران/شهرستان, cart-value tiers, live carrier quotes,
+in-store pickup (a zero-rate method), and پس‌کرایه. **Adding a new commercial
+arrangement must not mean adding a new rate type.**
+*Anchor: Phase 3.*
+
+**خ-3. Zones are defined by the merchant, and a destination no zone covers makes the
+method unavailable — never free.**
+A merchant may want city-level granularity inside Tehran and province-level
+elsewhere; the platform does not decide that for them. **An uncovered destination
+must hide the method, not price it at zero** — a silent zero is how a merchant ends
+up shipping for free without knowing.
+*Anchor: Phase 3.*
+
+**خ-4. The shipping amount is snapshotted on the order and on the invoice.**
+The same argument ADR-055 makes for the tax rate: a rate table can change after an
+order is placed, `invoices` is append-only, and the record must reproduce what was
+actually charged rather than what the current table would say.
+*Anchor: Phase 3; cross-reference ADR-055.*
+
+**خ-5. A rate quoted at checkout binds the merchant.**
+If a carrier's actual charge at handover differs from the quote the customer
+accepted, **the difference is the merchant's.** It is never re-charged to the
+customer without a new document.
+The customer holds an invoice stating an amount, and that invoice cannot be edited
+— ADR-056's correction-document shape is the only path to changing what a customer
+owes, and it exists for corrections, not for absorbing a carrier's variance.
+*Anchor: Phase 3; cross-reference ADR-056.*
+
+**خ-6. A free-shipping threshold is computed on the goods subtotal, after discount
+and before tax.**
+Decided explicitly because every reading is defensible and only one can be
+implemented. After discount, because a customer earns free shipping on what they
+actually pay for goods. Before tax, because otherwise a change in the tax rate
+silently moves the threshold — and ADR-055 makes the rate a dated, changeable
+thing.
+*Anchor: Phase 3; cross-reference ADR-055.*
+
+**خ-7. Insurance and packaging are their own order lines, never folded into the
+shipping amount.**
+ADR-044 requires each line to carry its own description captured at issuance. A
+merchant reconciling with a carrier, and a customer asking what they paid for, both
+need the parts separable.
+*Anchor: Phase 3.*
+
+**خ-8. One adapter may expose several named services. The port must not assume one
+adapter equals one carrier.**
+Iranian shipping aggregators front several carriers behind a single integration.
+Where one exists, **an aggregator adapter is preferred over writing several carrier
+adapters** — less code, one credential, one fixture suite. The port shape has to
+allow it, and that is a decision about the port rather than about a vendor.
+*Anchor: Phase 3; the shipping port's ADR.*
+
+**خ-9. Volumetric weight is the adapter's business or the merchant's, never the
+domain's.**
+Carriers price on the greater of actual and volumetric weight, each with their own
+divisor, and those divisors change. An integrated adapter applies its carrier's
+rule; a manual method uses whatever the merchant enters in their own table. **The
+domain never computes a volumetric weight**, for the same reason it never holds a
+provider's field names.
+*Anchor: Phase 3.*

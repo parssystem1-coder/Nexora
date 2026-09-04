@@ -4,7 +4,9 @@
 > `AGENTS.md` §۱ نیست. کارش فقط این است که اگر گفتگو قطع شد یا سشن جدیدی شروع شد،
 > بشود از همین‌جا ادامه داد. **این فایل حذف نمی‌شود؛ به‌روز می‌شود.**
 
-**Last updated: 2026-09-04, after session 18.**
+**Last updated: 2026-09-05, after session 19.** Every count below was taken from
+the repository on that date, not carried forward from a previous version of this
+file.
 
 ---
 
@@ -17,14 +19,25 @@ repository and either issues a correction or moves to the next item.
 
 **The analyst never edits normative documents.** It writes prompt and plan files
 into the repository root, each carrying a "سند غیرنرمتیو" header, and those files
-are deleted once spent. **One exception, established 2026-09-04: a file that the
+are deleted once spent.
+
+**One exception, established 2026-09-04 and re-confirmed 2026-09-05: a file the
 normative documents end up *citing* stops being a spent prompt and becomes a dated
-source document, which is retained.** See the housekeeping note below.
+source document, which is retained.** The operative rule is *"a document nothing
+cites is spent"*, not *"prompts are deleted"*. See the file list below.
 
 **The single source of truth is `D:\Nexora` on the maintainer's computer.** Any
 other copy — in a cloud workspace, in a summary, in a prior session's memory — may
 be stale. Verify against the repository before trusting anything, including this
 file.
+
+> **A process failure worth keeping, 2026-09-05.** After session 18 finished and
+> pushed, the analyst pushed **stale copies of three root files over its work** —
+> this file was reverted to its pre-session state, a deleted prompt was re-created,
+> and the rulings file's header was replaced. **Nothing normative was touched**, so
+> the damage was cosmetic, but it cost a session to repair. **The rule it produced:
+> the repository is downstream of nobody. An analyst copy never overwrites a file a
+> Code session has already updated.**
 
 ---
 
@@ -37,9 +50,10 @@ stop and report rather than working around it.*
 **Every session so far has found at least one false premise.** Among them: a
 recommendation that an already-ruled ADR forbade; a preference order stated
 backwards against ADR-027 item 3; a rule about `ALTER DEFAULT PRIVILEGES` that was
-scoped to one schema; an RPO target invented when ADR-010 already carried one; and
-a ruling that had to be withheld entirely because the empirical evidence
-disqualified its premise. **Keep the instruction in every prompt.**
+scoped to one schema; an RPO target invented when ADR-010 already carried one; a
+ruling that had to be withheld entirely because the empirical evidence disqualified
+its premise; and, in session 18, a prompt instruction to delete a file that the
+recording had just made load-bearing. **Keep the instruction in every prompt.**
 
 ---
 
@@ -55,11 +69,8 @@ disqualified its premise. **Keep the instruction in every prompt.**
 | 14 | Domains and the edge | ADR-059 (status codes for a non-serving host), amendments to ADR-019, ADR-027 and ADR-028 |
 | 15 | The last two open ADRs | ADR-039 and ADR-040 ruled. **No `OPEN` ADR remains.** Added a pooled-connection tenant-context test and extended the domain import rule |
 | 16 | Storage, backup, certificates | ADR-060 (object storage port), ADR-061 (cluster recovery), ADR-027's certificate amendment, `RUNBOOK_DISASTER_RECOVERY.md` |
-| 18 | The 44 competitive rulings | All recorded. **Seven ADR amendments, one error code, two brief amendments, twelve phase placements, one risk row — and no new ADR, because none was needed.** R-044 opened |
-
-**State after session 18:** 64 ADRs — 56 accepted, 8 deferred, **zero open**;
-**no new ADR was written, only amendments.** 44 risk-register rows, 34 open.
-Phase 2 still at 31 tables and 16 capabilities, **zero feature code written**.
+| 18 | The 44 competitive rulings (الف–چ) | All recorded. **Seven ADR amendments, one error code, two brief amendments, twelve phase placements, one risk row — and no new ADR, because none was needed.** R-044 opened |
+| 19 | The 11 addendum rulings (ح, خ) + repair | All recorded, **again with no new ADR**. R-032 given an owner and a deadline. The three overwritten files rebuilt from the repository |
 
 ### What session 18 recorded, and where
 
@@ -72,38 +83,56 @@ Phase 2 still at 31 tables and 16 capabilities, **zero feature code written**.
 | `RISK_REGISTER.md` | **R-044** — an unrate-limited SMS channel, opened as a **spend** control rather than a notification feature |
 | `decisions/2026-09.md` | The commercial rulings (پ, ج, چ) and the category fence that kept them out of the ADRs |
 
-**Three judgements this session made, recorded because a later reader will
+### What session 19 recorded, and where
+
+| Where | What |
+|---|---|
+| `06_IMPLEMENTATION_PLAN.md` | A second dated 2026-09-04 amendment: **ح-2 in Phase 2.5** (an operator capability to *publish* a plan version and a price version) and **ح-1 plus all nine خ rulings in Phase 3**, beside ث-5's carrier port |
+| `RISK_REGISTER.md` | A dated addendum to **R-032**, which now has an owner and a phase instead of a trigger. **It stays OPEN** — a deadline is not a delivery |
+| `decisions/2026-09.md` | The eleven rulings, the three cross-reference verifications, and the repair |
+
+**Judgements these two sessions made, recorded because a later reader will
 otherwise re-litigate them.** Commercial rulings — price, red lines, marketing
 claims — **did not enter an ADR**, because an ADR that rules a price is a category
-error. The twelve phase placements went to `06`, not an ADR, following the
-ADR-048/ADR-057 precedent that an ADR may not amend the owning document. And
-**الف-8 was recorded as a confirmation, not a narrowing**: ADR-027 item 4 already
-scopes its wildcard exclusion to *tenant-owned* domains and already permits
-`DNS-01` where the platform controls the zone, so a delegated zone was always
-inside its text.
+error. Phase placements went to `06`, not an ADR, following the ADR-048/ADR-057
+precedent that an ADR may not amend the owning document. **الف-8 was recorded as a
+confirmation, not a narrowing**: ADR-027 item 4 already scoped its wildcard
+exclusion to *tenant-owned* domains. And **none of the eleven shipping and
+administration rulings became an ADR**, because shipping has no port yet and ruling
+a design nobody has drafted is the failure a premature ADR causes.
 
-**One obligation left outside this repository.** ADR-052's trial is now 14 days;
-the commercial specification it was originally justified against
-(`D:\طرح پیشنهادی\12_COMMERCIAL_PRICING_AND_AI_DIAMOND_ECONOMY_SPEC11.md` §2)
-still says 7 and is out of step. **Nobody inside this repository can reconcile the
-two** — it needs the owner of that document.
+**State after session 19, verified against the repository on 2026-09-05:**
+
+- **64 ADRs — 56 `ACCEPTED`, 8 `DEFERRED`, zero `OPEN`** (`npm run graph`). Sessions
+  18 and 19 wrote **no new ADR**; both worked entirely by amendment.
+- **44 risk-register rows, 34 OPEN** (`npm run check:register` passes at 44). The
+  ten that are not open: `CLOSED` R-001, R-007, R-009, R-014 · `RESOLVED` R-002,
+  R-036, R-040 · `ACCEPTED` R-003, R-030 · `PARTIALLY CLOSED` R-005.
+  **A caution for anyone counting these mechanically:** the register's no-rewrite
+  convention means a status cell *begins* with its original word and carries dated
+  supersessions after it, so reading the first token misreads R-036 and R-040 as
+  open. **The last dated entry in the cell governs.**
+- **Phase 2 scope unchanged: 31 tables and 16 capabilities**, **zero feature code
+  written.** Neither session touched `PHASE_2_BRIEF.md` §3 or §4.
+- **Implemented today: 10 capabilities, 11 routes, 7 modules, 14 tables**; 430 tests
+  across 46 files; conformance 0 violations.
 
 ---
 
 ## What is next, in order
 
 1. **`SESSION_17_PLAN_LIST_SLICE_PROMPT.md`** — Phase 2 item 1, `plan.list`. The
-   first Phase 2 code, after sixteen sessions of documentation. Ends at a
-   hand-review stop; do not begin item 2. **Its precondition is now satisfied** —
-   session 18 ran on 2026-09-04, and ruling ب-3's finding is the one it was
-   waiting on: **item 1's migration is unchanged.** The prompt file has been
-   updated in place to say so.
+   first Phase 2 code, after seventeen sessions of documentation. Ends at a
+   hand-review stop; **do not begin item 2.** **Its precondition is satisfied** —
+   ruling ب-3's finding is the one it was waiting on: **item 1's migration is
+   unchanged.** The prompt file has been updated in place to say so.
 2. After item 1 is reviewed: items 2 onward, one slice per session, using the
    `/new-slice` skill.
 
-**Session 18 ran first and is done.** The competitive rulings were approved after
-the `plan.list` prompt was already written, and three of them (ب-4, ب-5, ب-8) bind
-Phase 2 migrations, so they went on the record first.
+**Sessions 18 and 19 both ran ahead of 17 and are done.** The competitive rulings
+were approved after the `plan.list` prompt was already written, and several of them
+(ب-4, ب-5, ب-8, and now ح-2) bind Phase 2 or Phase 2.5, so they went on the record
+first.
 
 ---
 
@@ -113,23 +142,28 @@ Phase 2 migrations, so they went on the record first.
 
 - `AUDIT_PROGRAMME_STATE.md` — this file
 - `SESSION_17_PLAN_LIST_SLICE_PROMPT.md` — until it runs
-- `COMPETITIVE_RULINGS_2026-09-04.md` — **retained permanently, and the reason is a
-  correction to this file's own earlier plan.** It was listed as spent-once-recorded
-  and session 18's prompt ordered it deleted. **It is now cited nine times from
-  normative documents** — the seven ADR amendments, `06`'s amendment,
-  `PHASE_2_BRIEF.md` §9.13, R-044 and `decisions/2026-09.md` all name it as the
-  provenance of a ruling. Deleting it would leave nine dangling references. **The
+- `COMPETITIVE_RULINGS_2026-09-04.md` — **retained permanently.** It was originally
+  marked spent-once-recorded, and two prompts ordered it deleted. **The normative
+  documents now cite it as the provenance of a decision** — seven ADR amendments,
+  both of `06`'s 2026-09-04 amendments, `PHASE_2_BRIEF.md` §9.13, R-032, R-044 and
+  `decisions/2026-09.md`. Deleting it would leave every one of those dangling. **The
   precedent decides it:** `EXTERNAL_ARCHITECTURE_REVIEW_2026-08-28.md` and
   `PHASE_2_DOCUMENTATION_GAPS_2026-08-28.md` are dated source documents cited from
-  seven files each, and both are retained. **The rule is not "prompts are deleted"
-  but "a document nothing cites is spent."**
+  seven files each, and both are retained.
 
-**Removed on 2026-09-04, as session 18's housekeeping step:** all seventeen spent
-`SESSION_*.md` prompts and `NEXORA_PLAN_3ROUNDS.md`. **Those seventeen are in git
-history and nothing cited them.** `SESSION_18_COMPETITIVE_RULINGS_PROMPT.md` was
-also removed but **was never committed, so unlike the rest it is not recoverable
-from git** — its substance survives as the rulings file plus the
-`decisions/2026-09.md` entry for that date.
+**Spent, and awaiting the maintainer's call:**
+
+- `SESSION_19_ADDENDUM_PROMPT.md` — **spent as of 2026-09-05.** Its own steps did not
+  instruct deleting it, unlike session 18's, so it was left in place rather than
+  removed on an assumption. **It is untracked and nothing cites it**, so deleting it
+  is one command and loses nothing but the prompt text itself.
+
+**Removed:** all seventeen earlier `SESSION_*.md` prompts and
+`NEXORA_PLAN_3ROUNDS.md` on 2026-09-04 — **those are in git history and nothing
+cited them.** `SESSION_18_COMPETITIVE_RULINGS_PROMPT.md` was removed on 2026-09-04,
+re-created by the analyst, and removed again on 2026-09-05; **it was never
+committed, so unlike the rest it is not recoverable from git.** Its substance is the
+rulings file plus the `decisions/2026-09.md` entries for 2026-09-04 and 2026-09-05.
 
 ---
 
@@ -144,12 +178,23 @@ These are tracked in `RISK_REGISTER.md` and need action outside this programme:
   hypothesis until it has been restored.
 - **R-043** — the platform issues invoices as a legal entity and registers none
   with سامانه مودیان. Needs a decision with an accountant, not an engineer.
+- **R-044** — an SMS channel with no rate limit is a **spend** risk, not a feature
+  gap. The limit must ship **with** Phase 2 item 17's first channel, not after it.
+- **R-032** — plan and price administration now has a phase (2.5) but no capability.
+  **Adding one is a contract change**: `05` §4.2 names no plan writer.
 - **The purge split for personal data** — which fields of the buyer-identity
   snapshot survive ADR-020 rule 4's reduction. Recorded as a **low-confidence
   proposal**; the natural-person national ID is the likeliest thing to be wrong.
   A question for an accountant.
 - **A separate registrable domain for tenant subdomains** (ruling الف-5) — must be
   purchased before the first customer.
+
+**One item is outside the repository's authority entirely.** ADR-052 as amended
+rules a **14-day** trial. The commercial specification it was originally justified
+against — `D:\طرح پیشنهادی\12_COMMERCIAL_PRICING_AND_AI_DIAMOND_ECONOMY_SPEC11.md`
+§2 — **still says 7 days and is now out of step.** No session may edit that file;
+the two must be reconciled by whoever owns it. The obligation is recorded in
+ADR-052's own amendment and in `decisions/2026-09.md` under 2026-09-04.
 
 ---
 
@@ -161,7 +206,7 @@ how the rulings were reached; the repository is the normative record.
 - **«ممیزی پیش از فاز ۲»** — every problem found from the start of the programme,
   with the recommendation for each
 - **«وبزی از داخل»** and **«حکم‌نامهٔ رقابتی نکسورا»** — the competitor review and
-  the 44 rulings that came out of it
+  the rulings that came out of it
 
 If a future session needs them and the links are lost, the maintainer's artifact
 gallery lists them.
