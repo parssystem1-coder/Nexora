@@ -18,6 +18,23 @@ export interface CapabilityRoute {
    * (organizationId in the path, email in the body).
    */
   pathParams: readonly string[];
+  /**
+   * Which keys of `inputSchema` arrive as query-string parameters. Added for
+   * ADR-036, whose request shape is two optional query parameters (`limit`
+   * and `cursor`) on a GET — neither a path parameter nor a request body.
+   *
+   * Without this, the OpenAPI generator's path/body split put them in a
+   * required JSON request body on a GET, which is a contract no client could
+   * satisfy and one the handler never reads. ADR-036's own verification list
+   * requires the generated artifact to document `limit`, `cursor` and
+   * `nextCursor` for every paginated capability, so the field is added by the
+   * slice that first needs it rather than declared ahead of an enforcement
+   * (`PHASE_2_BRIEF.md` §5, ADR-043).
+   *
+   * Optional: a capability with no query parameters omits it entirely, and
+   * every Phase 1 capability does.
+   */
+  queryParams?: readonly string[];
   successStatus: number;
 }
 

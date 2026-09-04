@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `d0cb1fe` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `47d105a` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 413 test cases in 46 files · 64 ADRs (56 accepted)
+**At a glance:** 8 modules · 17 tables (6 with RLS) · 11 capabilities · 12 routes · 439 test cases in 49 files · 64 ADRs (56 accepted)
 
 ## Modules
 
@@ -12,6 +12,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 |---|---|---|---|---|
 | `audit` | contracts, domain, infrastructure, migrations | 10 | — | yes |
 | `authorization` | application, contracts, domain, infrastructure, migrations | 17 | `capability` | yes |
+| `billing` | application, contracts, domain, infrastructure, interfaces, migrations | 12 | `audit`, `capability`, `identity` | yes |
 | `calendar` | contracts, domain | 4 | — | — |
 | `capability` | contracts, domain, interfaces | 8 | `audit` | yes |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 42 | `audit`, `capability` | yes |
@@ -31,6 +32,9 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `memberships` | tenant | yes | yes | yes | `memberships_self_or_tenant_access` | `20260822090300_tenant__create_memberships.sql` |
 | `organizations` | tenant | yes | yes | yes | `organizations_tenant_isolation` | `20260822090200_tenant__create_organizations.sql` |
 | `permissions` | authorization | — | — | — | — | `20260822090600_authorization__create_permission_catalog.sql` |
+| `plan_features` | billing | — | — | — | — | `20260905090000_billing__create_plans.sql` |
+| `plan_versions` | billing | — | — | — | — | `20260905090000_billing__create_plans.sql` |
+| `plans` | billing | — | — | — | — | `20260905090000_billing__create_plans.sql` |
 | `reserved_subdomains` | tenant | — | — | — | — | `20260823110000_tenant__create_reserved_subdomains.sql` |
 | `role_permissions` | authorization | — | — | — | — | `20260822090600_authorization__create_permission_catalog.sql` |
 | `roles` | authorization | — | — | — | — | `20260822090600_authorization__create_permission_catalog.sql` |
@@ -51,6 +55,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `membership.role.assign` | `POST /api/v1/organizations/:organizationId/memberships/:membershipId/roles` | `membership.role.assign` | HIGH_WRITE | yes | — |
 | `organization.create` | `POST /api/v1/organizations` | — | MEDIUM_WRITE | yes | — |
 | `organization.switch` | `POST /api/v1/organizations/:organizationId/switch` | — | LOW_WRITE | yes | — |
+| `plan.list` | `GET /api/v1/plans` | — | READ | yes | — |
 | `store.create` | `POST /api/v1/stores` | `store.create` | MEDIUM_WRITE | yes | — |
 | `store.read` | `GET /api/v1/stores/:storeId` | `store.read` | READ | yes | yes |
 
@@ -67,14 +72,14 @@ Roles ADR-030 requires exactly one implementation of.
 
 | layer | files | cases |
 |---|---|---|
-| application | 14 | 79 |
+| application | 15 | 87 |
 | conformance | 2 | 30 |
 | domain | 3 | 48 |
 | infrastructure | 4 | 15 |
-| integration | 15 | 194 |
+| integration | 16 | 207 |
 | interfaces | 1 | 4 |
 | other | 4 | 26 |
-| platform | 3 | 17 |
+| platform | 4 | 22 |
 
 <details><summary>Per file</summary>
 
@@ -83,6 +88,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/audit/infrastructure/audit-events-append-only.spec.ts` | infrastructure | 3 |
 | `modules/authorization/application/check-permission.service.spec.ts` | application | 2 |
 | `modules/authorization/infrastructure/role-catalog-agreement.spec.ts` | infrastructure | 1 |
+| `modules/billing/application/list-plans.service.spec.ts` | application | 8 |
 | `modules/calendar/domain/business-calendar.spec.ts` | domain | 27 |
 | `modules/capability/interfaces/capability-attempt.spec.ts` | interfaces | 4 |
 | `modules/identity/application/check-session-revoked.service.spec.ts` | application | 4 |
@@ -104,6 +110,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/tenant/infrastructure/organizations-rls.spec.ts` | infrastructure | 4 |
 | `platform/db/tenant-context-pool-reuse.spec.ts` | platform | 2 |
 | `platform/db/tenant-context.spec.ts` | platform | 5 |
+| `platform/pagination/cursor.spec.ts` | platform | 5 |
 | `platform/rate-limit/in-process-store.spec.ts` | platform | 10 |
 | `apps/api/auth-login-rate-limit.integration.spec.ts` | integration | 4 |
 | `apps/api/auth-login-trust-proxy.integration.spec.ts` | integration | 1 |
@@ -117,6 +124,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `apps/api/membership-role-assign.integration.spec.ts` | integration | 30 |
 | `apps/api/organization-create.integration.spec.ts` | integration | 13 |
 | `apps/api/organization-switch.integration.spec.ts` | integration | 12 |
+| `apps/api/plan-list.integration.spec.ts` | integration | 13 |
 | `apps/api/store-create.integration.spec.ts` | integration | 24 |
 | `apps/api/store-read.integration.spec.ts` | integration | 15 |
 | `apps/api/tenant-isolation-rls.spec.ts` | integration | 3 |

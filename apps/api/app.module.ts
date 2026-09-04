@@ -7,6 +7,7 @@ import { MembershipRoleController } from "../../modules/tenant/interfaces/member
 import { MembershipRevokeController } from "../../modules/tenant/interfaces/membership-revoke.controller.js";
 import { StoreCreateController } from "../../modules/tenant/interfaces/store-create.controller.js";
 import { OrganizationSwitchController } from "../../modules/tenant/interfaces/organization-switch.controller.js";
+import { PlanController } from "../../modules/billing/interfaces/plan.controller.js";
 import { AuthLoginController } from "../../modules/identity/interfaces/auth-login.controller.js";
 import { AuthLogoutController } from "../../modules/identity/interfaces/auth-logout.controller.js";
 import { AuthLogoutAllController } from "../../modules/identity/interfaces/auth-logout-all.controller.js";
@@ -37,6 +38,7 @@ import { HealthController } from "./health.controller.js";
     MembershipRevokeController,
     StoreCreateController,
     OrganizationSwitchController,
+    PlanController,
     AuthLoginController,
     AuthLogoutController,
     AuthLogoutAllController,

@@ -8,6 +8,7 @@ import {
   organizationSwitchCapability,
   membershipRevokeCapability,
 } from "../../modules/tenant/contracts/index.js";
+import { planListCapability } from "../../modules/billing/contracts/index.js";
 import {
   authLoginCapability,
   authLogoutCapability,
@@ -41,6 +42,7 @@ export const CAPABILITIES: readonly CapabilityDefinition[] = [
   membershipRoleAssignCapability,
   organizationCreateCapability,
   organizationSwitchCapability,
+  planListCapability,
   storeCreateCapability,
   storeReadCapability,
 ];

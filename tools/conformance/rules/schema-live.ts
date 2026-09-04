@@ -16,6 +16,16 @@ const TENANT_EXEMPT = new Set([
   "role_permissions",
   "credentials",
   "schema_migrations",
+  // Phase 2 item 1's three tables. PHASE_2_BRIEF.md §5 states the reason:
+  // "platform-authored reference data, identical for every tenant. 05 §4.2
+  // scopes plan.list global, not tenant; a tenant-scoped plan catalogue would
+  // make plan.list unanswerable before a tenant context exists, the same
+  // bootstrap problem R-003 documents for memberships." Listing them here is
+  // the checker being told the truth about their design — not an
+  // exceptions.json entry, which would be the checker being silenced.
+  "plans",
+  "plan_versions",
+  "plan_features",
 ]);
 
 const MONEY_NAME_RE = /amount|price|cost|total|balance|fee|money|charge/i;

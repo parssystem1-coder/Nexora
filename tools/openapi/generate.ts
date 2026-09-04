@@ -38,11 +38,21 @@ const errorEnvelopeSchema = z
 
 /**
  * Splits a capability's one input schema into the path parameters its route
- * declares and the request body that is everything else. Either half may be
- * empty: `store.read` is all path and no body, `organization.create` all body
- * and no path, `membership.invite` both.
+ * declares, the query parameters it declares, and the request body that is
+ * everything else. Any part may be empty: `store.read` is all path and no
+ * body, `organization.create` all body and no path, `membership.invite` both,
+ * and `plan.list` all query and no body.
+ *
+ * Query parameters were added for ADR-036 (`limit`, `cursor`). Before that
+ * this function had only two destinations, so a paginated GET's parameters
+ * fell through to the body and the artifact documented a required JSON body
+ * on a GET — a contract the handler never reads.
  */
-function splitInput(capability: CapabilityDefinition): { params?: z.AnyZodObject; body?: z.AnyZodObject } {
+function splitInput(capability: CapabilityDefinition): {
+  params?: z.AnyZodObject;
+  query?: z.AnyZodObject;
+  body?: z.AnyZodObject;
+} {
   const schema = capability.inputSchema;
   if (!(schema instanceof z.ZodObject)) {
     throw new Error(
@@ -60,11 +70,24 @@ function splitInput(capability: CapabilityDefinition): { params?: z.AnyZodObject
     }
   }
 
-  const bodyKeys = keys.filter((key) => !pathKeys.includes(key));
+  const queryKeys = capability.route.queryParams ?? [];
+  for (const key of queryKeys) {
+    if (!keys.includes(key)) {
+      throw new Error(
+        `Capability ${capability.id} declares query parameter "${key}", which its inputSchema does not define.`,
+      );
+    }
+    if (pathKeys.includes(key)) {
+      throw new Error(`Capability ${capability.id} declares "${key}" as both a path and a query parameter.`);
+    }
+  }
+
+  const bodyKeys = keys.filter((key) => !pathKeys.includes(key) && !queryKeys.includes(key));
   const mask = (selected: readonly string[]) => Object.fromEntries(selected.map((key) => [key, true as const]));
 
   return {
     params: pathKeys.length > 0 ? schema.pick(mask(pathKeys) as never) : undefined,
+    query: queryKeys.length > 0 ? schema.pick(mask(queryKeys) as never) : undefined,
     body: bodyKeys.length > 0 ? schema.pick(mask(bodyKeys) as never) : undefined,
   };
 }
@@ -93,7 +116,7 @@ export function buildDocument(capabilities: readonly CapabilityDefinition[] = CA
   registry.register("ErrorEnvelope", errorEnvelopeSchema);
 
   for (const capability of capabilities) {
-    const { params, body } = splitInput(capability);
+    const { params, query, body } = splitInput(capability);
     const responses: Record<string, unknown> = {
       [String(capability.route.successStatus)]: {
         description: `${capability.id} succeeded.`,
@@ -124,6 +147,7 @@ export function buildDocument(capabilities: readonly CapabilityDefinition[] = CA
       security: [{ sessionCookie: [] }],
       request: {
         ...(params ? { params } : {}),
+        ...(query ? { query } : {}),
         ...(body ? { body: { required: true, content: { "application/json": { schema: body } } } } : {}),
       },
       responses: responses as never,

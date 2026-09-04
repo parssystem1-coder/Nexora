@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "d0cb1fe",
+    "commit": "47d105a",
     "dirty": true
   },
   "modules": [
@@ -28,6 +28,24 @@
       "files": 17,
       "dependsOn": [
         "capability"
+      ],
+      "dependsOnPlatform": true
+    },
+    {
+      "name": "billing",
+      "layers": [
+        "application",
+        "contracts",
+        "domain",
+        "infrastructure",
+        "interfaces",
+        "migrations"
+      ],
+      "files": 12,
+      "dependsOn": [
+        "audit",
+        "capability",
+        "identity"
       ],
       "dependsOnPlatform": true
     },
@@ -170,6 +188,33 @@
       "name": "permissions",
       "module": "authorization",
       "migration": "20260822090600_authorization__create_permission_catalog.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "plan_features",
+      "module": "billing",
+      "migration": "20260905090000_billing__create_plans.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "plan_versions",
+      "module": "billing",
+      "migration": "20260905090000_billing__create_plans.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "plans",
+      "module": "billing",
+      "migration": "20260905090000_billing__create_plans.sql",
       "tenantId": false,
       "rlsEnabled": false,
       "rlsForced": false,
@@ -329,6 +374,16 @@
       "audit": true,
       "storeScoped": false,
       "route": "POST /api/v1/organizations/:organizationId/switch"
+    },
+    {
+      "id": "plan.list",
+      "module": "billing",
+      "file": "modules/billing/interfaces/plan-list.capability.ts",
+      "permissions": [],
+      "risk": "READ",
+      "audit": true,
+      "storeScoped": false,
+      "route": "GET /api/v1/plans"
     },
     {
       "id": "store.create",
@@ -768,6 +823,11 @@
       "cases": 1
     },
     {
+      "file": "modules/billing/application/list-plans.service.spec.ts",
+      "layer": "application",
+      "cases": 8
+    },
+    {
       "file": "modules/calendar/domain/business-calendar.spec.ts",
       "layer": "domain",
       "cases": 27
@@ -873,6 +933,11 @@
       "cases": 5
     },
     {
+      "file": "platform/pagination/cursor.spec.ts",
+      "layer": "platform",
+      "cases": 5
+    },
+    {
       "file": "platform/rate-limit/in-process-store.spec.ts",
       "layer": "platform",
       "cases": 10
@@ -936,6 +1001,11 @@
       "file": "apps/api/organization-switch.integration.spec.ts",
       "layer": "integration",
       "cases": 12
+    },
+    {
+      "file": "apps/api/plan-list.integration.spec.ts",
+      "layer": "integration",
+      "cases": 13
     },
     {
       "file": "apps/api/store-create.integration.spec.ts",
@@ -1025,6 +1095,11 @@
       "file": "modules/tenant/interfaces/organization-switch.controller.ts"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/plans",
+      "file": "modules/billing/interfaces/plan.controller.ts"
+    },
+    {
       "method": "POST",
       "path": "/api/v1/stores",
       "file": "modules/tenant/interfaces/store-create.controller.ts"
@@ -1041,13 +1116,13 @@
     }
   ],
   "counts": {
-    "modules": 7,
-    "tables": 14,
+    "modules": 8,
+    "tables": 17,
     "tablesWithRls": 6,
-    "capabilities": 10,
-    "routes": 11,
-    "testFiles": 46,
-    "testCases": 413,
+    "capabilities": 11,
+    "routes": 12,
+    "testFiles": 49,
+    "testCases": 439,
     "adrs": 64,
     "adrsAccepted": 56
   }
