@@ -92,6 +92,7 @@ For each ADR, completion requires:
 | ADR-056 | Correction Documents: Credit Notes and the Shape `invoices` Must Carry | Billing / Money | **ACCEPTED (new)** | **Phase 2 item 13's creating migration** — `document_type NOT NULL` must exist at creation because every issued row would need `INVOICE` backfilled. No credit note is issuable in Phase 2 |
 | ADR-057 | The Buyer's Legal Identity on an Invoice | Billing / Compliance | **ACCEPTED (new)** | **Phase 2 item 13's creating migration** (snapshot columns) and **a new capability owed to `PHASE_2_BRIEF.md` §3**, discharged by its 2026-09-03 amendment. Removes one R-043 blocker; closes none |
 | ADR-058 | Automatic Renewal by Direct Debit: Not in V1 | Billing / Lifecycle | **ACCEPTED (new)** | nothing — it forecloses nothing and creates no table. `supportsDirectDebit` stays in the port and stays false; ADR-023 item 1's startup check does the enforcing |
+| ADR-059 | What a Resolving Host Returns When the Store Behind It Is Not Serving | Storefront / Lifecycle | **ACCEPTED (new)** | **Phase 4's storefront delivery**; nothing in Phase 2. 503 while revivable, 410 once the reactivation window closes, never a 200 and never a redirect to a platform hostname |
 
 ### 1.2 Deferred, blocking nothing in V1
 
@@ -785,6 +786,58 @@ Storefront delivery was treated as a Phase 4 detail. It is not a detail: the sto
 
 7. **Serving state.** A store is served only when its subscription is in a serving state. Expiry must remove the store from the serving set and invalidate its cache, otherwise a cached storefront outlives its paid subscription.
 
+### Amendment, 2026-09-03 — the bound this ADR's own verification list demands, and the fact that there are two of them
+
+**Ruled by the maintainer on 2026-09-03.** This ADR's verification list says *"subscription expiry removes the storefront from serving within a defined bound"*, ADR-024's says *"storefront stops serving within the defined bound after expiry"*, and `06_IMPLEMENTATION_PLAN.md`'s Phase 4 Exit says *"expiry stops the storefront within the defined bound."* **Three documents refer to "the defined bound" and no document defines it** — verified by grep, 2026-09-03.
+
+**A release-blocking criterion with an undefined threshold cannot fail, which means it cannot pass either.** ADR-024 item 9 calls a storefront that stays live after expiry *"a release-blocking defect"*, so this is not a documentation tidy-up: it is the difference between a gate and a sentence.
+
+#### There are two bounds, not one, and that is the substance of this amendment
+
+Item 7 above already requires that expiry *"remove the store from the serving set and invalidate its cache."* Those are two machines with two clocks.
+
+**The origin** stops as soon as the data says so. ADR-024 item 2 already rules that *"serving state is derived, not stored twice"* and that exactly one function answers it, so the only thing between a state change and a refusal is whatever entitlement cache sits in front of that function.
+
+**The edge** is not bound by that at all. A page already cached at a CDN keeps being served until it expires or is purged, and **nothing the origin does changes an object already in an edge cache.** Treating one bound as covering both is the error this amendment exists to prevent.
+
+| Bound | Mechanism | Ceiling if the mechanism fails | **Ruled value** |
+|---|---|---|---|
+| **Origin** | `subscription.deprovision` invalidates the entitlement cache | the cache's own TTL | **60 seconds** |
+| **Edge** | the same job requests a CDN purge | the response's `s-maxage` | **5 minutes** |
+
+Both are **choices, not derivations** — recorded that way so a later reader tunes them against measurement rather than re-deriving a rationale that was never there. What they are chosen for: short enough that an expired storefront is not meaningfully still trading, long enough that neither is a per-request database lookup.
+
+#### The consequence that makes this enforceable rather than aspirational
+
+**A promised bound is an upper limit on cache lifetime.** A purge is best-effort — the provider may be down, may be slow, may not support it at all — and when it fails **the TTL is the only thing that holds.** Therefore:
+
+> **No storefront response may carry an `s-maxage` greater than 300 seconds.**
+
+That is a rule on this ADR's caching, not a note. It is the single line that turns *"we will invalidate the cache"* into something a test can check, and it is the line a later performance change will be tempted to break: raising `s-maxage` to an hour silently converts the platform's five-minute promise into a one-hour one.
+
+#### Purge is a declared port capability, not an assumption
+
+Item 4 above already establishes that CDN and DNS are a port rather than a vendor. ADR-023's discipline applies to it unchanged:
+
+- the CDN port **declares** whether it supports purge, and whether purge is **by-URL, by-tag, or whole-zone only**
+- application code branches on the **declared capability, never on a vendor name**
+- **a provider that cannot purge is legal.** The edge bound is then the `s-maxage` alone, and the platform's promise for that deployment is whatever that TTL is — stated, not silently degraded
+
+#### A failed purge is not allowed to be silent
+
+The two bounds differ by a factor of five, and a **persistently** failing purge does not make the promise five times worse — it makes it unbounded, because the object never leaves the edge until its TTL expires and the TTL is the only remaining guarantee.
+
+So: **the deprovision job records the purge outcome.** `PHASE_2_BRIEF.md` §4 already gives `scheduled_job_runs` *"job name, window, status, timings, error"* — **confirmed 2026-09-03; no new table is needed and none is added.** Repeated failure escalates to a human queue rather than retrying forever, in the same shape ADR-023 item 4 already uses for a `provider-unknown` payment.
+
+**One limitation of that table, stated rather than discovered later:** `scheduled_job_runs` records **one row per job run**, not one per purged object. A run that purges many stores records the run's status, not each store's. Whether per-domain purge outcomes need their own record is **item 14's design question**, and this amendment deliberately does not answer it or invent a table for it.
+
+#### Verification, added by this amendment
+
+- [ ] no storefront response carries `s-maxage` greater than 300, asserted in a test rather than reviewed
+- [ ] a subscription moved to a non-serving state stops being served at the origin within 60 seconds, measured
+- [ ] a CDN port that declares no purge support is accepted, and its edge bound is the TTL — proven with a fixture provider
+- [ ] a failed purge is recorded on the job run and escalates after a bounded number of attempts, rather than retrying silently
+
 ### Verification
 
 - [ ] cached product page served without a database round trip
@@ -1193,6 +1246,8 @@ trial.expire            terminate trials that were never converted
 
 A job that has not run must never cause a tenant to be over-served indefinitely; serving state is evaluated from data, so a late job delays notification, not correctness.
 
+> **Cross-reference, 2026-09-03:** *"within the defined bound"* in this ADR's verification list was undefined in every document that used the phrase. **ADR-019's 2026-09-03 amendment defines two** — 60 seconds at the origin, 5 minutes at the edge — and rules that no storefront response may carry an `s-maxage` above 300. **ADR-059** rules what a resolving host returns once serving has stopped.
+
 9. **Expiry propagates.** On transition to a non-serving state the platform must, in this order: invalidate effective entitlement cache, remove the store from the serving set, invalidate storefront and CDN cache (ADR-019), and emit `SubscriptionExpired` through the outbox. A storefront that stays live after expiry is a release-blocking defect.
 
 10. **Notification is mandatory.** Expiry without prior notice is prohibited. Notice must reach the organization owner through at least one channel, and the attempt must be audited.
@@ -1383,6 +1438,38 @@ Certificate private material is never stored in PostgreSQL. Only metadata and a 
 
 10. **Subscription coupling.** On transition to a non-serving state (ADR-024), verified custom domains are removed from the serving set and the certificate is left to expire naturally rather than being revoked, so that reactivation within the window restores service without re-issuance where possible.
 
+### Amendment, 2026-09-03 — the published address is an edge address, and the origin accepts nothing else
+
+**Ruled by the maintainer on 2026-09-03. This amendment is deliberately much narrower than the question that prompted it, because item 3 above already rules most of the answer** — and re-ruling it would replace a settled decision with a restatement while appearing to add something.
+
+**What item 3 already rules, and is not touched here:** that apex hostnames cannot use `CNAME` and get a published `A`/`AAAA` target while `www` and subdomains get a `CNAME` target; that `ALIAS`/`ANAME` is *"supported where the tenant's DNS provider offers it but is **never assumed**, because provider support is inconsistent"*; and — already in those words — that *"the apex A target is treated as a **long-lived public contract**: changing it requires a migration plan and tenant notification, so it must be an address the platform controls independently of any single hosting vendor."*
+
+**That ordering is item 3's and stands:** the published address is the baseline and flattening is the improvement where a provider offers it. **It is not inverted here.** Anyone reading this amendment as making `ALIAS` the preferred path and the address a fallback has it backwards.
+
+#### What this amendment adds
+
+**1. The published address is an *edge* address, never an origin's.** Item 3 requires an address *"the platform controls independently of any single hosting vendor"*; this says which layer that address must point at.
+
+**An origin address published into thousands of zones is two problems, not one.** It is an **unchangeable hosting decision** — the origin can never move without asking every tenant to edit DNS, and the ones who do not act go dark. And it is a **directly attackable target that bypasses the edge entirely**, defeating every protection, cache and rate limit the edge provides, for every tenant at once.
+
+**2. The origin accepts traffic only from the edge.** Stated as a requirement; **the mechanism — an authenticated header, mutual TLS, or a network allowlist — is the `CdnProvider` port's business and is chosen when a vendor is chosen**, exactly as ADR-023 leaves per-provider detail to adapters and item 6 above already requires be *"verified against the chosen provider at integration time and recorded in `PROVIDER_MATRIX.md`."* Without it, rule 1 is advice: the origin is still reachable, just less conveniently.
+
+**3. Why this is worth a tenant's trouble, in one sentence, because it is what they asked for.** A tenant's own domain — apex, no platform prefix — serving their store directly means **the tenant's brand is the hostname, the platform is invisible in the URL, and the tenant's search authority accrues to the tenant's domain** rather than to a platform subdomain they do not own and, per ADR-028's 2026-09-03 amendment, can never take with them.
+
+#### An unresolved tension between items 4 and 10, surfaced here and deliberately not settled
+
+**Item 4** requires *"automatic renewal starting at a configured margin before expiry, default 30 days"* with **no exception** for a non-serving subscription. **Item 10** says that on transition to a non-serving state *"the certificate is left to expire naturally rather than being revoked."*
+
+*"Left to expire naturally"* reads as anticipating expiry, which implies renewal stops; item 4's rule has no carve-out, which implies it does not. **ADR-027 does not say which, and the answer is load-bearing:** if renewal stops, a suspended tenant's certificate expires and their storefront presents a **browser interstitial instead of the clean 503 ADR-059 rules** — a worse outcome for a tenant who is about to pay, and one they cannot fix themselves.
+
+**Not settled here, because it is a decision and not a clarification**, and this session was not given it. **ADR-059's rule that the ACME challenge path answers on a non-serving host is required under either reading**, so nothing is blocked by leaving it open. **Recommendation: settle it, and if renewal continues, say so in item 10 so that "left to expire naturally" is read as "not revoked" rather than "not renewed."**
+
+#### Verification, added by this amendment
+
+- [ ] the published apex address resolves to an edge, and no origin address appears in any tenant-facing instruction
+- [ ] the origin refuses a request that did not arrive through the edge, proven with a direct request
+- [ ] repointing the edge requires no tenant action, demonstrated by changing the target the platform controls
+
 ### Verification
 
 - [ ] apex, www and a subdomain each verify and serve TLS
@@ -1450,6 +1537,45 @@ The list is data, versioned in the repository, and extending it must not require
 8. **Removal is complete.** Removing or failing a domain must remove it from routing, invalidate its cache entries and free the hostname for a legitimate re-claim. A dangling mapping is a cross-tenant risk.
 
 9. **Audit.** Domain add, verify, fail, set-primary, remove and contested-claim resolution are all audited with actor and tenant.
+
+### Amendment, 2026-09-03 — a platform subdomain is never reissued to a different organization, and item 8 is narrowed to say so
+
+**Ruled by the maintainer on 2026-09-03.** This amendment **narrows item 8 above**, and does so visibly rather than by adding a rule that quietly contradicts it.
+
+#### The hazard
+
+`shop-a.<platform>` belongs to organization A. A leaves. B signs up and asks for `shop-a`. **Every link, bookmark, QR code, printed card, third-party integration and callback URL still pointing at that hostname now reaches B's store.** That is not cosmetic confusion: a callback or redirect URL that still resolves is a live path into a system that no longer belongs to the party that configured it, and neither party did anything wrong.
+
+#### The ruling
+
+> **A platform subdomain, once assigned to an organization, is never assigned to a different one.** On offboarding it moves permanently into the reserved set.
+>
+> **It may be returned to the same organization.** ADR-024 item 6 already promises that reactivation restores *"the same store, domains and data"* — **a promise that is only keepable if the name was not given away in the meantime.**
+
+**The cost is stated rather than glossed: the platform subdomain namespace only ever shrinks.** At ADR-010's assumed scale that is not a constraint that binds, and it is the right trade — a name is cheap and a cross-tenant path is not.
+
+#### Item 8 is narrowed, and this is the part that must not be missed
+
+Item 8 above says removal must *"free the hostname for a legitimate re-claim."* **That is correct for a customer-owned domain and wrong for a platform subdomain**, and as written it covers both — ADR-027 item 1's `type` enum includes `PLATFORM`.
+
+> **Item 8's "free the hostname for a legitimate re-claim" applies to customer-owned domains (`APEX`, `WWW`, `SUBDOMAIN`) only. It does not apply to `PLATFORM` subdomains.** Everything else item 8 requires — remove from routing, invalidate cache entries, leave no dangling mapping — applies to both, unchanged.
+
+**Why the two differ, which is the whole reason one rule cannot cover both.** For a customer-owned domain, **control of DNS *is* the ownership check**, and it changed hands legitimately — item 1's `UNIQUE (hostname_ascii) WHERE status = 'VERIFIED'` plus item 2's first-to-verify rule already handle it correctly, and the first registration must be unverified before a second can verify. For a platform subdomain **nothing changed hands**: there is no external proof of ownership to re-run, the platform simply reissues a name it owns, and **only the platform can prevent that.**
+
+#### One thing this ruling is not yet expressible against, recorded rather than assumed
+
+`reserved_subdomains` as it exists today is a single column — `CREATE TABLE reserved_subdomains (name text PRIMARY KEY)` — seeded with thirteen infrastructure names and **written by nothing at runtime**; every consumer only reads it. **A single `name` column cannot express "reserved because organization A released it, and returnable to A"**, which the ruling above requires.
+
+**Applying the test this programme now puts to every column** (ADR-056): *a column must exist at creation if old rows would need a real value in it; it may wait if old rows are legitimately empty.* **It may wait.** The thirteen seeded names are infrastructure reservations with no releasing organization, so a provenance column added by Phase 4 is legitimately empty for every existing row, and `reserved_subdomains` carries no `REVOKE` — a later `UPDATE` is available if one is ever wanted. **So this is a Phase 4 implementation obligation and not a schema trap**, and it is recorded here so that Phase 4 does not discover it while writing the migration.
+
+**Whether released names live in `reserved_subdomains` at all, or in their own table, is Phase 4's design choice.** Item 7's requirement that the reserved list be *"data, versioned in the repository"* was written about the static blocklist; a runtime-appended set is a different thing sharing a purpose, and conflating them would make the blocklist un-reviewable.
+
+#### Verification, added by this amendment
+
+- [ ] a platform subdomain released by one organization cannot be claimed by another, proven with a test that attempts it
+- [ ] the same organization reactivating within ADR-024 item 6's window recovers its own subdomain
+- [ ] a customer-owned domain released by one tenant **can** still be verified by another that genuinely controls its DNS — item 8's original behaviour, proven not to have been broken by this narrowing
+- [ ] the static blocklist and any runtime-reserved set remain separately reviewable
 
 ### Verification
 
@@ -3647,6 +3773,78 @@ Recorded so the next reader inherits an answer rather than an argument. **All fo
 - [ ] a configuration that would enable a direct-debit path fails **at startup**, per ADR-023 item 1, and not at a customer-facing runtime failure
 - [ ] renewal follows ADR-024 item 4's invoice-and-notify in every test, with no branch on a mandate
 - [ ] the reopening conditions above are checked as a set when this ADR is next opened — the ADR is not reopened on the product reason alone
+
+
+---
+
+## ADR-059 - What a Resolving Host Returns When the Store Behind It Is Not Serving
+
+**ACCEPTED (new)**, ruled by the maintainer on 2026-09-03, depends on ADR-019, ADR-020, ADR-024, ADR-027 and ADR-028; **blocks Phase 4's storefront delivery**, nothing in Phase 2
+
+### Problem
+
+ADR-028 item 3 rules what happens when a host does **not** resolve — *"an unmatched host returns a platform-level 404, never a default store"* — and ADR-024 item 2 rules when a store may be served. **Neither says what a host that resolves perfectly well returns when the store behind it is not in a serving state**, and the two ADRs together make that the ordinary case rather than an edge: a domain stays verified through grace, through suspension, and through the whole reactivation window.
+
+This is its own decision because it spans the subscription lifecycle, the storefront and how an automated consumer treats the site, **and it belongs to none of them alone.** ADR-024 owns the state; ADR-019 owns the delivery; neither owns the status code.
+
+### Decision
+
+**1. The matrix.**
+
+| Situation | Status | Why |
+|---|---|---|
+| host resolves to no `VERIFIED` domain | **404** | **already ruled by ADR-028 item 3** — carried here for completeness, not re-decided |
+| domain verified, subscription not serving (`EXPIRED`, `PAST_DUE` past grace, `SUSPENDED`, `PAUSED`) | **503**, with `Retry-After` | the condition is temporary and the platform intends the site to come back |
+| store permanently gone — past ADR-020's reversible window, or `CANCELED` past ADR-024 item 6's reactivation window | **410** | the condition is permanent, and 410 says so where 404 only says *not here today* |
+| a missing path inside a serving store | **404** | ordinary, and unchanged |
+
+**2. The status is a projection of the lifecycle, not a switch someone flips. This is the important half.**
+
+**A 503 is a promise that the site is coming back.** Held indefinitely it stops being true — an automated consumer that sees an unavailable site for weeks will treat the URL as gone whatever the code says, and the platform will have spent the tenant's accumulated search authority to say nothing.
+
+> **A host serves 503 while the subscription can still be revived** — through ADR-024 item 4's grace window and item 6's reactivation window, default 30 days. **When that window closes and the subscription becomes `CANCELED`, the host serves 410.**
+
+**Computed by the same derived function ADR-024 item 2 already requires**, not by a separate flag. ADR-024 item 2's whole point is that *"serving state is derived, not stored twice"*; a second switch controlling the HTTP status would be exactly the second source of truth that rule exists to forbid, and it would drift.
+
+**3. Two prohibitions, and both are the standard way this gets done wrong.**
+
+- **Never a `200` carrying an "unavailable" page.** A success status with an error body is a soft 404: it tells every automated consumer the page is fine, and keeps the placeholder indexed as though it were the store.
+- **Never a redirect to a platform-branded page.** Sending a tenant's own domain to a Nexora page moves the tenant's traffic and their accumulated search signals onto the platform's hostname. **Whatever the platform's interest in that, it is not the platform's to take with a customer's domain and without their agreement** — and a tenant who reactivates would find the value had moved and not moved back.
+
+**4. What still answers while the store does not.** A non-serving host is not a dead host, and each exception is on the list for a reason rather than by convention:
+
+- **The ACME HTTP-01 challenge path** (`/.well-known/acme-challenge/…`). ADR-027 item 4 requires `HTTP-01` for single hostnames, so a challenge that cannot be answered is a certificate that cannot be issued or renewed. **A suspended store whose certificate then fails presents a browser interstitial instead of a clean 503** — a worse outcome for a tenant who is about to pay, and one the tenant cannot fix themselves.
+- **The domain-verification path**, where `HTTP_FILE` verification is used (ADR-027 item 2's accepted fallback). A tenant fixing their domain while suspended must be able to; ADR-028 item 6's periodic re-verification runs against non-serving domains too.
+- **Nothing else — and `robots.txt` in particular returns 503 with everything else.** This is deliberate and correct rather than an oversight: a crawler that cannot read `robots.txt` **backs off rather than crawling**, which is exactly the desired behaviour for a store that is temporarily dark. Serving a permissive `robots.txt` beside a 503 would invite the crawl the 503 is trying to defer.
+
+### An unresolved tension in ADR-027 that this ADR surfaces and does not settle
+
+Item 4's exception above depends on whether certificates are renewed at all while a subscription is non-serving, **and ADR-027 does not say.**
+
+- **ADR-027 item 4** requires *"automatic renewal starting at a configured margin before expiry, default 30 days"*, with **no carve-out** for a non-serving subscription.
+- **ADR-027 item 10** says that on transition to a non-serving state *"the certificate is **left to expire naturally** rather than being revoked, so that reactivation within the window restores service without re-issuance where possible."*
+
+*"Left to expire naturally"* reads as anticipating expiry, which implies renewal stops. Item 4's rule has no exception, which implies it does not. **The two are in tension and neither is wrong on its own.**
+
+**This ADR's rule is required under either reading**, which is why it is recorded without settling the tension: if renewal continues, HTTP-01 must be answerable while non-serving; if renewal stops, a new certificate is needed at reactivation and HTTP-01 must be answerable **then**. Either way the challenge path serves.
+
+**Recommendation, not a ruling: ADR-027 should settle whether renewal continues during a non-serving state.** It is that ADR's territory and the maintainer's decision, and this session amends ADR-027 for a different purpose without taking it.
+
+### What this ADR does not do
+
+- **It does not re-decide the 404 for an unresolved host** — ADR-028 item 3 owns that and is cited, not restated.
+- **It does not define the delay** before a serving store's storefront actually stops being served. ADR-019's 2026-09-03 amendment rules the two bounds; this ADR rules what is returned **once** it has stopped.
+- **It does not rule on the tenant-facing content of the 503 or 410 page**, beyond the two prohibitions — whether it names the tenant, offers a contact, or is blank is a Phase 4 product decision.
+- **It does not settle ADR-027's renewal tension**, recorded above.
+- It creates no table and writes no migration.
+
+### Verification
+
+- [ ] a verified host whose subscription is `EXPIRED` returns 503 with `Retry-After`, and never 200 or a redirect
+- [ ] the same host returns **410** once the reactivation window has closed, driven by the derived serving function and not by a stored flag
+- [ ] the ACME challenge path answers on a non-serving host, proven with a simulated renewal
+- [ ] `robots.txt` returns 503 on a non-serving host — asserted deliberately, so a later "fix" has to argue with a test
+- [ ] no response on a non-serving host carries status 200 or a 3xx to a platform hostname
 
 ## 3. Open Items Deliberately Left Open
 

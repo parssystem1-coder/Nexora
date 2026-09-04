@@ -592,3 +592,24 @@ Phase 2.5 was created on 2026-09-03 as **Commercial Growth**, carrying discounts
 
 **Not settled, and named so it is owned:** the **seller's** own registration identity (owed to the سامانه مودیان slice), the national-identifier validation algorithms (the implementing slice's), refund documents as distinct from credit notes, and the ADR-020 rule 4 purge reduction — ADR-057 proposes which snapshot fields survive and **marks the split explicitly as unverified against the Iranian legal minimum**.
 
+### 9.12 Amendment, 2026-09-03 (seventh to this file) — what item 14's deprovision job now owes
+
+**Only the Phase 2 half of the 2026-09-03 domain-and-edge rulings enters this brief. Everything else in them is Phase 4 and is deliberately excluded** — ADR-059's status matrix, ADR-028's subdomain rule and ADR-027's edge-address rule all land in Phase 4's storefront and domain work, and putting them here would widen a phase that is already open.
+
+**The gap that made this urgent.** ADR-024 item 9 calls a storefront that stays live after expiry *"a release-blocking defect"*, and its verification list said the storefront must stop *"within the defined bound."* **Three documents used that phrase and none defined it** — ADR-019's own verification list, ADR-024's, and `06`'s Phase 4 Exit criterion. A release-blocking criterion with an undefined threshold cannot fail, so it cannot pass either.
+
+**ADR-019's 2026-09-03 amendment defines two bounds, and item 14's `subscription.deprovision` job is what has to meet them:**
+
+| Bound | Mechanism | **Value** |
+|---|---|---|
+| Origin | the job invalidates the entitlement cache; its TTL is the ceiling if the job fails | **60 seconds** |
+| Edge | the job requests a CDN purge; the response's `s-maxage` is the ceiling if the purge fails or is unsupported | **5 minutes** |
+
+**The consequence that binds beyond item 14:** because a purge is best-effort and the TTL is the only thing that holds when it fails, **no storefront response may carry an `s-maxage` greater than 300 seconds.** That is a constraint on Phase 4's caching, recorded here because it is the reason the edge bound is meetable at all.
+
+**And item 14 must record the purge outcome.** **`scheduled_job_runs` already covers it — §4 gives it *"job name, window, status, timings, error"* — so §4 gains no table**, which is said explicitly because a reader who sees purge outcomes discussed will look for one. Repeated failure escalates to a human queue rather than retrying forever, in the shape ADR-023 item 4 already uses for a `provider-unknown` payment.
+
+**One limitation stated rather than left to be discovered:** `scheduled_job_runs` holds **one row per job run, not one per purged object.** Whether per-domain purge outcomes need their own record is **item 14's design question**, and neither ADR-019's amendment nor this one answers it or invents a table for it.
+
+**§4's list stays at 31 and §3's at sixteen.** Nothing in this session adds either.
+

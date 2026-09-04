@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "0885f62",
+    "commit": "70ca5e0",
     "dirty": true
   },
   "modules": [
@@ -685,6 +685,12 @@
       "blocks": "nothing — it forecloses nothing and creates no table. `supportsDirectDebit` stays in the port and stays false; ADR-023 item 1's startup check does the enforcing"
     },
     {
+      "id": "ADR-059",
+      "title": "What a Resolving Host Returns When the Store Behind It Is Not Serving",
+      "status": "ACCEPTED (new)",
+      "blocks": "**Phase 4's storefront delivery**; nothing in Phase 2. 503 while revivable, 410 once the reactivation window closes, never a 200 and never a redirect to a platform hostname"
+    },
+    {
       "id": "ADR-011",
       "title": "Co-Pilot Cadence vs AI Credit Cost",
       "status": "DEFERRED",
@@ -1025,7 +1031,7 @@
     "routes": 11,
     "testFiles": 45,
     "testCases": 410,
-    "adrs": 61,
-    "adrsAccepted": 51
+    "adrs": 62,
+    "adrsAccepted": 52
   }
 }
