@@ -150,6 +150,35 @@ Plugins, AI, MCP, advanced automation, CRM, SEO, analytics, channels, marketplac
 
 ---
 
+## Amendment, 2026-09-04 — competitive gaps, each placed in a phase
+
+**Ruled by the maintainer on 2026-09-04** (`COMPETITIVE_RULINGS_2026-09-04.md`, ث-1 … ث-12), from a read-only review of a live competitor's admin panel, pricing page and public documentation.
+
+**Evidence limit, carried from the ruling file because it bounds the comparison: one competitor was examined. This is a generalisation from a single observed instance plus general knowledge, not a comparative study.**
+
+**Placed here rather than in an ADR, and that is deliberate.** Phasing belongs to this file. The precedent is consistent: **ADR-048 could not add a table to `PHASE_2_BRIEF.md` §4 and ADR-057 could not add a capability to §3** — both stated the obligation and left the owning document to discharge it. **An ADR may not place an item in a phase either.** The table spans seven phases, so it sits at the end of the phase list rather than inside any one of them; each phase's own section is unchanged.
+
+**Nothing here is left as "we will see."** Every item has a phase or is explicitly excluded with a trigger.
+
+| Id | Item | Phase | Why |
+|---|---|---|---|
+| ث-1 | Torob and Emalls integration | **Phase 4 — and a phase exit criterion** | A large share of Iranian storefront traffic arrives through these two. A store builder without them is not competitive, so this is a gate rather than a nice-to-have. |
+| ث-2 | Mailboxes on the tenant's domain | **Phase 4 — delegated zones only** | An `MX` record is impossible without zone control (ADR-027's 2026-09-04 amendment, الف-9). |
+| ث-3 | Multilingual sites | **Out of V1, with a trigger** | It multiplies every content table and every SEO decision. **The one place this platform deliberately stays behind.** Trigger: the first tenant with real export sales. |
+| ث-4 | Support ticketing | **Phase 2.5 — bought, not built** | Needed from the first paying customer; building one takes weeks. An external tool at launch; build in-house only if volume justifies it. |
+| ث-5 | Shipping carriers | **Phase 3 — as a port** | The same discipline as ADR-023: capability flags, an adapter, fixtures. **Never an `if` on a carrier's name.** |
+| ث-6 | PWA application | **Phase 4** | Cheap, visible, and expected by the market. |
+| ث-7 | Tenant-facing webhooks | **Phase 2.5** | `outbox_events` is already the substrate (ADR-050); exposing it is small and hands integration work to others. |
+| ث-8 | Organization ownership transfer | **Phase 2.5** | With the constraint that **the buyer-identity snapshot on issued invoices is never rewritten** (ADR-057) — the invoice records who bought, not who owns now. |
+| ث-9 | Template and designer marketplace | **Phase 4** | **A template is data, not code**, so it needs no new security boundary (پ-6, ADR-005). |
+| ث-10 | Accounting-software bridge | **Phase 5** | Its prerequisite is gap-free invoice numbering, which **ADR-048 already ruled**. A sellable product, not a feature. |
+| ث-11 | Installment / BNPL payment | **Flag now, adapter in Phase 3** | Installment is a payment *mode* and ADR-023's flags said nothing about it. `supportsInstallment` is added by that ADR's 2026-09-04 amendment and stays false in V1. |
+| ث-12 | A published SLA | **Only after the first restore drill** | **A published number with no monitoring behind it is a commitment, not a feature.** Prerequisites: **R-041** (the first restore drill, which ADR-061 rules is what closes it) and **ADR-040**'s deferred metrics. After both, publish 99.9%. |
+
+**ث-12 is the one to read twice.** ADR-010 already carries an availability *assumption* of 99.5% flagged by its own 2026-08-28 amendment as unverified, with a standing rule that no document may cite a number from that table as met before Phase 4 item 9 has run. **Publishing 99.9% is a different act from assuming 99.5%** — it is a commitment to an outside party — and this ruling gates it on the two things that would make it observable.
+
+---
+
 ## Working Rules
 
 - one vertical slice at a time

@@ -1150,6 +1150,26 @@ This ADR is titled *"…and Iranian PSP Profile"* and profiles no PSP. That is c
 
 **`RISK_REGISTER.md` R-015** records that provider selection has no settled phase and that *"modeling a first adapter's fixtures still means choosing"* a provider. This checklist is what that choice has to answer; it does not make the choice.
 
+### Amendment, 2026-09-04 — an installment capability flag, declared now and implemented later
+
+**Ruled by the maintainer on 2026-09-04** (`COMPETITIVE_RULINGS_2026-09-04.md`, ث-11).
+
+**Installment / BNPL payment is a payment *mode*, and item 1's capability flags say nothing about it.** A provider either offers it or does not, exactly like `supportsRefund` or `supportsDirectDebit`, and application code must branch on the declared capability rather than on a provider's name — item 1's existing rule, unchanged.
+
+> **`PaymentProviderCapabilities` gains `supportsInstallment`.** **No adapter declares it true in V1**, and item 1's existing rule does the enforcing without anything new being written: *"Any code path that assumes an unavailable capability must fail at startup with a configuration error, not at runtime with a customer-facing failure."*
+
+**The flag is cheap today and the adapter is Phase 3's**, where the commerce checkout that would use it lives. **This is the same shape ADR-058 uses for `supportsDirectDebit`** — the flag stays in the port and stays false — with one difference recorded so the two are not confused: **ADR-058 rules direct debit *out* of V1 for a stated reason and names four reopening conditions; this rules installment merely *not yet built*, with a phase.**
+
+### What this amendment does not do
+
+- It adds no adapter, no provider and no dependency, and does not decide whether the platform's own subscription may ever be paid in instalments — this is the commerce checkout's flag.
+- It does not touch item 6's rule on recurring, or ADR-058.
+
+### Verification, added by this amendment
+
+- [ ] no adapter declares `supportsInstallment: true` in V1, asserted in the shared adapter contract suite
+- [ ] a configuration that would enable an installment path fails at startup, per item 1
+
 ### Verification
 
 - [ ] adapter contract test suite runs against fixtures with no network
@@ -1254,6 +1274,38 @@ A job that has not run must never cause a tenant to be over-served indefinitely;
 
 10. **Notification is mandatory.** Expiry without prior notice is prohibited. Notice must reach the organization owner through at least one channel, and the attempt must be audited.
 
+### Amendment, 2026-09-04 — one billing cadence per subscription, and who pays for a notification
+
+**Ruled by the maintainer on 2026-09-04** (`COMPETITIVE_RULINGS_2026-09-04.md`, ب-6, ت-1 and ت-3). **Binds Phase 2 item 17.**
+
+**ب-6. A subscription never has more than one billing cadence.** Item 1 above models **one `term_length` per subscription**, and a second cadence breaks it — not awkwardly, but structurally: `subscription_periods` is one append-only series with one `period_start`/`period_end` pair per row, and a second cadence needs a second series with no defined relationship to the first.
+
+> **Any add-on, whenever it is built, is prorated to the parent's `period_end` and issued on the parent's invoice**, using the proration rule **ADR-025 item 3** already defines for upgrades. No second cadence, no second allocator, no second invoice series.
+
+**This constrains a future add-on rather than scheduling one** — `PHASE_2_BRIEF.md` §5's D2-7 keeps the add-on rung present and always empty, and that is unchanged.
+
+**ت-1. Subscription-lifecycle notifications are the platform's and the platform pays for them.** Renewal reminders, expiry warnings and payment receipts are sent and paid for by **Nexora**.
+
+**The reason is item 10 itself.** *"Notification is mandatory. Expiry without prior notice is prohibited."* **A mandatory obligation must not depend on the tenant's own SMS credit** — a tenant whose credit has run out would stop receiving the notices this ADR forbids expiring them without, and the platform would have made its own compliance contingent on a third party's balance.
+
+**The tenant's own storefront notifications remain theirs**, running on the tenant's SMS panel: order-status messages to the tenant's own customers, whose volume is thousands of times greater and whose economics only work that way. **The split is by whose obligation the message discharges, not by which system sends it.**
+
+**ت-3. Notification templates are fixed in Phase 2 and become editable in Phase 3.** An editable template means **tenant-authored text in platform tables**, which brings ADR-044's display-text decisions with it — the ADR that ruled the plan tables carry a machine key only. **Phase 2 sends a few correct templates**, and the question of where tenant text lives is answered once, in Phase 3, rather than twice.
+
+### What this amendment does not do
+
+- **It does not change item 10**, item 8's job list, or the state machine. Item 10 said notification is mandatory and audited; this says who pays and what the message may contain.
+- **It creates no table.** `notifications` and `notification_deliveries` are item 17's, already in `PHASE_2_BRIEF.md` §4, and unchanged in shape by this.
+- **It does not choose an SMS provider**, and does not rule the rate limit — that is ت-2, recorded as **R-044** because it is a financial control with no owner rather than a notification feature.
+- **It builds no add-on**, and does not decide when one exists.
+
+### Verification, added by this amendment
+
+- [ ] a lifecycle notification is sent on a platform-owned channel and does not consult the tenant's SMS balance
+- [ ] a tenant with zero SMS credit still receives every notice item 10 requires
+- [ ] no Phase 2 code path reads a tenant-authored notification template
+- [ ] no subscription carries two `term_length` values or two concurrent period series
+
 ### Verification
 
 - [ ] a one-year term expires exactly at its calendar boundary in the billing timezone
@@ -1316,6 +1368,38 @@ Rationale for keeping the expiry date: resetting the term on upgrade silently se
 8. **Data is never lost.** Entitlement is separate from data. A plan change adjusts what the tenant may do, never what the tenant has. Over-limit handling after a downgrade is governed by ADR-026.
 
 9. **Upgrade must be self-service.** The capability is exposed to the tenant owner and admin roles through the Admin UI and API, with the same policy chain as any other capability. Requiring operator intervention to upgrade is a product defect.
+
+### Amendment, 2026-09-04 — direction is determined from entitlements and quotas, never from price; and a fourth case
+
+**Ruled by the maintainer on 2026-09-04** (`COMPETITIVE_RULINGS_2026-09-04.md`, ب-1, ب-2 and ب-6).
+
+**ب-1. Plan-change direction is determined from entitlements and quotas, never from price.**
+
+Item 2's table above determines direction partly by price — *"Upgrade (higher price or superset entitlement)"*, *"Downgrade (lower price or reduced entitlement)"*, *"Lateral (same price)"*. **Two plans at the same price can be incomparable**, and under the lateral row as written a tenant would lose a capability and gain another in one immediate, unpriced step with no protection at all.
+
+> **Upgrade** means a superset of entitlements **and** every quota greater than or equal.
+> **Downgrade** is its inverse: a subset of entitlements and every quota less than or equal.
+> **Lateral** means **exactly identical** entitlements and quotas — not equal price.
+
+**Price is a consequence of the direction, not its definition.** The money column of item 2's table is unchanged and still applies once direction is known; only how direction is *determined* changes.
+
+**ب-2. A fourth case, "incomparable", is defined and prohibited in V1.** A change that simultaneously grants and removes falls into none of the three rows above, and is **rejected** with `PLAN_CHANGE_INCOMPARABLE` (`05_API_CAPABILITY_CONTRACTS.md` §7).
+
+**Why prohibited rather than treated as a downgrade, which is the cheaper-looking option:** losing a **capability** needs a data-preservation story that does not exist. **ADR-026 covers quota overage only** — existing records retained, reads retained, only new creates blocked — and says nothing about what happens to data behind an entitlement the tenant no longer holds. **Prohibiting is cheap, and it reopens the moment that story is written.**
+
+**ب-6. A subscription never has more than one billing cadence** — recorded in full in ADR-024's amendment of the same date. The half that belongs here: **any add-on, whenever it is built, is prorated to the parent's `period_end` and issued on the parent's invoice, using the proration rule item 3 below already defines for upgrades.** No second allocator, no second rounding, no second cadence.
+
+### What this amendment does not do
+
+- **It does not change item 3's proration rule**, item 2's money column, or the prohibition on an immediate downgrade.
+- **It does not define what makes two entitlement sets comparable in code.** ADR-008 owns the entitlement model and Phase 2 item 6 builds it; this rules the comparison's *meaning*, not its implementation.
+- **It builds no add-on.** `PHASE_2_BRIEF.md` §5's D2-7 keeps the add-on rung present and always empty, and that is unchanged — ب-6 constrains a future add-on rather than scheduling one.
+
+### Verification, added by this amendment
+
+- [ ] two plans at the same price with different entitlements are **not** treated as lateral
+- [ ] a change that grants one entitlement and removes another is refused with `PLAN_CHANGE_INCOMPARABLE`, proven with a constructed pair
+- [ ] direction is computed without reading a price, asserted by a test that changes only the price and expects the direction to be unchanged
 
 ### Verification
 
@@ -1513,6 +1597,59 @@ Recorded here rather than in a footnote, because it is the single assumption the
 - [ ] the origin refuses a request that did not arrive through the edge, proven with a direct request
 - [ ] repointing the edge requires no tenant action, demonstrated by changing the target the platform controls
 
+### Amendment, 2026-09-04 — two domain-connection methods, and what delegation buys that the record method cannot
+
+**Ruled by the maintainer on 2026-09-04**, from a read-only review of a live competitor's admin panel, pricing page and public documentation (`COMPETITIVE_RULINGS_2026-09-04.md`, rulings الف-1 … الف-4 and الف-8 … الف-10). **Evidence limit, carried from that file because it bounds several of these: one competitor was examined, not a comparative study.**
+
+**الف-1. Two domain-connection methods are supported. Record-based is the default; nameserver delegation is optional.** A tenant either places two records in their own DNS and keeps ownership of their zone, or delegates nameservers to the platform and in exchange gets wildcard certificates, mailboxes on the domain, and an apex that needs no maintenance.
+
+> **Why both, and this is the reasoning that makes the rest of this amendment follow:** this ADR records two limits as facts — no wildcard in V1, and the apex address being a *"long-lived public contract"*. **Both are consequences of the chosen method, not laws.** Delegation removes them, but a platform outage then takes down the tenant's whole domain including their email, not just their site. Making it mandatory imposes that cost on everyone.
+
+**The premise was checked against items 3 and 4 rather than accepted, and it is true for item 3 and needs correcting for item 4.**
+
+- **Item 3 — true.** *"The apex A target is treated as a long-lived public contract: changing it requires a migration plan and tenant notification"* is a consequence of the tenant holding the zone: the platform must ask them to edit a record. **Under delegation the platform holds the zone and repoints the apex itself**, so the concern genuinely dissolves. Item 3's other clause — *"apex hostnames cannot use CNAME"* — is a DNS protocol fact rather than a method consequence, but it concerns record *type*, not the public-contract problem, and a platform holding the zone can publish whatever the apex needs.
+- **Item 4 — the premise overstates it, and الف-8 below is corrected accordingly.**
+
+**الف-2. A full zone export, one click, on every plan, at no charge.** Any tenant whose zone the platform holds must be able to download a standard zone file plus a human-readable record list at any moment. *This is what makes delegation safe to accept. It is a read, and it is cheap; its effect is to neutralise exactly the fear a merchant has about handing over their domain.* **Phase 4.**
+
+**الف-3. Any domain the platform gives or sells is registered in the tenant's own name.** Registrant is the tenant, with their own IRNIC handle for `.ir`; Nexora is technical contact only. **Never Nexora as registrant.** *A "free domain" registered under the platform's own handle is not a gift.* **Phase 4, and a registrar port when one exists.** Recorded as a red line (ج-4).
+
+**الف-4. The apex, with no prefix, is the default primary domain; `www` redirects to it.** **Item 7 is unchanged** — it already requires that *"`www` and apex must both be claimable and one must redirect to the other according to the store's choice."* This ruling sets the **default** where item 7 leaves a choice; it removes no choice. *What a merchant prints on a business card is `example.ir`.*
+
+**الف-8. Wildcard certificates are available for delegated zones and not for tenant-held zones — and this confirms item 4 rather than narrowing it.**
+
+The ruling as proposed said item 4 *"excludes wildcards from V1 absolutely"* and must therefore be narrowed. **Read against item 4, that is not what it says.** Item 4's own bullets, verbatim:
+
+> *"`HTTP-01` for single hostnames; `DNS-01` only where **the platform controls the zone**, since `DNS-01` on a **tenant-owned zone** requires tenant DNS API credentials and that is out of V1 scope"*
+>
+> *"**wildcard certificates for tenant-owned domains are out of V1 scope** for that reason"*
+
+**Item 4 already scopes the exclusion to tenant-owned domains, and already permits `DNS-01` where the platform controls the zone.** A delegated zone is a zone the platform controls, so item 4's text already reaches it. **This amendment therefore records a confirmation of what item 4 scoped, not a change to it** — the distinction matters, because presenting it as a narrowing would imply the ADR was altered when it was only read correctly.
+
+**الف-9. Mailboxes on a tenant's domain exist only for delegated zones, and are a plan feature.** An `MX` record is out of reach without zone control. *This turns delegation from a request into an incentive: the tenant delegates because they gain something.* **Phase 4.**
+
+**One precision, because the anchor is easy to over-read: item 8 does not already cover this.** Item 8 governs **sending** domains — SPF, DKIM, DMARC, their own verification lifecycle, and a separate table and state machine from web domains. **Mailboxes are receiving, and `MX` is a different record with a different purpose.** Item 8's separation rule applies to whatever mailbox entity is eventually built, and its reasoning — *"a verified web domain proves nothing about mail authorization"* — applies with equal force; but item 8 does not itself model a mailbox, and this amendment does not model one either.
+
+**الف-10. Before any delegation, the tenant's current zone is read and migrated.** Before anyone is asked to change nameservers, their existing records are read, whatever must carry over is carried over, and **if they hold mail records the platform does not cover, they are warned before the switch.** *This is the difference between a professional migration and taking a business's email offline.* **Phase 4.**
+
+**الف-7 is not recorded here because it is already ruled** — that the published address is always an edge address and never an origin's is item 3 plus this ADR's 2026-09-03 amendment, and `COMPETITIVE_RULINGS_2026-09-04.md` restates it only as a red line.
+
+### What this amendment does not do
+
+- **It builds nothing and creates no table.** `store_domains` already carries `type` (`APEX | WWW | SUBDOMAIN | PLATFORM`) and `verification_method`; whether a delegation method needs a further value is Phase 4's migration to decide.
+- **It does not choose a registrar or a DNS vendor.** Item 6 already requires per-provider constraints to be *"verified against the chosen provider at integration time and recorded in `PROVIDER_MATRIX.md`"*, and that stands.
+- **It does not model mailboxes**, and does not extend item 8's sending-domain entity to cover them.
+- **It does not change item 4's V1 scope.** Wildcards for tenant-held zones remain out, for item 4's own stated reason.
+
+### Verification, added by this amendment
+
+- [ ] both connection methods are offered, and the record-based one is the default a tenant reaches without asking
+- [ ] a zone export downloads on every plan, including a trial, with no charge and no support request
+- [ ] a domain the platform registers shows the **tenant** as registrant, checked against the registry rather than against our own record
+- [ ] the apex is primary by default and `www` redirects to it, with the store still able to choose the reverse (item 7)
+- [ ] a wildcard is issued for a delegated zone and refused for a tenant-held one
+- [ ] a delegation that would drop an existing `MX` record warns **before** the nameserver switch, proven with a zone that has one
+
 ### Verification
 
 - [ ] apex, www and a subdomain each verify and serve TLS
@@ -1619,6 +1756,39 @@ Item 8 above says removal must *"free the hostname for a legitimate re-claim."* 
 - [ ] the same organization reactivating within ADR-024 item 6's window recovers its own subdomain
 - [ ] a customer-owned domain released by one tenant **can** still be verified by another that genuinely controls its DNS — item 8's original behaviour, proven not to have been broken by this narrowing
 - [ ] the static blocklist and any runtime-reserved set remain separately reviewable
+
+### Amendment, 2026-09-04 — where tenant subdomains live, and what a trial is given
+
+**Ruled by the maintainer on 2026-09-04** (`COMPETITIVE_RULINGS_2026-09-04.md`, الف-5 and الف-6).
+
+**الف-5. Tenant subdomains live on a registrable domain entirely separate from the brand domain.** Not a subdomain of the domain the platform markets itself on.
+
+Three reasons, and each is independently sufficient:
+
+- **Cookies are scoped across a domain's subdomains.** Separating the two domains is a security boundary, not a naming preference — a cookie set at the brand domain's apex is visible to every tenant subdomain under it.
+- **Search reputation.** Thousands of abandoned stores on a shared parent affect the brand domain's own standing.
+- **Subdomain takeover.** A dangling record on the brand domain is far more dangerous than the same mistake on a service domain, because the brand domain is where a customer expects to find the platform itself.
+
+**Operationally this is a purchase, and it has to happen before the first customer** — moving tenant subdomains afterwards would break every URL under the old parent, which this ADR's own 2026-09-03 amendment forbids for a different reason and the same effect.
+
+**الف-6. A trial receives a random subdomain. A chosen name is granted only with the first paid subscription.**
+
+**This follows directly from this ADR's 2026-09-03 amendment**, which rules that a platform subdomain, once assigned, is never assigned to a different organization. **That rule plus a free trial means every abandoned signup burns a good name permanently.** Short commercial names are an asset and must not be spent on trials.
+
+**The two rulings are not independent**: the never-reissue rule is what makes a trial-time name choice expensive, and this ruling is the price of keeping that rule rather than an argument against it. Cross-referenced in **ADR-052**, which owns the trial.
+
+### What this amendment does not do
+
+- It does not change item 7's reserved blocklist, item 1's uniqueness rule, or the 2026-09-03 amendment's never-reissue rule — it depends on that rule rather than altering it.
+- **It creates no table and no column.** How a random name is generated, and how a chosen name is claimed at first payment, is Phase 4's design work alongside `store_domains`.
+- It does not decide the separate domain's actual name, which is a purchase.
+
+### Verification, added by this amendment
+
+- [ ] no tenant subdomain resolves under the brand domain, asserted against configuration rather than reviewed
+- [ ] a cookie set on the brand domain is not visible to a tenant subdomain
+- [ ] a trial signup receives a generated name, and no trial can claim a chosen one
+- [ ] a chosen name becomes claimable at first payment and is then covered by the never-reissue rule
 
 ### Verification
 
@@ -2979,6 +3149,31 @@ This is not a theoretical fork. The business model reconciled against Phase 2 on
 - **It does not address add-on pricing.** `PHASE_2_BRIEF.md` §4 excludes `subscription_items` and D2-7 keeps the add-on rung present-and-empty, while the business model sells three separately-priced add-ons. That mismatch is recorded in `decisions/2026-09.md`, deliberately not as a decision here.
 - It does not decide invoice numbering, which is **ADR-048**.
 
+### Amendment, 2026-09-04 — each term length is its own price version; a discount is stored, never computed
+
+**Ruled by the maintainer on 2026-09-04** (`COMPETITIVE_RULINGS_2026-09-04.md`, ب-5). **Binds Phase 2 item 2's price tables.**
+
+> **One-year and two-year are two price rows, not one price and a percentage.**
+
+**Two reasons, and both are this ADR's and ADR-022's own rules rather than new ones.**
+
+- **This ADR pins a price version at renewal** — re-pinning to the current version, fixed at renewal-invoice issuance. **A discount expressed as a percentage would have to be reproduced years later** to explain what was charged, from whatever the multiplier happened to be at the time. A stored amount needs no reproduction.
+- **ADR-022 item 2 forbids floating-point arithmetic on money**, and **every percentage carries a rounding**. Item 5 requires a declared rounding mode and the remainder-distributing allocator for exactly this reason; a term discount computed at issuance would be a second place rounding happens, on a figure that is then frozen into an append-only invoice.
+
+**Seed value: two-year at 80% of twice the annual price.** **That number is commercial and changes without any schema change** — which is the point of storing the amount rather than the rate. It is a seed for item 2, not a rule.
+
+### What this amendment does not do
+
+- **It creates no table and adds no column.** `prices` and `price_versions` are item 2's, and this constrains what rows go in them rather than their shape.
+- **It does not decide which term lengths are offered.** That is commercial, and it is why a term is a row rather than an enum.
+- **It does not change the renewal re-pinning rule above**, which applies to a two-year price version exactly as it does to a one-year one.
+
+### Verification, added by this amendment
+
+- [ ] a two-year term is a price version of its own, and no percentage or multiplier appears in any monetary computation
+- [ ] changing the two-year seed price requires no migration
+- [ ] a renewal re-pins to the current price version of **the same term length**
+
 ### Verification
 
 - [ ] a renewal invoice issued after a price version is published is drawn against the new version, proven by a test that would fail under inherit-forever
@@ -3393,6 +3588,35 @@ This is true of essentially every self-serve trial in the industry, and **the mi
 - **It does not touch ADR-024's state machine**, which already models everything a trial needs: the state, its three legal exits, its SERVING status, and the job that expires it. Nothing in ADR-024 is amended, extended or reinterpreted here — this ADR supplies the one thing ADR-024 left out, which is the way in.
 - **It does not decide what a trial grants.** Whether a trialling tenant gets the full plan version's entitlements or a reduced set is an entitlement question owned by ADR-008's precedence chain and Phase 2 item 6, not by this ADR. **This is a real open edge and is named rather than assumed** — an implementer of item 6 who finds no answer here should read this sentence as confirmation that none was given, not as permission to invent one silently.
 - **It does not create a trial for an existing paying subscriber.** Conversion runs one way; `ACTIVE → TRIALING` is not a legal transition in ADR-024 item 3 and this ADR does not add one.
+
+### Amendment, 2026-09-04 — the trial is 14 days, with one operator-granted extension; and a trial's subdomain is generated
+
+**Ruled by the maintainer on 2026-09-04** (`COMPETITIVE_RULINGS_2026-09-04.md`, ب-7 and الف-6).
+
+**ب-7. The trial is 14 days.** The ruling above sets 7; this supersedes that number and nothing else about it. **Seven days is not enough to build a real store, and a trial that ends before the result is worth looking at converts nobody.**
+
+**A single operator-granted 14-day extension is available.** It is an **operator capability with an audit record**, not an automatic option and not a self-serve one — an automatic extension is a 28-day trial with extra steps, and the audit record is what makes the difference visible. **The extension capability belongs to Phase 2.5**, alongside the other operator-facing work; **the 14-day default is plan-version data and belongs to items 1 and 2**, unchanged in shape by this amendment.
+
+**What else moves with the number, checked rather than assumed.** The `7` appears in four places in this repository:
+
+| Where | Treatment |
+|---|---|
+| this ADR's Decision — *"The default trial length is 7 days"* | superseded by this amendment |
+| this ADR's Problem — *"whose acquisition offer is a **7-day free trial**"* | **a citation of the commercial specification, not a rule.** Left as written; see below |
+| this ADR's verification bullet — *"a plan version can express 'offers a 7-day trial'"* | restated below with the new number |
+| `decisions/2026-09.md` and `RISK_REGISTER.md` R-040 | **dated records, left untouched** per this repository's no-rewrite convention — they say what was true when written |
+
+> **The obligation this creates outside the repository, recorded because nobody inside it can discharge it.** This ADR's Problem section justifies 7 as *"matching the commercial model"* — `D:\طرح پیشنهادی\12_COMMERCIAL_PRICING_AND_AI_DIAMOND_ECONOMY_SPEC11.md` §2, whose first-year offer is a 7-day free trial. **That document is outside this repository and still says 7. It is now out of step with this ADR, and the two must be reconciled by whoever owns it.** Recorded here rather than silently assumed to follow.
+
+**الف-6. A trial receives a generated subdomain; a chosen name is granted only with the first paid subscription.** Ruled in **ADR-028's amendment of the same date** and cross-referenced here because it is a property of a trial: ADR-028's 2026-09-03 amendment makes a platform subdomain permanently unreissuable, so **a free trial with a chosen name burns a good name permanently on every abandoned signup.**
+
+**This interacts with the abuse surface this ADR already ACCEPTED.** One-trial-per-organization does not stop a second organization; a generated subdomain does not stop it either, and is not offered as a fix for it. What it does stop is the **collateral** cost of that abuse — the namespace being consumed by signups that never convert — which is a different harm with a cheaper remedy.
+
+### Verification, superseding and adding
+
+- [ ] a plan version can express **"offers a 14-day trial"** and "offers no trial", and the second is not a special case in any query — *(supersedes the 7-day form above)*
+- [ ] an operator extension grants exactly 14 further days, is refused a second time, and writes an audit record naming the operator
+- [ ] a trial receives a generated subdomain and cannot claim a chosen one
 
 ### Verification
 

@@ -615,3 +615,39 @@ Phase 2.5 was created on 2026-09-03 as **Commercial Growth**, carrying discounts
 
 **§4's list stays at 31 and §3's at sixteen.** Nothing in this session adds either.
 
+### 9.13 Amendment, 2026-09-04 (eighth to this file) — the V1 quota list, and two item-1 seed obligations
+
+**Ruled by the maintainer on 2026-09-04** (`COMPETITIVE_RULINGS_2026-09-04.md`, ب-4, ب-8 and پ-3). **§4 gains no table and §3 gains no capability.**
+
+#### ب-4 — the V1 quota resource list is a closed list, and it is a restriction
+
+> **The V1 quota resource list contains only what the platform can count: `members`, `stores`, `domains`.** All three are countable from the platform's own tables.
+
+**Read as a restriction, not an addition.** It is **not** "these three plus whatever else a plan wants to promise" — **it is these three and nothing else in V1.** A resource may join the list only when the platform can count it from data it holds.
+
+**Storage and bandwidth are excluded, and are neither enforced nor advertised** until an object storage adapter (**ADR-060**, which is a port with no adapter) and edge metering exist. *A limit that is not counted is a promise someone eventually discovers.*
+
+**The second half of that has to survive outside this repository, which is why it is written here as well as in `decisions/2026-09.md`: "not advertised" is a statement about marketing copy.** A pricing page listing "10 GB storage" while nothing counts bytes is the same defect as an unenforced quota, reached from the other direction, and it is recorded as a red line (ج-2) because marketing pressure lands precisely there.
+
+**This binds item 7** (`plan_quota_policies`, `tenant_quota_overrides`). ADR-027 item 9's *"Add `domains` to the quota resource list"* is unchanged and is one of the three.
+
+#### ب-8 — the "powered by Nexora" mark is a `plan_features` flag, seeded by item 1
+
+> **The mark appears on trials only and is removed on every paid plan.**
+
+Competitors sell its removal on lower paid tiers as well. **This platform does not: if you have paid, the site is yours.** Platform visibility comes from trial volume, which always exceeds paid customers, and the position is itself a sales line.
+
+**Technically it is one flag in `plan_features`, seeded in item 1 — no new table, no new column beyond what item 1 already creates.** ADR-044's ruling is undisturbed: `plan_features` carries a machine `key`, and this is one.
+
+#### پ-3 — every payment gateway is free, on every plan
+
+**Also a `plan_features` seed rather than a mechanism.** ADR-023's *Adding a new provider* section rules that a gateway must cost *"one adapter, one capability declaration, one credential schema, one fixture-based test suite, and one configuration entry"* with zero changes elsewhere — **charging for something the architecture already made nearly free is rent on the platform's own work.** No plan gates a gateway.
+
+**Item 1's seed therefore carries these two feature keys**, and neither is a schema change.
+
+#### What this amendment does not do
+
+- **§4's table list stays at 31 and §3's capability list at sixteen.** Nothing here adds either.
+- **Item 1's migration is unchanged** — ب-3 rules that `plans` gains no family or product-line column, recorded in `decisions/2026-09.md`.
+- It does not price anything. The plan prices, the two-year seed and the add-on catalogue are commercial and live outside the normative documents.
+
