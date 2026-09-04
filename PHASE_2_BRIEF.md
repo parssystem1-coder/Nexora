@@ -279,6 +279,32 @@ ADR-041 (`ACCEPTED (was OPEN)`, 2026-09-03) ruled a **fifth** option: **keep the
 
 **Enforced, not merely written:** `npm run check:partitions` (`tools/schema/check-partition-isolation.ts`, in CI) fails the build if any partition lacks its own RLS/FORCE/policy or is directly reachable by `nexora_app`. It matches nothing today and fires on the first partitioning migration — see `RISK_REGISTER.md` **R-042** for why a partition is not protected by its parent.
 
+**Amendment, 2026-09-05 (ninth to this file) — three versioned tables join the append-only list, and two identity tables deliberately do not.**
+
+**Ruled by the maintainer on 2026-09-05**, on a finding item 1's slice reported and correctly declined to fix itself. **Discharged by Phase 2 item 2's migration `20260905120100_billing__enforce_append_only.sql`.**
+
+**The finding.** §4 calls `plan_versions` an *"immutable versioned plan definition"*, §2 warns that *"getting the immutability boundary wrong here propagates into `prices`, `subscriptions`, `invoices` and `subscription_changes`"*, and ADR-025 item 6 requires that *"a later edit to that plan must not retroactively alter the change"* — **yet the `REVOKE UPDATE, DELETE` list above did not contain it.** Immutability was discipline alone, on the one table the platform's whole billing history pins against. **A comment asserting a property is not that property** — this file's own words, three paragraphs up, about a different table.
+
+**Three tables are added:**
+
+| Table | Why it is on the list |
+|---|---|
+| `plan_versions` | §4 calls it immutable; ADR-025 item 6's pinning and ADR-024 item 1's `plan_version_id` on every subscription period both rest on it |
+| `plan_features` | the grants a version makes are part of what that version **is**. A version whose feature set can be edited is not an immutable definition, and ruling ب-8's attribution flag is one of those grants |
+| `price_versions` | §4 calls it an *"immutable versioned amount + currency"*; ADR-047 pins a `price_version_id` onto a renewal invoice, and ADR-055 requires an issued invoice to be reconstructible from what it references |
+
+**Two tables are deliberately excluded, and this is the half a later reader is most likely to misread as an omission.**
+
+**`plans` and `prices` are bare identity rows** — an id, a machine key or a term length, a timestamp. **They assert nothing a later reader must be able to trust as unchanged.** An invoice pins a *version*, never an identity, so freezing the identity row buys no integrity; and a future plan-retirement mechanism, which nobody has designed, may legitimately need to touch one. **An earlier statement of this ruling said four tables and included `prices`. That was wrong by its own reasoning** — `prices` is an identity row exactly as `plans` is — **and the ruling is three.**
+
+**Why this is done now rather than in each table's creating migration, which is the rule everywhere else in this section.** Because a `REVOKE` is not a backfill. ADR-055's `NOT NULL` tax columns had to exist at creation precisely because **rows already in an append-only table can never be filled in**; a grant carries no such asymmetry and can be withdrawn at any later time. The repository already contains the worked example: `20260822100100_audit__enforce_append_only.sql` revoked on `audit_events`, which `20260822090800` had created. **Nothing had written to any of the three outside its own seed in any case** — D2-11 rules that no Phase 2 capability creates or edits a plan.
+
+**`INSERT` is untouched, and that is the point.** Ruling ح-2 (2026-09-04) gives Phase 2.5 an operator capability that **publishes** a new plan version and a new price version. Publishing is an append. Revoking `UPDATE` and `DELETE` is exactly what makes *"publish, never edit"* a database property rather than a naming convention in a contract.
+
+**§4's table list gains no table from this amendment.** `prices` and `price_versions` have been on it since the phase was scoped, both owned by item 2; `plan_versions` and `plan_features` since item 1. The scope list is unchanged at 31.
+
+**Proven, not asserted.** `modules/billing/infrastructure/prices-schema.spec.ts` attempts an `UPDATE` and a `DELETE` on each of the three **as `nexora_app`**, the role the application actually runs as, and requires a permission error. Per ADR-030's standard the assertions were **watched failing**: with the grants temporarily restored, all four privilege tests fail, so they discriminate rather than passing vacuously.
+
 ### Idempotency
 
 - Exactly one platform mechanism, owned by the `idempotency` module (item 3). No module invents its own — `AGENTS.md` §4, ADR-009; a module-local idempotency table is already a live-DB conformance violation (`SCHEMA-DUPLICATE-IDEMPOTENCY-TABLE`).

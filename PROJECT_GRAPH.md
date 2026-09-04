@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `47d105a` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `c7820f0` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 8 modules · 17 tables (6 with RLS) · 11 capabilities · 12 routes · 439 test cases in 49 files · 64 ADRs (56 accepted)
+**At a glance:** 8 modules · 19 tables (6 with RLS) · 11 capabilities · 12 routes · 454 test cases in 50 files · 64 ADRs (56 accepted)
 
 ## Modules
 
@@ -12,7 +12,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 |---|---|---|---|---|
 | `audit` | contracts, domain, infrastructure, migrations | 10 | — | yes |
 | `authorization` | application, contracts, domain, infrastructure, migrations | 17 | `capability` | yes |
-| `billing` | application, contracts, domain, infrastructure, interfaces, migrations | 12 | `audit`, `capability`, `identity` | yes |
+| `billing` | application, contracts, domain, infrastructure, interfaces, migrations | 15 | `audit`, `capability`, `identity`, `money` | yes |
 | `calendar` | contracts, domain | 4 | — | — |
 | `capability` | contracts, domain, interfaces | 8 | `audit` | yes |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 42 | `audit`, `capability` | yes |
@@ -35,6 +35,8 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `plan_features` | billing | — | — | — | — | `20260905090000_billing__create_plans.sql` |
 | `plan_versions` | billing | — | — | — | — | `20260905090000_billing__create_plans.sql` |
 | `plans` | billing | — | — | — | — | `20260905090000_billing__create_plans.sql` |
+| `price_versions` | billing | — | — | — | — | `20260905120000_billing__create_prices.sql` |
+| `prices` | billing | — | — | — | — | `20260905120000_billing__create_prices.sql` |
 | `reserved_subdomains` | tenant | — | — | — | — | `20260823110000_tenant__create_reserved_subdomains.sql` |
 | `role_permissions` | authorization | — | — | — | — | `20260822090600_authorization__create_permission_catalog.sql` |
 | `roles` | authorization | — | — | — | — | `20260822090600_authorization__create_permission_catalog.sql` |
@@ -75,7 +77,7 @@ Roles ADR-030 requires exactly one implementation of.
 | application | 15 | 87 |
 | conformance | 2 | 30 |
 | domain | 3 | 48 |
-| infrastructure | 4 | 15 |
+| infrastructure | 5 | 30 |
 | integration | 16 | 207 |
 | interfaces | 1 | 4 |
 | other | 4 | 26 |
@@ -89,6 +91,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/authorization/application/check-permission.service.spec.ts` | application | 2 |
 | `modules/authorization/infrastructure/role-catalog-agreement.spec.ts` | infrastructure | 1 |
 | `modules/billing/application/list-plans.service.spec.ts` | application | 8 |
+| `modules/billing/infrastructure/prices-schema.spec.ts` | infrastructure | 15 |
 | `modules/calendar/domain/business-calendar.spec.ts` | domain | 27 |
 | `modules/capability/interfaces/capability-attempt.spec.ts` | interfaces | 4 |
 | `modules/identity/application/check-session-revoked.service.spec.ts` | application | 4 |

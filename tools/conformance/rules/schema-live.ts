@@ -26,6 +26,10 @@ const TENANT_EXEMPT = new Set([
   "plans",
   "plan_versions",
   "plan_features",
+  // Item 2, exempt by the same §5 clause, which names all seven
+  // plan-and-price tables together.
+  "prices",
+  "price_versions",
 ]);
 
 const MONEY_NAME_RE = /amount|price|cost|total|balance|fee|money|charge/i;

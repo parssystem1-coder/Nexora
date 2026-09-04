@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "47d105a",
+    "commit": "c7820f0",
     "dirty": true
   },
   "modules": [
@@ -41,11 +41,12 @@
         "interfaces",
         "migrations"
       ],
-      "files": 12,
+      "files": 15,
       "dependsOn": [
         "audit",
         "capability",
-        "identity"
+        "identity",
+        "money"
       ],
       "dependsOnPlatform": true
     },
@@ -215,6 +216,24 @@
       "name": "plans",
       "module": "billing",
       "migration": "20260905090000_billing__create_plans.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "price_versions",
+      "module": "billing",
+      "migration": "20260905120000_billing__create_prices.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "prices",
+      "module": "billing",
+      "migration": "20260905120000_billing__create_prices.sql",
       "tenantId": false,
       "rlsEnabled": false,
       "rlsForced": false,
@@ -828,6 +847,11 @@
       "cases": 8
     },
     {
+      "file": "modules/billing/infrastructure/prices-schema.spec.ts",
+      "layer": "infrastructure",
+      "cases": 15
+    },
+    {
       "file": "modules/calendar/domain/business-calendar.spec.ts",
       "layer": "domain",
       "cases": 27
@@ -1117,12 +1141,12 @@
   ],
   "counts": {
     "modules": 8,
-    "tables": 17,
+    "tables": 19,
     "tablesWithRls": 6,
     "capabilities": 11,
     "routes": 12,
-    "testFiles": 49,
-    "testCases": 439,
+    "testFiles": 50,
+    "testCases": 454,
     "adrs": 64,
     "adrsAccepted": 56
   }

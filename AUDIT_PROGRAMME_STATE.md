@@ -115,10 +115,10 @@ the repository on 2026-09-05:**
   supersessions after it, so reading the first token misreads R-036 and R-040 as
   open. **The last dated entry in the cell governs.**
 - **Phase 2 scope unchanged at 31 tables and 16 capabilities** — no session touched
-  `PHASE_2_BRIEF.md` §3 or §4 — but **3 of those tables and 1 of those capabilities
-  are now built.**
-- **Implemented today: 8 modules, 17 tables, 11 capabilities, 12 routes**; 460 tests
-  across 49 files; conformance 0 violations; `exceptions.json` still does not exist.
+  `PHASE_2_BRIEF.md` §3 or §4 — but **5 of those tables and 1 of those capabilities
+  are now built** (items 1 and 2; item 2 surfaces no capability by design).
+- **Implemented today: 8 modules, 19 tables, 11 capabilities, 12 routes**; 475 tests
+  across 50 files; conformance 0 violations; `exceptions.json` still does not exist.
 
 **The documentation programme is finished. What follows is slices.**
 

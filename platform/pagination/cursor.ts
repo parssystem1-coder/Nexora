@@ -12,14 +12,30 @@
  * for." All three are checked on decode, which is what makes a cursor issued
  * for one capability unusable on another.
  *
- * What it is NOT: signed, encrypted, or authenticated. A cursor names a
- * position in a public ordering — it carries no identity and grants no
- * access, and every row it could seek to is one the caller's own query would
- * have reached anyway. Base64url is an obfuscation of the encoding, not a
- * security boundary, and ADR-036 item 5's "bearer token for position" is
- * exactly that: a position, not a bearer token for authority. If a future
- * paginated capability's sort key is itself sensitive, that capability owes
- * its own decision — it does not get to quietly reuse this one.
+ * **What it is NOT: signed, encrypted, or authenticated — and this is the
+ * note to read before building the next paginated capability.** A cursor is
+ * base64url of a small JSON object: anyone can decode one and craft another.
+ * That is deliberate, and it is safe for a reason that has nothing to do with
+ * the cursor: **a cursor names a position in an ordering, and it is RLS that
+ * decides which rows exist to be positioned among.**
+ *
+ * `plan.list` is safe because its data is platform-global — there is nothing
+ * to scope. **`invoice.list` will be safe for the harder reason**: its query
+ * runs inside `withTenantContext`, so a forged cursor naming another tenant's
+ * invoice key seeks past a row the policy never returns, and the caller sees
+ * their own next page. The cursor cannot widen a result set it does not
+ * filter.
+ *
+ * **The defect this comment exists to prevent** is a later capability that
+ * treats a cursor as proof of anything — scoping a query by a value decoded
+ * from it, trusting a tenant or store id it carries, or skipping an
+ * authorization check because "the cursor came from us." It did not: it came
+ * from whoever sent the request. Base64url is an obfuscation of the encoding,
+ * not a boundary, and ADR-036 item 5's "bearer token for position" means a
+ * position, never authority. **If a future capability's sort key is itself
+ * sensitive** — a row's position leaking the existence of data the caller
+ * cannot read — **that capability owes its own decision and may not quietly
+ * inherit this one.**
  *
  * ADR-036 item 5 also permits the encoding to change without a contract
  * version bump, precisely because it is opaque. `VERSION` below is what makes

@@ -236,12 +236,17 @@ describe("GET /api/v1/plans", () => {
       })
       .execute();
 
-    try {
-      const res = await request(app.getHttpServer()).get("/api/v1/plans?limit=100").set("Cookie", `sid=${token}`);
-      expect((res.body.items as { key: string }[]).map((i) => i.key)).not.toContain(key);
-    } finally {
-      await db.deleteFrom("plan_versions").where("id", "=", versionId).execute();
-      await db.deleteFrom("plans").where("id", "=", planId).execute();
-    }
+    // No cleanup, and that is now a property of the schema rather than a
+    // shortcut. `PHASE_2_BRIEF.md` §5's 2026-09-05 amendment revoked DELETE on
+    // `plan_versions` from `nexora_app`, so this test cannot remove what it
+    // inserts — which is what "append-only" means when you are the application
+    // role. It is re-runnable by construction instead: the key is random, and
+    // the row is invisible to `plan.list` for the very reason under test, so it
+    // affects no other assertion in this file.
+    const res = await request(app.getHttpServer()).get("/api/v1/plans?limit=100").set("Cookie", `sid=${token}`);
+
+    expect((res.body.items as { key: string }[]).map((i) => i.key)).not.toContain(key);
+    expect(planId).toBeTruthy();
+    expect(versionId).toBeTruthy();
   });
 });

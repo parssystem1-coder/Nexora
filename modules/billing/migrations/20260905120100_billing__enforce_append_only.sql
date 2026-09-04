@@ -1,0 +1,45 @@
+-- Discharges `PHASE_2_BRIEF.md` §5's dated 2026-09-05 amendment, which adds
+-- three tables to the append-only `REVOKE UPDATE, DELETE` list.
+--
+-- **Why this exists as a separate migration from the one that creates
+-- `prices`.** It is the shape Phase 1 already established:
+-- `20260822090800_audit__create_audit_events.sql` created the table and
+-- `20260822100100_audit__enforce_append_only.sql` revoked on it. Keeping the
+-- grant change apart from the schema change means the reviewable unit is "what
+-- the application role may no longer do", by itself, for three tables at once
+-- — two of which were created by an earlier migration.
+--
+-- **Item 1 raised this and correctly declined to fix it.** `PHASE_2_BRIEF.md`
+-- §4 calls `plan_versions` an "immutable versioned plan definition" and §2
+-- warns that "getting the immutability boundary wrong here propagates into
+-- prices, subscriptions, invoices and subscription_changes" — yet §5's REVOKE
+-- list did not contain it, so the property was discipline alone on the very
+-- table ADR-025 item 6's version pinning rests on. Amending that list is
+-- `PHASE_2_BRIEF.md`'s decision and not a slice's; it was ruled on 2026-09-05
+-- and is discharged here.
+--
+-- **A REVOKE is not a backfill, which is why doing it now costs nothing.**
+-- Unlike ADR-055's NOT NULL tax columns — which had to exist at creation
+-- because rows already in an append-only table can never be filled in — a
+-- grant can be withdrawn at any later time. Nothing has written to these
+-- tables outside their own seeds in any case: D2-11 rules that no Phase 2
+-- capability creates or edits a plan, and item 1's tables have no writer at
+-- all.
+--
+-- **What is deliberately NOT on this list, and why it is not an oversight.**
+-- `plans` and `prices` are bare identity rows — an id, a key or a term, a
+-- timestamp. They assert nothing that a later reader must be able to trust as
+-- unchanged, and a future retirement mechanism may legitimately need to touch
+-- one. Freezing an identity row buys no integrity and forecloses a mechanism
+-- nobody has designed. (An earlier statement of this amendment said four
+-- tables and included `prices`; that was wrong by its own reasoning and the
+-- ruling is three.)
+--
+-- Scoped per table, exactly as the audit precedent is: this does not change
+-- `platform/db/init/001_roles.sql`'s blanket ALTER DEFAULT PRIVILEGES, which
+-- affects only objects created after it runs and never retroactively re-grants
+-- on an existing table. Each later ledger-shaped table still owes its own
+-- REVOKE in its own creating migration.
+REVOKE UPDATE, DELETE ON plan_versions FROM nexora_app;
+REVOKE UPDATE, DELETE ON plan_features FROM nexora_app;
+REVOKE UPDATE, DELETE ON price_versions FROM nexora_app;
