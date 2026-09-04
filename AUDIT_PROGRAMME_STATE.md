@@ -4,7 +4,7 @@
 > `AGENTS.md` §۱ نیست. کارش فقط این است که اگر گفتگو قطع شد یا سشن جدیدی شروع شد،
 > بشود از همین‌جا ادامه داد. **این فایل حذف نمی‌شود؛ به‌روز می‌شود.**
 
-**Last updated: 2026-09-05, after session 19.** Every count below was taken from
+**Last updated: 2026-09-05, after session 17 — the last prompt of the programme.** Every count below was taken from
 the repository on that date, not carried forward from a previous version of this
 file.
 
@@ -71,6 +71,7 @@ recording had just made load-bearing. **Keep the instruction in every prompt.**
 | 16 | Storage, backup, certificates | ADR-060 (object storage port), ADR-061 (cluster recovery), ADR-027's certificate amendment, `RUNBOOK_DISASTER_RECOVERY.md` |
 | 18 | The 44 competitive rulings (الف–چ) | All recorded. **Seven ADR amendments, one error code, two brief amendments, twelve phase placements, one risk row — and no new ADR, because none was needed.** R-044 opened |
 | 19 | The 11 addendum rulings (ح, خ) + repair | All recorded, **again with no new ADR**. R-032 given an owner and a deadline. The three overwritten files rebuilt from the repository |
+| 17 | **Phase 2 item 1 — `plan.list`** | **The first Phase 2 code.** New `billing` module, three platform-global tables, ADR-036's pagination contract built as platform machinery, `queryParams` added to `CapabilityRoute`. **Stopped at the hand-review gate** |
 
 ### What session 18 recorded, and where
 
@@ -101,7 +102,8 @@ exclusion to *tenant-owned* domains. And **none of the eleven shipping and
 administration rulings became an ADR**, because shipping has no port yet and ruling
 a design nobody has drafted is the failure a premature ADR causes.
 
-**State after session 19, verified against the repository on 2026-09-05:**
+**State after session 17 (which ran last, despite its number), verified against
+the repository on 2026-09-05:**
 
 - **64 ADRs — 56 `ACCEPTED`, 8 `DEFERRED`, zero `OPEN`** (`npm run graph`). Sessions
   18 and 19 wrote **no new ADR**; both worked entirely by amendment.
@@ -112,27 +114,38 @@ a design nobody has drafted is the failure a premature ADR causes.
   convention means a status cell *begins* with its original word and carries dated
   supersessions after it, so reading the first token misreads R-036 and R-040 as
   open. **The last dated entry in the cell governs.**
-- **Phase 2 scope unchanged: 31 tables and 16 capabilities**, **zero feature code
-  written.** Neither session touched `PHASE_2_BRIEF.md` §3 or §4.
-- **Implemented today: 10 capabilities, 11 routes, 7 modules, 14 tables**; 430 tests
-  across 46 files; conformance 0 violations.
+- **Phase 2 scope unchanged at 31 tables and 16 capabilities** — no session touched
+  `PHASE_2_BRIEF.md` §3 or §4 — but **3 of those tables and 1 of those capabilities
+  are now built.**
+- **Implemented today: 8 modules, 17 tables, 11 capabilities, 12 routes**; 460 tests
+  across 49 files; conformance 0 violations; `exceptions.json` still does not exist.
+
+**The documentation programme is finished. What follows is slices.**
 
 ---
 
 ## What is next, in order
 
-1. **`SESSION_17_PLAN_LIST_SLICE_PROMPT.md`** — Phase 2 item 1, `plan.list`. The
-   first Phase 2 code, after seventeen sessions of documentation. Ends at a
-   hand-review stop; **do not begin item 2.** **Its precondition is satisfied** —
-   ruling ب-3's finding is the one it was waiting on: **item 1's migration is
-   unchanged.** The prompt file has been updated in place to say so.
-2. After item 1 is reviewed: items 2 onward, one slice per session, using the
-   `/new-slice` skill.
+1. **A hand review of item 1.** `PHASE_2_BRIEF.md` §2's review posture is a stop,
+   not a suggestion: *"Stop after item 1, request review, do not begin item 2 until
+   approved."* Two things in it are copied by every later slice and expensive to
+   change afterwards — **the pagination shape** (`AGENTS.md` §2 makes it the
+   platform contract by construction) and **the platform-global-table pattern**. A
+   third, version immutability, is load-bearing for the whole billing history.
+2. **Two questions the review should settle**, both recorded in
+   `decisions/2026-09.md` under 2026-09-05:
+   - **`plan_versions` is not on `PHASE_2_BRIEF.md` §5's append-only list**, so its
+     immutability is discipline rather than a grant. The slice did not add it — that
+     list is §5's to amend — and deliberately made adding it later free.
+   - **Ruling ب-8 and ADR-052 pull in different directions** on whether a trial and
+     a paid offering are the same plan version. The seed answers it one way; item 4
+     owns the resolution.
+3. After item 1 is approved: items 2 onward, one slice per session, using the
+   `/new-slice` skill. **`06_IMPLEMENTATION_PLAN.md` is the order.**
 
-**Sessions 18 and 19 both ran ahead of 17 and are done.** The competitive rulings
-were approved after the `plan.list` prompt was already written, and several of them
-(ب-4, ب-5, ب-8, and now ح-2) bind Phase 2 or Phase 2.5, so they went on the record
-first.
+**Sessions 18 and 19 both ran ahead of 17.** The competitive rulings were approved
+after the `plan.list` prompt was written, and four of them (ب-4, ب-5, ب-8, ح-2)
+bind Phase 2 or Phase 2.5, so they went on the record first.
 
 ---
 
@@ -141,7 +154,6 @@ first.
 **Live — do not delete:**
 
 - `AUDIT_PROGRAMME_STATE.md` — this file
-- `SESSION_17_PLAN_LIST_SLICE_PROMPT.md` — until it runs
 - `COMPETITIVE_RULINGS_2026-09-04.md` — **retained permanently.** It was originally
   marked spent-once-recorded, and two prompts ordered it deleted. **The normative
   documents now cite it as the provenance of a decision** — seven ADR amendments,
@@ -151,12 +163,11 @@ first.
   `PHASE_2_DOCUMENTATION_GAPS_2026-08-28.md` are dated source documents cited from
   seven files each, and both are retained.
 
-**Spent, and awaiting the maintainer's call:**
-
-- `SESSION_19_ADDENDUM_PROMPT.md` — **spent as of 2026-09-05.** Its own steps did not
-  instruct deleting it, unlike session 18's, so it was left in place rather than
-  removed on an assumption. **It is untracked and nothing cites it**, so deleting it
-  is one command and loses nothing but the prompt text itself.
+**No prompt files remain.** `SESSION_17_PLAN_LIST_SLICE_PROMPT.md` and
+`SESSION_19_ADDENDUM_PROMPT.md` were both removed on 2026-09-05 by session 17's
+housekeeping step, which its own text authorised. **The programme's prompt queue is
+empty**; work continues as slices against `06_IMPLEMENTATION_PLAN.md`, not as
+prompts.
 
 **Removed:** all seventeen earlier `SESSION_*.md` prompts and
 `NEXORA_PLAN_3ROUNDS.md` on 2026-09-04 — **those are in git history and nothing
