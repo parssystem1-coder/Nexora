@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "70ca5e0",
+    "commit": "b163168",
     "dirty": true
   },
   "modules": [
@@ -567,14 +567,14 @@
     {
       "id": "ADR-039",
       "title": "Connection Pool Sizing and Query Timeouts",
-      "status": "OPEN",
-      "blocks": "first deployment carrying real traffic, or the first second instance"
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "**deployment configuration, not a Phase 2 migration.** Pool size is derived from `max_connections` and the app refuses to start if oversubscribed; timeouts are server-side per role. The transaction-scope property is now guarded by a test"
     },
     {
       "id": "ADR-040",
       "title": "Observability Boundary",
-      "status": "OPEN",
-      "blocks": "nothing in Phase 2; owed before production"
+      "status": "ACCEPTED (was OPEN)",
+      "blocks": "nothing in Phase 2. Logging is a port, enforced in `domain` today and **owed for `application`**; no logging dependency is adopted; metrics and traces deferred to first real traffic"
     },
     {
       "id": "ADR-041",
@@ -851,6 +851,11 @@
       "cases": 4
     },
     {
+      "file": "platform/db/tenant-context-pool-reuse.spec.ts",
+      "layer": "platform",
+      "cases": 2
+    },
+    {
       "file": "platform/db/tenant-context.spec.ts",
       "layer": "platform",
       "cases": 5
@@ -943,7 +948,7 @@
     {
       "file": "tools/conformance/harness.selftest.spec.ts",
       "layer": "conformance",
-      "cases": 23
+      "cases": 24
     },
     {
       "file": "tools/graph/extract.spec.ts",
@@ -1029,9 +1034,9 @@
     "tablesWithRls": 6,
     "capabilities": 10,
     "routes": 11,
-    "testFiles": 45,
-    "testCases": 410,
+    "testFiles": 46,
+    "testCases": 413,
     "adrs": 62,
-    "adrsAccepted": 52
+    "adrsAccepted": 54
   }
 }

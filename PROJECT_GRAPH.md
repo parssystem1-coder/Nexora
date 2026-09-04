@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `70ca5e0` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `b163168` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 410 test cases in 45 files · 62 ADRs (52 accepted)
+**At a glance:** 7 modules · 14 tables (6 with RLS) · 10 capabilities · 11 routes · 413 test cases in 46 files · 62 ADRs (54 accepted)
 
 ## Modules
 
@@ -68,13 +68,13 @@ Roles ADR-030 requires exactly one implementation of.
 | layer | files | cases |
 |---|---|---|
 | application | 14 | 79 |
-| conformance | 2 | 29 |
+| conformance | 2 | 30 |
 | domain | 3 | 48 |
 | infrastructure | 4 | 15 |
 | integration | 15 | 194 |
 | interfaces | 1 | 4 |
 | other | 4 | 26 |
-| platform | 2 | 15 |
+| platform | 3 | 17 |
 
 <details><summary>Per file</summary>
 
@@ -102,6 +102,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/tenant/application/revoke-membership.service.spec.ts` | application | 9 |
 | `modules/tenant/application/switch-organization.service.spec.ts` | application | 2 |
 | `modules/tenant/infrastructure/organizations-rls.spec.ts` | infrastructure | 4 |
+| `platform/db/tenant-context-pool-reuse.spec.ts` | platform | 2 |
 | `platform/db/tenant-context.spec.ts` | platform | 5 |
 | `platform/rate-limit/in-process-store.spec.ts` | platform | 10 |
 | `apps/api/auth-login-rate-limit.integration.spec.ts` | integration | 4 |
@@ -120,7 +121,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `apps/api/store-read.integration.spec.ts` | integration | 15 |
 | `apps/api/tenant-isolation-rls.spec.ts` | integration | 3 |
 | `tools/conformance/harness.selftest.live-db.spec.ts` | conformance | 6 |
-| `tools/conformance/harness.selftest.spec.ts` | conformance | 23 |
+| `tools/conformance/harness.selftest.spec.ts` | conformance | 24 |
 | `tools/graph/extract.spec.ts` | other | 5 |
 | `tools/openapi/openapi.spec.ts` | other | 7 |
 | `tools/register/register-integrity.spec.ts` | other | 10 |
@@ -165,8 +166,8 @@ Roles ADR-030 requires exactly one implementation of.
 | ADR-036 | Collection Pagination Contract | ACCEPTED (new) | Phase 2 item 1, and every later `*.list` capability |
 | ADR-037 | Credential Storage and the Encryption Deferral | ACCEPTED (new) | Phase 2 item 10 (storage shape) · Phase 3/4 (the mechanism itself) |
 | ADR-038 | Idempotency Composition at the Capability Boundary | ACCEPTED (new) | Phase 2 item 3, and every idempotent capability after it |
-| ADR-039 | Connection Pool Sizing and Query Timeouts | OPEN | first deployment carrying real traffic, or the first second instance |
-| ADR-040 | Observability Boundary | OPEN | nothing in Phase 2; owed before production |
+| ADR-039 | Connection Pool Sizing and Query Timeouts | ACCEPTED (was OPEN) | **deployment configuration, not a Phase 2 migration.** Pool size is derived from `max_connections` and the app refuses to start if oversubscribed; timeouts are server-side per role. The transaction-scope property is now guarded by a test |
+| ADR-040 | Observability Boundary | ACCEPTED (was OPEN) | nothing in Phase 2. Logging is a port, enforced in `domain` today and **owed for `application`**; no logging dependency is adopted; metrics and traces deferred to first real traffic |
 | ADR-041 | Ledger and Audit Table Growth | ACCEPTED (was OPEN) | **Phase 2 items 4, 5, 9 and 12 — their creating migrations**, which must keep the append-only tables partition-*compatible* (no FK to a candidate table, no uniqueness excluding the event column). Nothing is partitioned; the trigger is 50M rows / 50 GB or R-025 closing |
 | ADR-042 | Error Message Audience and Localization | ACCEPTED (new) | Phase 2, every capability that raises an error |
 | ADR-043 | Guarding `CapabilityDefinition` Against `05` §5 | ACCEPTED (new) | Phase 2 items 6–7 (the first slices that would add a declared field) |

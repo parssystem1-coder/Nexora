@@ -72,8 +72,8 @@ For each ADR, completion requires:
 | ADR-036 | Collection Pagination Contract | Platform / Contracts | **ACCEPTED (new)** | Phase 2 item 1, and every later `*.list` capability |
 | ADR-037 | Credential Storage and the Encryption Deferral | Billing / Security | **ACCEPTED (new)** | Phase 2 item 10 (storage shape) · Phase 3/4 (the mechanism itself) |
 | ADR-038 | Idempotency Composition at the Capability Boundary | Platform / Integrity | **ACCEPTED (new)** | Phase 2 item 3, and every idempotent capability after it |
-| ADR-039 | Connection Pool Sizing and Query Timeouts | Platform / Data | **OPEN** | first deployment carrying real traffic, or the first second instance |
-| ADR-040 | Observability Boundary | Platform / Ops | **OPEN** | nothing in Phase 2; owed before production |
+| ADR-039 | Connection Pool Sizing and Query Timeouts | Platform / Data | **ACCEPTED (was OPEN)** | **deployment configuration, not a Phase 2 migration.** Pool size is derived from `max_connections` and the app refuses to start if oversubscribed; timeouts are server-side per role. The transaction-scope property is now guarded by a test |
+| ADR-040 | Observability Boundary | Platform / Ops | **ACCEPTED (was OPEN)** | nothing in Phase 2. Logging is a port, enforced in `domain` today and **owed for `application`**; no logging dependency is adopted; metrics and traces deferred to first real traffic |
 | ADR-041 | Ledger and Audit Table Growth | Platform / Data | **ACCEPTED (was OPEN)** | **Phase 2 items 4, 5, 9 and 12 — their creating migrations**, which must keep the append-only tables partition-*compatible* (no FK to a candidate table, no uniqueness excluding the event column). Nothing is partitioned; the trigger is 50M rows / 50 GB or R-025 closing |
 | ADR-042 | Error Message Audience and Localization | Platform / Contracts | **ACCEPTED (new)** | Phase 2, every capability that raises an error |
 | ADR-043 | Guarding `CapabilityDefinition` Against `05` §5 | Platform / CI | **ACCEPTED (new)** | Phase 2 items 6–7 (the first slices that would add a declared field) |
@@ -2024,7 +2024,7 @@ Recorded because they are what a future session will otherwise rediscover:
 
 ## ADR-039 - Connection Pool Sizing and Query Timeouts
 
-**OPEN** — options and a recommendation are recorded; the decision is the maintainer's
+**ACCEPTED (was OPEN)**, ruled by the maintainer on 2026-09-03, following the recommendation; depends on ADR-010, ADR-021 and ADR-023
 
 ### Problem
 
@@ -2066,9 +2066,71 @@ Every capability opens a transaction through `withTenantContext`, so with no ser
 
 **Trigger:** the same deployment moment R-012's `TRUST_PROXY` decision is owed at — before this API is first placed behind a proxy or load balancer, or before a second instance runs, whichever comes first. Both are decisions that can only be made correctly with the real topology in hand, and taking them together is cheaper than twice.
 
+### Ruling
+
+**Ruled by the maintainer on 2026-09-03, following the recommendation above — A for sizing, D for timeouts, E documenting both.** The options and recommendation are left exactly as written. What this section adds is the part the recommendation deliberately left to the ruling: **the relationship the number falls out of, the transaction-scope property, and a fourth timeout the options list did not name.**
+
+#### 1. A derivation, not a number
+
+The recommendation already refuses to propose a measured number — *"`pg`'s `max: 10` is a library default, not a measurement of this workload"* — and already requires that *"sizing must be computed against `max_connections`, not chosen per pool in isolation."* **The ruling makes that computation the decision:**
+
+> **The database's `max_connections` is the budget, and every connecting process draws from it.**
+>
+> `pool_max = floor((max_connections − reserved) / (instances × pools_per_instance))`
+>
+> where `reserved` covers superuser slots, the migration role, and any monitoring connection.
+
+**`pools_per_instance` is 2, not 1, and leaving it out is the mistake this formula exists to prevent.** The Problem section above already records it: `connections.ts` creates `APP_DB` and `AUDIT_DB` per process. A derivation written per instance rather than per pool understates the draw by half, which is precisely how the `AUDIT_DB` starvation constraint above gets violated by someone who thought they had done the arithmetic.
+
+**Measured 2026-09-03 against the native PostgreSQL 17.5 the test suite uses:** `max_connections` 100, `superuser_reserved_connections` 3. The full local suite at 7 Vitest workers peaks at **23 concurrent connections**, and CI at 3 workers peaks at **10** — the measurements `decisions/2026-09.md`'s R-008 entry recorded. **Those are test-harness numbers and not a production sizing input**, and are cited here only because they are the sole real observation of this system's connection behaviour that exists.
+
+**Two obligations that make the derivation real rather than arithmetic:**
+
+- **The application refuses to start** when configured `pool_max × instances × pools_per_instance` exceeds the budget. ADR-023 item 1 already establishes the shape — *"Any code path that assumes an unavailable capability must fail at startup with a configuration error, not at runtime with a customer-facing failure"* — and this applies it to a resource rather than a capability. A pool that is oversubscribed fails at the worst moment otherwise: under load, as connection-acquisition errors on some requests and not others.
+- **A larger pool is not a faster system**, stated once so nobody "fixes" latency by raising it. Past the database's real concurrency, more connections buy context-switching and lock contention, not throughput. ADR-010's targets are **unverified assumptions until `06` Phase 4 item 9** by its own 2026-08-28 amendment, so they bound nothing here either.
+
+#### 2. The tenant context is transaction-scoped — and this is a tenant-isolation property, not a pooling nicety
+
+Every RLS policy in the platform reads `current_setting('app.tenant_id', true)`. **If that setting outlived its transaction, a pooled connection would return to the pool still carrying it, and the next checkout — possibly a different tenant, possibly no tenant — would inherit it.** That is a cross-tenant read reached through the pool rather than through a policy, and **every existing isolation test is blind to it**, because all of them set a context before they query.
+
+> **The tenant context is set inside the transaction that uses it, and no connection is ever returned to the pool carrying a tenant setting.**
+
+**Verified against source on 2026-09-03 rather than assumed.** `platform/db/tenant-context.ts` calls, inside `db.transaction().execute(...)`:
+
+```ts
+await sql`select set_config('app.tenant_id', ${context.tenantId ?? ""}, true)`.execute(trx);
+```
+
+`set_config`'s third argument is `is_local`, and it is **`true`** — the setting reverts at COMMIT. **The property already holds; there is no defect here and nothing was changed.**
+
+**It is nevertheless now a guarded property**, because ADR-030's standard is that a property nobody has watched fail is not evidence, and this one is a single argument away from silent breakage that no type checker and no other test would catch. `platform/db/tenant-context-pool-reuse.spec.ts` runs a transaction under a tenant context, proves the same backend is returned by comparing `pg_backend_pid()` — **failing rather than passing vacuously if it is not** — then asserts the setting is gone and that a tenant-owned table returns **zero rows** on that recycled connection, with a row seeded that was visible inside the transaction so the zero proves refusal rather than an empty table. **It was watched failing on 2026-09-03**: flipping that third argument to `false` turns it red at the leftover-setting assertion, and reverting turns it green.
+
+#### 3. Four timeouts, each with the failure it prevents
+
+**Set server-side per role, per option D, which the recommendation already chose** — enforced by PostgreSQL regardless of which client connects, and naturally per-role, since `nexora_migrate` legitimately needs the ceiling `nexora_app` must not have. A timeout with no stated failure mode gets tuned away by the first person it inconveniences, so each is recorded with one:
+
+| Setting | Role | Prevents |
+|---|---|---|
+| `statement_timeout` | `nexora_app` | one slow query holding a connection until the pool is exhausted and **every tenant** is down — not just the slow query's own |
+| `idle_in_transaction_session_timeout` | `nexora_app` | a leaked transaction pinning a connection **and its tenant setting** indefinitely. **This one interacts directly with §2**: transaction-scoped context is only bounded if transactions actually end |
+| `lock_timeout` | **`nexora_migrate`** | a migration queueing behind a long read and then blocking every write behind *itself*. Under forward-only migrations (ADR-021 item 8) that turns a slow deploy into an outage with no rollback |
+| a request-scoped deadline shorter than the HTTP timeout | application | a client that has already given up leaving work running and a connection held. **Not in the options above** — it is application-side by nature and cannot be a role default |
+
+**The first three are the same value in every environment** — they are safety ceilings, not tuning, and an environment that needs a different one has a problem the timeout is hiding. **The fourth is not**, because it is bounded by whatever HTTP timeout sits in front of the API, which is deployment topology.
+
+#### 4. Revisit trigger, with an input rather than an opinion
+
+The `Blocks` cell's trigger stands: **the first deployment carrying real traffic, or the first second instance.** What must be **measured** at that moment, so the revisit has data:
+
+- **peak concurrent checkouts** per pool
+- **checkout wait time** — the number that says whether the pool is too small, which pool size alone never says
+- **how often the pool is saturated**, and for how long
+
+Until then the derivation in §1 is the answer and the numbers in it are inputs, not results.
+
 ### Verification
 
-*(applies once the decision is taken; an `OPEN` ADR has nothing to verify yet)*
+*(the decision is taken as of 2026-09-03; these now apply)*
 
 - [ ] every pool's `max`, `connectionTimeoutMillis` and `idleTimeoutMillis` is set explicitly, with no reliance on a library default
 - [ ] `statement_timeout` and `idle_in_transaction_session_timeout` are set for `nexora_app` and are proven to fire, by a test that runs a deliberately slow query and observes it aborted
@@ -2081,7 +2143,7 @@ Every capability opens a transaction through `withTenantContext`, so with no ser
 
 ## ADR-040 - Observability Boundary
 
-**OPEN** — options and a recommendation are recorded; the decision is the maintainer's
+**ACCEPTED (was OPEN)**, ruled by the maintainer on 2026-09-03, following the recommendation; depends on ADR-034, ADR-037 and ADR-057
 
 ### Problem
 
@@ -2120,9 +2182,58 @@ What is undecided is where the *next* layer's boundary sits.
 
 Named explicitly so it does not become the venue for every future observability argument: **alerting policy** (thresholds, escalation, who is paged), **dashboards**, and **vendor or backend choice** (collector, storage, APM). Those are operational decisions belonging to whoever runs this platform in production, and none of them is blocked by, or blocks, the boundary question above.
 
+### Ruling
+
+**Ruled by the maintainer on 2026-09-03, following the recommendation above — A + D + F, with the metrics endpoint constrained as this ADR already states.** The options and recommendation are left exactly as written. What this section adds is the boundary stated as a rule, the log line's required shape, the never-log list, and level semantics.
+
+#### 1. The boundary comes first, and the library is a consequence of it
+
+**Logging is a port.** No `domain` file and no `application` file imports a logging library; the logger is injected at the interface and infrastructure layers, exactly as ADR-023 item 9 confines provider SDKs to adapters. Metrics and traces are **deferred with the trigger option D already names**, and the boundary is ruled now precisely so that adding them later is an adapter rather than a refactor.
+
+**How much of that is already enforced, checked rather than claimed:**
+
+- **The domain half is enforced for the logger actually in use.** `tools/conformance/rules/imports.ts`'s `DOMAIN_FORBIDDEN` already carries `^@nestjs/`, and the logger this repository uses is NestJS's `Logger` from `@nestjs/common`. A domain file importing it **already fails CI today.**
+- **A logging-library pattern was added to that list** — `pino`, `winston`, `bunyan`, `loglevel`, `log4js` — as depth against a future dependency, with a deliberately failing fixture (`forbidden-import-domain-logger`) proving it fires, per ADR-030's standard. One entry, one fixture, one self-test assertion.
+- **The application half is NOT enforced, and this ADR does not pretend otherwise.** `imports.ts` has `DOMAIN_FORBIDDEN` and `PLUGIN_FORBIDDEN` and **no forbidden-package list for the application layer at all** — its only application-layer rule is dependency direction. Extending it is a new constant, a new branch, a new rule id and a new fixture, which is a rule mechanism rather than a list entry. **Recorded as owed, with a named trigger: the first slice that adds a logging call in an `application/` file.** Claiming enforcement the project does not have would be worse than the gap, because it stops anyone looking.
+
+#### 2. What a log line is
+
+- **Structured: one JSON object per line.** No line whose only content is prose. `apps/api/logging.middleware.ts` already meets this — `console.log(JSON.stringify(entry))` with `requestId`, `correlationId`, `tenantId`, method, path, status and duration.
+- **It carries the same `correlationId` that `audit_events` records for that capability attempt.** ADR-034 item 4 puts one audit row per attempt; **a log line and an audit row for the same attempt must be joinable**, or an incident gets investigated twice from two half-views and the two accounts disagree. This is the ruling's most useful consequence and the one most easily lost when a new emitter is added.
+- **It carries `tenant_id` wherever one exists.** Every support question begins with which tenant, and a line without one is a line that has to be correlated by timestamp.
+
+#### 3. What must never be logged
+
+- **Credentials and secrets.** ADR-037 item 3 forbids writing a plaintext secret to the database *"by any code path — including a stub adapter, a seed, a fixture, or a test."* **That prohibition is extended to logs here, explicitly, because ADR-037 does not mention them** — and a log file is the other place secrets end up, with none of the database's access control and a copy in every shipper downstream.
+- **The buyer's personal identifiers — and this list changed on 2026-09-03.** ADR-057 has just put **کد ملی**, a legal name, a postal address and a phone number into the platform. **Before that ADR there was no personal data here to protect; there is now, and this rule is written against the system as it now is rather than as it was.** A national identifier in a log line survives every retention policy that applies to the database and none that applies to logs — ADR-053's session purge, ADR-020's tenant purge and ADR-041's retention windows all stop at the database boundary.
+- **Whole request or response bodies**, for the same reason: they carry both of the above without anyone deciding to log either.
+
+**Enforcement, stated honestly: this is a review rule, not a checked one.** Option F's redaction-at-the-seam is what would make it checkable, and it is ruled but not built — the seam is §1's port and the allow-list arrives with it. **No cheap mechanical check exists today**: a secret in a log is a runtime value, not a source-text pattern, so `tools/conformance/rules/secrets.ts` — which scans source for credential-shaped *literals* — cannot see it. Saying otherwise would stop someone looking for a real check later.
+
+#### 4. Levels, tied to the error taxonomy that already exists
+
+`05_API_CAPABILITY_CONTRACTS.md` §7 already distinguishes a retryable `CONCURRENCY_CONFLICT` from a permanent `CONFLICT` and says *"a client must not treat the two the same way."* **Neither is a system fault.**
+
+> **An expected, contracted error is not logged at error level. The error level is for faults the platform did not anticipate.**
+
+A `FORBIDDEN`, a `VALIDATION_ERROR`, a `CONFLICT` and a `SESSION_INVALIDATED` are all the platform working correctly. **An error channel that fills with contracted outcomes is an error channel nobody reads, which is the same as not having one** — and it is how a real fault goes unnoticed for a week.
+
+#### 5. The library: none is adopted, and the recommendation this ruling was drafted against is void
+
+**The session brief recommended `pino`. That recommendation is void twice over, and both reasons were established from the repository:**
+
+- **Option A above — the recommended option — says the seam costs *"no dependency."*** Adopting `pino` would contradict the very option being ruled.
+- **A logger is already present and in use.** NestJS's `Logger` appears in `modules/capability/interfaces/capability-attempt.ts` and `modules/capability/interfaces/http-exception.filter.ts`, and `apps/api/logging.middleware.ts` emits JSON through `console.log`. **Two paths, which is exactly what option 1 above describes** — not a greenfield.
+
+> **The ruling: unify onto the seam NestJS's `LoggerService` interface already provides. No logging dependency is added.**
+
+`Logger` is the injection surface already in use, and `LoggerService` lets the backend be replaced without touching a call site. **What the default backend does not do is emit JSON**, which §2 requires — so the seam's backend must be structured, and `logging.middleware.ts`'s existing `console.log(JSON.stringify(...))` is the shape to converge on rather than a second path to preserve.
+
+**If a dependency is ever wanted for that backend, `pino` is the named candidate** — JSON-first, low overhead, composes with `LoggerService`. **Nothing is installed in this session**: the dependency arrives with the first code that uses it, in its own change, where a lockfile diff belongs and can be reviewed as one.
+
 ### Verification
 
-*(applies once the decision is taken; an `OPEN` ADR has nothing to verify yet)*
+*(the decision is taken as of 2026-09-03; these now apply)*
 
 - [ ] every log line in the request path is emitted through one seam, asserted mechanically
 - [ ] a declared-sensitive field is redacted in a log line, proven by a deliberately failing fixture

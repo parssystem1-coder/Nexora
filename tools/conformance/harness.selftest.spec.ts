@@ -42,6 +42,19 @@ describe("forbidden imports", () => {
     expect(violations.map((v) => v.rule)).toContain("FORBIDDEN-IMPORT-DOMAIN");
   });
 
+  /**
+   * ADR-040 (ACCEPTED 2026-09-03) rules that logging is a port. The logger this
+   * repository actually uses is NestJS's `Logger`, which the existing
+   * `^@nestjs/` pattern already catches in a domain file — this fixture guards
+   * the case a future dependency would open, and proves the added entry fires
+   * rather than sitting in the list unexercised (ADR-030's standard).
+   */
+  it("flags domain importing a logging library (ADR-040)", () => {
+    const violations = checkImports(fixture("forbidden-import-domain-logger"));
+    expect(violations.map((v) => v.rule)).toContain("FORBIDDEN-IMPORT-DOMAIN");
+    expect(violations.some((v) => v.message.includes("logging library"))).toBe(true);
+  });
+
   it("flags the plugin boundary importing redis", () => {
     const violations = checkImports(fixture("forbidden-import-plugin"));
     expect(violations.map((v) => v.rule)).toContain("FORBIDDEN-IMPORT-PLUGIN");

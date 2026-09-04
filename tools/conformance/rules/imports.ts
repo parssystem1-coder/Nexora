@@ -36,6 +36,12 @@ const DOMAIN_FORBIDDEN: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /^react$|^react-dom/, label: "React" },
   { pattern: /-sdk$|^@[\w-]+\/.*sdk/i, label: "provider SDK" },
   { pattern: /stripe|twilio|aws-sdk|@aws-sdk\//i, label: "provider SDK" },
+  // ADR-040 (ACCEPTED 2026-09-03): logging is a port. The logger actually in
+  // use is NestJS's `Logger`, which `^@nestjs/` above already catches here —
+  // this entry is depth against a future dependency, so that adopting one
+  // cannot quietly reach domain code. It does NOT cover the application layer,
+  // which has no forbidden-package list at all; see ADR-040's ruling.
+  { pattern: /^pino$|^pino-|^winston$|^bunyan$|^loglevel$|^log4js$/i, label: "logging library" },
 ];
 
 // Packages forbidden inside the plugin SDK boundary per ADR-030.
