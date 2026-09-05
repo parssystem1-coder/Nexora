@@ -101,6 +101,18 @@ jobs:
         if: always()
         run: npm run check:partitions
 
+      # PHASE_2_BRIEF.md section 5 and 04 section 1 both forbid a foreign key
+      # that crosses a module boundary, and until 2026-09-05 nothing enforced
+      # it - Phase 2 item 2 reported omitting one by hand with no check behind
+      # the rule. Item 4 is the first slice that will want one: subscriptions
+      # holds pinned plan_version_id and price_version_id values owned by
+      # billing, and REFERENCES plan_versions (id) is what a careful developer
+      # writes by habit. Outside the conformance harness for the same reason as
+      # the check above: exceptions.json is applied generically on rule + file.
+      - name: Cross-module foreign-key tripwire (04 section 1, PHASE_2_BRIEF section 5)
+        if: always()
+        run: npm run check:fk
+
       - name: Project graph up to date
         if: always()
         run: npm run graph -- --check
