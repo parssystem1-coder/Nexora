@@ -689,6 +689,41 @@ Rules:
 
 **PostgreSQL is authoritative.** Redis may be used only as a read-through performance optimization in front of it. A Redis failure must degrade performance, never correctness.
 
+### Amendment, 2026-09-05 — the retention default is 30 days, and what a `response_snapshot` may contain makes that a privacy decision
+
+**Ruled by the maintainer on 2026-09-05**, alongside Phase 2 item 3's creating migration. **This amendment supplies a number; it does not introduce the concept.**
+
+**What this ADR already said, quoted because a session brief asserted the opposite and the difference matters:** the *Lifecycle* rules above end with *"retention is bounded and configurable; expiry must not silently permit re-execution of a financially significant operation within its business window"*, and the *Identity* section requires the record to store *"`request_hash`, `status`, `response_snapshot`, `created_at`, `expires_at`, and the originating `actor_type`."* **So retention was already bounded, already configurable, already constrained, and already carried per record in an `expires_at` column.** What was missing was only the default.
+
+**1. The default retention is 30 days from creation.**
+
+**Recorded as a choice, not a derivation.** It comfortably exceeds any realistic client retry horizon while keeping a table that grows with write volume bounded at a fixed multiple of it. **This is the same epistemic posture ADR-053 takes for `sessions`** — *"an operational judgement… made in the absence of a stated compliance obligation"* — and the same consequence follows: if a compliance obligation is ever identified, it governs and this number changes.
+
+**It satisfies this ADR's own constraint, which had to be checked rather than assumed.** The longest business window a Phase 2 idempotent operation sits inside is ADR-024's renewal cycle, whose invoice is issued at T-30d. A retry of a *renewal payment* therefore lives inside a 30-day window — **equal to this default, not comfortably inside it.** The reason that is nonetheless safe is that the operation being replayed is a single payment attempt, not the renewal cycle: ADR-023 item 4's reconciliation sweep resolves an unresolved intent in hours, not weeks. **Recorded because the arithmetic is close enough that a later reader should see it was done, and because if the sweep's horizon ever lengthens, this number is what must move.**
+
+**2. The window is resolved from configuration at claim time and stored in `expires_at`, never computed by the purge job.**
+
+This is what *"bounded and configurable"* requires, and the failure it prevents is specific: a job that computed the boundary from a current setting would silently change the lifetime of every row already written each time the setting changed, including rows whose callers are still entitled to a replay.
+
+**3. The purge is a scheduled job, and it is owed to Phase 2 item 12 rather than built by item 3.**
+
+`scheduled_job_runs` is item 12's table (`PHASE_2_BRIEF.md` §4), so item 3 cannot record a job run into a table that does not exist. **This is exactly the position ADR-053 records for `session.purge`**, and the same fence applies: adding `idempotency.purge` to an item's scope is a decision belonging to `PHASE_2_BRIEF.md`, not to an ADR. It is recorded here as owed, and stopped there. The job must be idempotent and safe to re-run, the standard ADR-024 item 8 sets for every scheduled job, and audited at the level of the job run rather than the deleted row — ADR-053 item 3's reasoning applies unchanged, and applies with more force here, since this table's whole purpose is high write volume.
+
+> **One consequence the purge's implementer must not discover the hard way.** `idempotency_records` is **tenant-owned with `FORCE ROW LEVEL SECURITY`**, unlike `sessions`, which is RLS-exempt. A sweep running as `nexora_app` with no tenant context therefore sees **zero rows** and would delete nothing while reporting success. The purge must either run per tenant inside each tenant's context, or run outside the application role the way ADR-054's restore does. **Neither is chosen here; the trap is named so that whichever slice writes the job chooses deliberately.**
+
+**4. A `response_snapshot` can contain personal data, and this table is therefore inside ADR-020's purge scope.**
+
+**Checked against ADR-038 rather than assumed**, because the opposite would have been convenient: nothing in ADR-038 narrows what a snapshot holds. Its item 4 replays *"the outcome the stored snapshot records"*, which is a capability's own response. **ADR-057 put کد ملی and a postal address into the platform through `billing.profile.set`, which is a write and therefore passes through this store**, so if that capability's response echoes the profile, a copy of both lands here.
+
+**Two things are true and both belong in the record:**
+
+- **It is conditional, not established.** `billing.profile.set`'s response shape is item 13's design and does not exist yet. The claim is that a snapshot *can* carry personal data, not that one does today. **`request_hash` cannot** — it is a hash, so the request side of a claim is already safe by construction.
+- **The consequence is unconditional.** `idempotency_records` is tenant-owned, is not append-only, and is not a financial record, so **ADR-020 rule 4 places it squarely inside purge scope** — it is not among the *"append-only records required for financial, tax or legal purposes"* that rule excludes. A tenant purge must delete these rows.
+
+**The cheaper mitigation, named rather than mandated:** a capability whose response carries personal data may store a **narrower snapshot** — enough to replay the outcome, without the personal fields. That is a decision for the slice that builds such a capability, and it is recorded here so the option is visible when someone reaches it instead of being invented under pressure.
+
+**5. What this amendment does not do.** It does not write the purge job, does not choose its frequency, and does not amend `PHASE_2_BRIEF.md`'s item scope. It sets no retention for any other table. And it does not make this table an ADR-041 partitioning candidate — see that ADR's own 2026-09-05 note.
+
 ### Verification
 
 - [ ] exactly one idempotency table exists in the schema
@@ -2754,6 +2789,14 @@ ADR-020 rule 4 commits to retaining financial records *"per the legal retention 
 - it does not authorise deleting anything ADR-020 excludes from purge
 - **it does not close R-042**, which describes a real property of PostgreSQL and of this project's grants that stays true whether or not anything is ever partitioned. R-042 is now *guarded* by the check above, which is a different thing from resolved
 - it does not reduce the growth **R-030** records. Growth is now **owned and bounded by a stated trigger**; it is **not reduced**, because nothing is archived and nothing is deleted
+
+### Amendment, 2026-09-05 — `idempotency_records` is not a candidate, and growth rate is not the test
+
+**One line, added because the mistake it prevents is a plausible one.** `idempotency_records` (Phase 2 item 3) grows with platform *activity* exactly as the four candidates do, so a reader matching on growth rate would add it to the list. **It does not belong there.**
+
+**The candidates are append-only tables that ADR-020 excludes from purge — which is precisely why partitioning is the only bound available to them.** `idempotency_records` is neither: it is mutable, it is off `PHASE_2_BRIEF.md` §5's `REVOKE` list, and `nexora_app` holds `DELETE` on it. **It can simply be deleted from**, and ADR-009's 2026-09-05 amendment gives it a 30-day retention default and an `expires_at` column to sweep on. A cheaper bound already exists, so the expensive one is not needed.
+
+**The candidate list is unchanged: `audit_events`, `usage_ledger_entries`, `billing_payment_events`, `subscription_state_transitions`.** The test for joining it is *append-only and unpurgeable*, not *fast-growing*.
 
 ### Verification
 

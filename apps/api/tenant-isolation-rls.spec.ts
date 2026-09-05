@@ -5,6 +5,7 @@ import { createDb } from "../../platform/db/kysely.js";
 import { loadDbConfig } from "../../platform/config.js";
 import { describeDbError } from "../../platform/db/describe-error.js";
 import { withTenantContext } from "../../platform/db/tenant-context.js";
+import "../../modules/idempotency/infrastructure/idempotency.tables.js";
 import {
   seedUser,
   seedOrganization,
@@ -155,6 +156,29 @@ const SEED_ROW: Record<string, SeedRow> = {
     );
     return row.id;
   },
+  idempotency_records: async (f) => {
+    // Phase 2 item 3. Inserted directly rather than through a seed helper:
+    // ADR-038's `withIdempotentCapability` is this table's only intended
+    // writer and does not exist yet (item 4), so there is no capability to
+    // drive it through. The key is randomised so repeated runs of this suite
+    // never collide on UNIQUE (tenant_id, capability, idempotency_key).
+    const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
+      trx
+        .insertInto("idempotency_records")
+        .values({
+          tenant_id: f.orgId,
+          capability: "test.rls-probe",
+          idempotency_key: randomUUID(),
+          request_hash: `sha256:${"0".repeat(64)}`,
+          status: "CLAIMED",
+          actor_type: "system",
+          expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow(),
+    );
+    return row.id;
+  },
   audit_events: async (f) => {
     const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
       trx
@@ -192,6 +216,10 @@ const TOUCH_COLUMN: Record<string, string> = {
   store_memberships: "created_at",
   membership_roles: "created_at",
   audit_events: "occurred_at",
+  // `created_at` rather than `expires_at`: both are immutable in the table
+  // types, but `created_at` is the column every row always has a value for and
+  // matches the convention above.
+  idempotency_records: "created_at",
 };
 
 interface Probe {
@@ -281,9 +309,13 @@ try {
 }
 
 describe("tenant isolation: every RLS-protected table, enumerated live, denies cross-tenant read/write/delete", () => {
-  it("the live enumeration finds exactly today's six tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
+  it("the live enumeration finds exactly today's seven tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
     expect(tenantOwnedTables.map((t) => t.table)).toEqual([
       "audit_events",
+      // Phase 2 item 3, and the first Phase 2 table to appear here: items 1 and
+      // 2 were platform-global. This assertion failing on a new tenant-owned
+      // table is the suite working, not breaking.
+      "idempotency_records",
       "membership_roles",
       "memberships",
       "organizations",

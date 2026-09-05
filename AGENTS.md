@@ -118,3 +118,5 @@ A feature that works but has no test at the layer where its rule lives is not do
 | Architecture boundary | CI conformance test (ADR-030) |
 
 Mocked PostgreSQL never satisfies a tenant isolation requirement.
+
+**A destructive statement written to prove it is denied must still be harmless if it is ever allowed.** Target a row that does not exist, or a throwaway schema — never live data. Proving that a `REVOKE`, a policy or a constraint actually denies means running the statement with the protection removed, and in that window it succeeds; a proof aimed at real rows destroys them. Added 2026-09-05 after exactly that happened (`decisions/2026-09.md`, Phase 2 item 2).

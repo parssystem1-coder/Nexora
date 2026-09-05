@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "c7820f0",
+    "commit": "3791fde",
     "dirty": true
   },
   "modules": [
@@ -71,6 +71,16 @@
       "dependsOn": [
         "audit"
       ],
+      "dependsOnPlatform": true
+    },
+    {
+      "name": "idempotency",
+      "layers": [
+        "infrastructure",
+        "migrations"
+      ],
+      "files": 3,
+      "dependsOn": [],
       "dependsOnPlatform": true
     },
     {
@@ -151,6 +161,17 @@
       "rlsEnabled": false,
       "rlsForced": false,
       "policies": []
+    },
+    {
+      "name": "idempotency_records",
+      "module": "idempotency",
+      "migration": "20260905150000_idempotency__create_idempotency_records.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "idempotency_records_tenant_isolation"
+      ]
     },
     {
       "name": "membership_roles",
@@ -862,6 +883,11 @@
       "cases": 4
     },
     {
+      "file": "modules/idempotency/infrastructure/idempotency-records-schema.spec.ts",
+      "layer": "infrastructure",
+      "cases": 13
+    },
+    {
       "file": "modules/identity/application/check-session-revoked.service.spec.ts",
       "layer": "application",
       "cases": 4
@@ -1072,6 +1098,11 @@
       "cases": 10
     },
     {
+      "file": "tools/schema/cross-module-fk.spec.ts",
+      "layer": "other",
+      "cases": 6
+    },
+    {
       "file": "tools/schema/partition-isolation.spec.ts",
       "layer": "other",
       "cases": 4
@@ -1140,13 +1171,13 @@
     }
   ],
   "counts": {
-    "modules": 8,
-    "tables": 19,
-    "tablesWithRls": 6,
+    "modules": 9,
+    "tables": 20,
+    "tablesWithRls": 7,
     "capabilities": 11,
     "routes": 12,
-    "testFiles": 50,
-    "testCases": 454,
+    "testFiles": 52,
+    "testCases": 473,
     "adrs": 64,
     "adrsAccepted": 56
   }

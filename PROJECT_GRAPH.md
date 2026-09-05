@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `c7820f0` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `3791fde` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 8 modules · 19 tables (6 with RLS) · 11 capabilities · 12 routes · 454 test cases in 50 files · 64 ADRs (56 accepted)
+**At a glance:** 9 modules · 20 tables (7 with RLS) · 11 capabilities · 12 routes · 473 test cases in 52 files · 64 ADRs (56 accepted)
 
 ## Modules
 
@@ -15,6 +15,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `billing` | application, contracts, domain, infrastructure, interfaces, migrations | 15 | `audit`, `capability`, `identity`, `money` | yes |
 | `calendar` | contracts, domain | 4 | — | — |
 | `capability` | contracts, domain, interfaces | 8 | `audit` | yes |
+| `idempotency` | infrastructure, migrations | 3 | — | yes |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 42 | `audit`, `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
 | `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 67 | `audit`, `authorization`, `capability`, `identity` | yes |
@@ -28,6 +29,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `audit_events` | audit | yes | yes | yes | `audit_events_tenant_isolation` | `20260822090800_audit__create_audit_events.sql` |
 | `credentials` | identity | — | — | — | — | `20260823130000_identity__create_credentials.sql` |
 | `currencies` | money | — | — | — | — | `20260822110000_money__create_currencies.sql` |
+| `idempotency_records` | idempotency | yes | yes | yes | `idempotency_records_tenant_isolation` | `20260905150000_idempotency__create_idempotency_records.sql` |
 | `membership_roles` | authorization | yes | yes | yes | `membership_roles_tenant_isolation` | `20260822090700_authorization__create_membership_roles.sql` |
 | `memberships` | tenant | yes | yes | yes | `memberships_self_or_tenant_access` | `20260822090300_tenant__create_memberships.sql` |
 | `organizations` | tenant | yes | yes | yes | `organizations_tenant_isolation` | `20260822090200_tenant__create_organizations.sql` |
@@ -77,10 +79,10 @@ Roles ADR-030 requires exactly one implementation of.
 | application | 15 | 87 |
 | conformance | 2 | 30 |
 | domain | 3 | 48 |
-| infrastructure | 5 | 30 |
+| infrastructure | 6 | 43 |
 | integration | 16 | 207 |
 | interfaces | 1 | 4 |
-| other | 4 | 26 |
+| other | 5 | 32 |
 | platform | 4 | 22 |
 
 <details><summary>Per file</summary>
@@ -94,6 +96,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/billing/infrastructure/prices-schema.spec.ts` | infrastructure | 15 |
 | `modules/calendar/domain/business-calendar.spec.ts` | domain | 27 |
 | `modules/capability/interfaces/capability-attempt.spec.ts` | interfaces | 4 |
+| `modules/idempotency/infrastructure/idempotency-records-schema.spec.ts` | infrastructure | 13 |
 | `modules/identity/application/check-session-revoked.service.spec.ts` | application | 4 |
 | `modules/identity/application/login.service.spec.ts` | application | 10 |
 | `modules/identity/application/logout-all.service.spec.ts` | application | 4 |
@@ -136,6 +139,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `tools/graph/extract.spec.ts` | other | 5 |
 | `tools/openapi/openapi.spec.ts` | other | 7 |
 | `tools/register/register-integrity.spec.ts` | other | 10 |
+| `tools/schema/cross-module-fk.spec.ts` | other | 6 |
 | `tools/schema/partition-isolation.spec.ts` | other | 4 |
 
 </details>
