@@ -120,3 +120,5 @@ A feature that works but has no test at the layer where its rule lives is not do
 Mocked PostgreSQL never satisfies a tenant isolation requirement.
 
 **A destructive statement written to prove it is denied must still be harmless if it is ever allowed.** Target a row that does not exist, or a throwaway schema — never live data. Proving that a `REVOKE`, a policy or a constraint actually denies means running the statement with the protection removed, and in that window it succeeds; a proof aimed at real rows destroys them. Added 2026-09-05 after exactly that happened (`decisions/2026-09.md`, Phase 2 item 2).
+
+**A statement that must change rows asserts how many it changed.** Under `FORCE` row-level security a missing tenant context matches nothing and fails silently — the `UPDATE` reports success, zero rows move, and the failure surfaces later as a confusing assertion somewhere else. Check the affected-row count, or read the row back, whenever a statement is supposed to change something. Added 2026-09-10, after this cost time twice: Phase 2 item 3 predicted it for a purge sweep, and item 5 hit it for real in a test helper (`decisions/2026-09.md`, both dates).

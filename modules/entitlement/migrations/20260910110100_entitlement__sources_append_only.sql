@@ -1,0 +1,20 @@
+-- Discharges `PHASE_2_BRIEF.md` §5's 2026-09-10 amendment, which adds
+-- `entitlement_sources` to the append-only `REVOKE UPDATE, DELETE` list.
+--
+-- **ADR-045 found this and explicitly declined to rule it**, naming item 6 as
+-- the owner: "`entitlement_sources` is record-shaped and is *not* on
+-- `PHASE_2_BRIEF.md` §5's `REVOKE UPDATE, DELETE` list. Whether that omission is
+-- deliberate is stated nowhere. It is not this ADR's to decide." Item 6 is where
+-- it is decided, and the answer is that the omission was not deliberate.
+--
+-- ADR-008 is what decides it: an explainability record carries an `evaluatedAt`
+-- and exists "for audit and debugging", and `04` §1 rules that audit records are
+-- append-only. A record of why a tenant was refused, which the platform can
+-- later rewrite, answers nothing.
+--
+-- It also protects ADR-041 obligation 1 for a table that is now a candidate:
+-- `evaluated_at` is the column a future partition key would use, and an UPDATE
+-- moving it would move a row between partitions after the fact.
+--
+-- Scoped per table, as every prior REVOKE here is.
+REVOKE UPDATE, DELETE ON entitlement_sources FROM nexora_app;

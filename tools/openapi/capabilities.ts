@@ -9,6 +9,7 @@ import {
   membershipRevokeCapability,
 } from "../../modules/tenant/contracts/index.js";
 import { planListCapability } from "../../modules/billing/contracts/index.js";
+import { entitlementResolveCapability } from "../../modules/entitlement/contracts/index.js";
 import {
   planSubscribeCapability,
   subscriptionCancelCapability,
@@ -42,6 +43,7 @@ export const CAPABILITIES: readonly CapabilityDefinition[] = [
   authLoginCapability,
   authLogoutCapability,
   authLogoutAllCapability,
+  entitlementResolveCapability,
   membershipInviteCapability,
   membershipRevokeCapability,
   membershipRoleAssignCapability,

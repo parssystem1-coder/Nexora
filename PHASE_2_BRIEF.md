@@ -307,6 +307,18 @@ ADR-041 (`ACCEPTED (was OPEN)`, 2026-09-03) ruled a **fifth** option: **keep the
 
 **Proven, not asserted.** `modules/billing/infrastructure/prices-schema.spec.ts` attempts an `UPDATE` and a `DELETE` on each of the three **as `nexora_app`**, the role the application actually runs as, and requires a permission error. Per ADR-030's standard the assertions were **watched failing**: with the grants temporarily restored, all four privilege tests fail, so they discriminate rather than passing vacuously.
 
+**Amendment, 2026-09-10 (tenth to this file) — `entitlement_sources` joins the append-only list, and ADR-045 is why it was not on it.**
+
+**Ruled by the maintainer on 2026-09-10**, discharged by Phase 2 item 6's migration `20260910110100_entitlement__sources_append_only.sql`.
+
+**ADR-045 found this omission and explicitly declined to rule it**, naming item 6 as its owner: *"`entitlement_sources` is record-shaped and is **not** on `PHASE_2_BRIEF.md` §5's `REVOKE UPDATE, DELETE` list. Whether that omission is deliberate is stated nowhere. **It is not this ADR's to decide.**"* It is decided here, and the omission was not deliberate.
+
+**ADR-008 is what decides it.** Its Explainability clause requires the engine to expose the resolution *"for audit and debugging"* with an **`evaluatedAt`** — the timestamp of one resolution event. A snapshot keyed by tenant and feature would have no use for a per-row evaluation time, because it would only ever hold the latest. `04` §1 already rules that *"audit and ledger records are append-only"*, and **a record of why a tenant was refused, which the platform can later rewrite, answers nothing.**
+
+**One consequence follows and is recorded rather than left for a later reader.** A log's row count grows with platform **activity**, so by **ADR-041's own test** `entitlement_sources` is a partitioning candidate — and that ruling's candidate list does not name it. A dated cross-reference is added to ADR-041. Its three obligations are satisfied at creation: `evaluated_at` is the immutable event column; nothing declares a foreign key referencing the table; and there is no uniqueness beyond the primary key, **so no permanent exclusion from partitioning was created.**
+
+**The other two item 6 tables are unchanged.** `plan_entitlements` is platform-global reference data and stays off this list — it is seeded by migration and read, never appended to per event. `tenant_entitlement_overrides` is mutable by definition and must stay so: an override is changed, not superseded.
+
 ### Idempotency
 
 - Exactly one platform mechanism, owned by the `idempotency` module (item 3). No module invents its own — `AGENTS.md` §4, ADR-009; a module-local idempotency table is already a live-DB conformance violation (`SCHEMA-DUPLICATE-IDEMPOTENCY-TABLE`).

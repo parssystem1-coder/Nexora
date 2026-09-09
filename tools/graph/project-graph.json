@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "7e88982",
+    "commit": "a9c2a90",
     "dirty": true
   },
   "modules": [
@@ -25,7 +25,7 @@
         "infrastructure",
         "migrations"
       ],
-      "files": 19,
+      "files": 20,
       "dependsOn": [
         "capability"
       ],
@@ -70,6 +70,27 @@
       "files": 8,
       "dependsOn": [
         "audit"
+      ],
+      "dependsOnPlatform": true
+    },
+    {
+      "name": "entitlement",
+      "layers": [
+        "application",
+        "contracts",
+        "domain",
+        "infrastructure",
+        "interfaces",
+        "migrations"
+      ],
+      "files": 12,
+      "dependsOn": [
+        "audit",
+        "authorization",
+        "capability",
+        "identity",
+        "subscription",
+        "tenant"
       ],
       "dependsOnPlatform": true
     },
@@ -125,7 +146,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 31,
+      "files": 32,
       "dependsOn": [
         "audit",
         "authorization",
@@ -188,6 +209,17 @@
       "policies": []
     },
     {
+      "name": "entitlement_sources",
+      "module": "entitlement",
+      "migration": "20260910110000_entitlement__create_entitlements.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "entitlement_sources_tenant_isolation"
+      ]
+    },
+    {
       "name": "idempotency_records",
       "module": "idempotency",
       "migration": "20260905150000_idempotency__create_idempotency_records.sql",
@@ -235,6 +267,15 @@
       "name": "permissions",
       "module": "authorization",
       "migration": "20260822090600_authorization__create_permission_catalog.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
+      "name": "plan_entitlements",
+      "module": "entitlement",
+      "migration": "20260910110000_entitlement__create_entitlements.sql",
       "tenantId": false,
       "rlsEnabled": false,
       "rlsForced": false,
@@ -377,6 +418,17 @@
       ]
     },
     {
+      "name": "tenant_entitlement_overrides",
+      "module": "entitlement",
+      "migration": "20260910110000_entitlement__create_entitlements.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "tenant_entitlement_overrides_tenant_isolation"
+      ]
+    },
+    {
       "name": "users",
       "module": "identity",
       "migration": "20260822090000_identity__create_users.sql",
@@ -416,6 +468,18 @@
       "audit": true,
       "storeScoped": false,
       "route": "POST /api/v1/auth/logout-all"
+    },
+    {
+      "id": "entitlement.resolve",
+      "module": "entitlement",
+      "file": "modules/entitlement/interfaces/entitlement-resolve.capability.ts",
+      "permissions": [
+        "entitlement.resolve"
+      ],
+      "risk": "READ",
+      "audit": true,
+      "storeScoped": false,
+      "route": "GET /api/v1/organizations/:organizationId/entitlements"
     },
     {
       "id": "membership.invite",
@@ -977,6 +1041,11 @@
       "cases": 4
     },
     {
+      "file": "modules/entitlement/domain/resolve-entitlement.spec.ts",
+      "layer": "domain",
+      "cases": 18
+    },
+    {
       "file": "modules/idempotency/infrastructure/idempotency-records-schema.spec.ts",
       "layer": "infrastructure",
       "cases": 13
@@ -1132,6 +1201,11 @@
       "cases": 1
     },
     {
+      "file": "apps/api/entitlement.integration.spec.ts",
+      "layer": "integration",
+      "cases": 19
+    },
+    {
       "file": "apps/api/error-contract.integration.spec.ts",
       "layer": "integration",
       "cases": 3
@@ -1254,6 +1328,11 @@
       "file": "modules/tenant/interfaces/organization.controller.ts"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/organizations/:organizationId/entitlements",
+      "file": "modules/entitlement/interfaces/entitlement.controller.ts"
+    },
+    {
       "method": "POST",
       "path": "/api/v1/organizations/:organizationId/memberships",
       "file": "modules/tenant/interfaces/membership.controller.ts"
@@ -1310,13 +1389,13 @@
     }
   ],
   "counts": {
-    "modules": 10,
-    "tables": 23,
-    "tablesWithRls": 10,
-    "capabilities": 14,
-    "routes": 15,
-    "testFiles": 58,
-    "testCases": 555,
+    "modules": 11,
+    "tables": 26,
+    "tablesWithRls": 12,
+    "capabilities": 15,
+    "routes": 16,
+    "testFiles": 60,
+    "testCases": 592,
     "adrs": 64,
     "adrsAccepted": 56
   }

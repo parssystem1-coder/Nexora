@@ -2737,6 +2737,8 @@ Three rules, binding on the creating migrations of Phase 2 items 4, 5, 9 and 12.
 
 **So the likely outcome is no collision at all.** If item 12 nevertheless chooses a unique index on `billing_payment_events`, that is acceptable — and it must then **record the resulting permanent exclusion in this ADR** rather than silently create the conflict. Either outcome is fine; discovering it during a conversion is not.
 
+> **Cross-reference, 2026-09-10 — a fifth candidate, found by applying this ruling's own test.** Phase 2 item 6 created `entitlement_sources` and classified it as a **log** rather than a snapshot, on ADR-008's Explainability clause (an `evaluatedAt` per resolution, kept *"for audit and debugging"*). **Its row count therefore grows with platform activity, which is exactly this ruling's definition of a candidate — and the four-table list above does not name it.** Recorded here rather than left as a fast-growing table nobody classified. **Nothing is partitioned and nothing changes**; the three obligations were satisfied at creation, and item 6's migration records how: `evaluated_at` is the immutable event column, no table declares a foreign key referencing it, and there is no uniqueness beyond the primary key, so **no permanent exclusion from partitioning was created.** `PHASE_2_BRIEF.md` §5's 2026-09-10 amendment adds it to the append-only list at the same time, which is what makes its event column immutable in the database rather than by convention.
+
 **`id uuid PRIMARY KEY` stays as it is** on `audit_events` and on the new tables. Uniqueness is kept while it is free; Q0's finding that partitioning surrenders it is a known price of the future conversion, recorded and not paid today.
 
 #### Part 4 — The revisit trigger, made observable

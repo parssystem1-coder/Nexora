@@ -15,6 +15,7 @@ export type CapabilityErrorCode =
   | "CONFLICT"
   | "CONCURRENCY_CONFLICT"
   | "IDEMPOTENCY_CONFLICT"
+  | "ENTITLEMENT_CONFLICT"
   | "DOMAIN_RESERVED"
   | "INTERNAL_ERROR";
 
@@ -50,6 +51,15 @@ const STATUS_BY_CODE: Record<CapabilityErrorCode, number> = {
   // request". Phase 2 item 4's `plan.subscribe` is its first user; documented
   // in 05_API_CAPABILITY_CONTRACTS.md §7 since 2.0.
   IDEMPOTENCY_CONFLICT: 409,
+  // 409. ADR-008 rule 3: when two grants of the same feature conflict and are
+  // not both declared additive, "resolution fails closed with
+  // ENTITLEMENT_CONFLICT". A conflict rather than a 500 because the state is
+  // real and self-consistent from the server's side — two valid grants that
+  // cannot be combined — and rather than a 403 because the caller is not
+  // forbidden, the answer is undecidable until an operator changes one of the
+  // grants. Documented in 05_API_CAPABILITY_CONTRACTS.md §7; Phase 2 item 6's
+  // `entitlement.resolve` is its first user.
+  ENTITLEMENT_CONFLICT: 409,
   // 409, the same class as CONFLICT but a distinct code: the slug conflicts
   // with a platform-reserved word, not with another row's unique index.
   // store.create (05_API_CAPABILITY_CONTRACTS.md §7) is its first user.

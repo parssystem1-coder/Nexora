@@ -269,6 +269,152 @@
         }
       }
     },
+    "/api/v1/organizations/{organizationId}/entitlements": {
+      "get": {
+        "operationId": "entitlement.resolve",
+        "summary": "entitlement.resolve (v1)",
+        "description": "Risk: READ. Store-scoped: false. Idempotent: false. Audited: true. Required permissions: entitlement.resolve.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+            },
+            "required": false,
+            "name": "featureKey",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "entitlement.resolve succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "organizationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "evaluatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "entitlements": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "featureKey": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "ALLOW",
+                              "DENY",
+                              "LIMIT"
+                            ]
+                          },
+                          "limit": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "resolvedFrom": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "featureKey",
+                          "state",
+                          "limit",
+                          "resolvedFrom"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "organizationId",
+                    "evaluatedAt",
+                    "entitlements"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR | TENANT_CONTEXT_REQUIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ENTITLEMENT_CONFLICT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/{organizationId}/memberships": {
       "post": {
         "operationId": "membership.invite",

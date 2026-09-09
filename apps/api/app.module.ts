@@ -11,6 +11,7 @@ import { PlanController } from "../../modules/billing/interfaces/plan.controller
 import { PlanSubscribeController } from "../../modules/subscription/interfaces/plan-subscribe.controller.js";
 import { SubscriptionReadController } from "../../modules/subscription/interfaces/subscription-read.controller.js";
 import { SubscriptionCancelController } from "../../modules/subscription/interfaces/subscription-cancel.controller.js";
+import { EntitlementController } from "../../modules/entitlement/interfaces/entitlement.controller.js";
 import { AuthLoginController } from "../../modules/identity/interfaces/auth-login.controller.js";
 import { AuthLogoutController } from "../../modules/identity/interfaces/auth-logout.controller.js";
 import { AuthLogoutAllController } from "../../modules/identity/interfaces/auth-logout-all.controller.js";
@@ -45,6 +46,7 @@ import { HealthController } from "./health.controller.js";
     PlanSubscribeController,
     SubscriptionReadController,
     SubscriptionCancelController,
+    EntitlementController,
     AuthLoginController,
     AuthLogoutController,
     AuthLogoutAllController,

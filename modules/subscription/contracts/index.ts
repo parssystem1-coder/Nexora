@@ -26,3 +26,5 @@ export { subscriptionCancelCapability } from "../interfaces/subscription-cancel.
  */
 export { TRANSITION_REASONS } from "../domain/transition-reason.js";
 export type { TransitionReason, TransitionActorType } from "../domain/transition-reason.js";
+export type { SubscriptionPlanVersionReader } from "./subscription.contract.js";
+export { createSubscriptionPlanVersionReader } from "./subscription.contract.js";

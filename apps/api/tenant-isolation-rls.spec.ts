@@ -278,6 +278,47 @@ const SEED_ROW: Record<string, SeedRow> = {
     });
     return row.id;
   },
+  tenant_entitlement_overrides: async (f) => {
+    // Phase 2 item 6. Inserted directly: `05` §4.2 has no capability that sets
+    // an override, which ADR-045's Tier 2 reasoning records as the very trigger
+    // that would give this table a `version` column when one appears.
+    const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
+      trx
+        .insertInto("tenant_entitlement_overrides")
+        .values({
+          id: randomUUID(),
+          tenant_id: f.orgId,
+          feature_key: "rls_probe_feature",
+          override_type: "ABSOLUTE",
+          state: "ALLOW",
+          limit_value: null,
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow(),
+    );
+    return row.id;
+  },
+  entitlement_sources: async (f) => {
+    // Phase 2 item 6's append-only explainability log, and the fifth ADR-041
+    // partitioning candidate. Written directly rather than through
+    // `entitlement.resolve`, so this probe does not depend on the plan
+    // catalogue's seed as well as on RLS.
+    const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
+      trx
+        .insertInto("entitlement_sources")
+        .values({
+          id: randomUUID(),
+          tenant_id: f.orgId,
+          feature_key: "rls_probe_feature",
+          state: "ALLOW",
+          limit_value: null,
+          resolved_from: JSON.stringify(["PLAN_VERSION"]),
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow(),
+    );
+    return row.id;
+  },
   audit_events: async (f) => {
     const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
       trx
@@ -408,9 +449,12 @@ try {
 }
 
 describe("tenant isolation: every RLS-protected table, enumerated live, denies cross-tenant read/write/delete", () => {
-  it("the live enumeration finds exactly today's ten tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
+  it("the live enumeration finds exactly today's twelve tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
     expect(tenantOwnedTables.map((t) => t.table)).toEqual([
       "audit_events",
+      // Phase 2 item 6. Both failed this assertion and the seed-factory one
+      // before their factories were written, which is the registry working.
+      "entitlement_sources",
       // Phase 2 item 3, and the first Phase 2 table to appear here: items 1 and
       // 2 were platform-global. This assertion failing on a new tenant-owned
       // table is the suite working, not breaking.
@@ -428,6 +472,7 @@ describe("tenant isolation: every RLS-protected table, enumerated live, denies c
       // has created. It failed both assertions too, on the same day.
       "subscription_state_transitions",
       "subscriptions",
+      "tenant_entitlement_overrides",
     ]);
     expect(tenantOwnedTables.every((t) => t.pkColumn === "id")).toBe(true);
   });

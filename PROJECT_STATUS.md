@@ -192,3 +192,13 @@ Update this section when that changes.
 
 Update this section when that changes.
 
+**Item 6 done — entitlement resolution.** ADR-008's precedence chain is the deliverable; the three tables are how its inputs are stored. The chain is transcribed a second time in the domain test, independently of the implementation's own constant, and that caught a real bug: **ADR-008 ranks `TENANT_OVERRIDE_DELTA` above `PLAN_VERSION`**, so walking the chain in precedence order reaches a delta before the grant it must adjust. A delta is a modifier, not a base — the ADR's own "adjusts **the resolved value**" settles it — and the first resolver threw on every legitimate delta.
+
+**The cache the session brief asked for was already refused.** `PHASE_2_BRIEF.md` §5 rules **no cache in Phase 2 (D2-4), resolve per request**, with a named revisit condition. ADR-008 says effective entitlement *may* be cached; ADR-019's 2026-09-03 amendment **bounds** a cache if one exists — *"whatever entitlement cache sits in front of that function"* — rather than requiring one; ADR-039 says nothing about caching. Resolving per request satisfies the 60-second origin bound trivially, because staleness is zero. Building one would have contradicted authority #2 on no measurement, and shipped a cache whose invalidator does not exist until item 14.
+
+**`entitlement_sources` is a log, not a snapshot, and ADR-045 handed item 6 that decision** — it found the omission, called the table "record-shaped", and said explicitly it was "not this ADR's to decide". ADR-008's `evaluatedAt`, kept "for audit and debugging", is the sentence that decides it. So §5's append-only list gains it, and **it is a fifth ADR-041 partitioning candidate that ruling's four-table list does not name**, now recorded there — with all three obligations satisfied at creation and proven from a virgin schema.
+
+**`AGENTS.md` §8 gained its second universal rule**, beside the one item 3 added: *a statement that must change rows asserts how many it changed*. Under `FORCE` RLS a missing tenant context matches nothing and fails silently. Item 3 predicted it; item 5 hit it.
+
+Update this section when that changes.
+

@@ -30,6 +30,9 @@ const TENANT_EXEMPT = new Set([
   // plan-and-price tables together.
   "prices",
   "price_versions",
+  // Phase 2 item 6. Platform-authored reference data, exempt by the same
+  // §5 clause that already names it alongside the plan and price tables.
+  "plan_entitlements",
 ]);
 
 const MONEY_NAME_RE = /amount|price|cost|total|balance|fee|money|charge/i;
