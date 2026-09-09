@@ -237,6 +237,47 @@ const SEED_ROW: Record<string, SeedRow> = {
     });
     return row.id;
   },
+  subscription_state_transitions: async (f) => {
+    // Phase 2 item 5, and the first ADR-041 partitioning candidate any Phase 2
+    // item has created. Needs a parent subscription: the foreign key is
+    // intra-module and real — ADR-041 obligation 2 forbids a foreign key
+    // *referencing* a candidate, not one declared *by* it.
+    //
+    // `ACTIVE` rather than `TRIALING` on the parent keeps this probe clear of
+    // the one-trial-per-organization partial unique index, which would collide
+    // on the suite's second run.
+    const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, async (trx) => {
+      const subscription = await trx
+        .insertInto("subscriptions")
+        .values({
+          id: randomUUID(),
+          tenant_id: f.orgId,
+          plan_version_id: randomUUID(),
+          price_version_id: randomUUID(),
+          status: "ACTIVE",
+          term_length: "1 year",
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow();
+
+      return trx
+        .insertInto("subscription_state_transitions")
+        .values({
+          id: randomUUID(),
+          tenant_id: f.orgId,
+          subscription_id: subscription.id,
+          from_status: "ACTIVE",
+          to_status: "PAST_DUE",
+          reason_code: "PAYMENT_MISSED",
+          actor_type: "system",
+          actor_id: null,
+          occurred_at: new Date().toISOString(),
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow();
+    });
+    return row.id;
+  },
   audit_events: async (f) => {
     const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
       trx
@@ -367,7 +408,7 @@ try {
 }
 
 describe("tenant isolation: every RLS-protected table, enumerated live, denies cross-tenant read/write/delete", () => {
-  it("the live enumeration finds exactly today's nine tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
+  it("the live enumeration finds exactly today's ten tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
     expect(tenantOwnedTables.map((t) => t.table)).toEqual([
       "audit_events",
       // Phase 2 item 3, and the first Phase 2 table to appear here: items 1 and
@@ -383,6 +424,9 @@ describe("tenant isolation: every RLS-protected table, enumerated live, denies c
       // and the seed-factory one before their factories were written — which is
       // the loud failure the registry exists to produce.
       "subscription_periods",
+      // Phase 2 item 5, and the first ADR-041 partitioning candidate this phase
+      // has created. It failed both assertions too, on the same day.
+      "subscription_state_transitions",
       "subscriptions",
     ]);
     expect(tenantOwnedTables.every((t) => t.pkColumn === "id")).toBe(true);

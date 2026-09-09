@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "9db7415",
+    "commit": "7e88982",
     "dirty": true
   },
   "modules": [
@@ -25,7 +25,7 @@
         "infrastructure",
         "migrations"
       ],
-      "files": 18,
+      "files": 19,
       "dependsOn": [
         "capability"
       ],
@@ -125,7 +125,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 20,
+      "files": 31,
       "dependsOn": [
         "audit",
         "authorization",
@@ -355,6 +355,17 @@
       ]
     },
     {
+      "name": "subscription_state_transitions",
+      "module": "subscription",
+      "migration": "20260910100000_subscription__create_state_transitions.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "subscription_state_transitions_tenant_isolation"
+      ]
+    },
+    {
       "name": "subscriptions",
       "module": "subscription",
       "migration": "20260910090000_subscription__create_subscriptions.sql",
@@ -507,6 +518,18 @@
       "audit": true,
       "storeScoped": true,
       "route": "GET /api/v1/stores/:storeId"
+    },
+    {
+      "id": "subscription.cancel",
+      "module": "subscription",
+      "file": "modules/subscription/interfaces/subscription-cancel.capability.ts",
+      "permissions": [
+        "subscription.cancel"
+      ],
+      "risk": "HIGH_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/organizations/:organizationId/subscription/cancel"
     },
     {
       "id": "subscription.read",
@@ -999,6 +1022,11 @@
       "cases": 7
     },
     {
+      "file": "modules/subscription/application/cancel-subscription.service.spec.ts",
+      "layer": "application",
+      "cases": 12
+    },
+    {
       "file": "modules/subscription/application/subscribe-to-plan.service.spec.ts",
       "layer": "application",
       "cases": 11
@@ -1154,6 +1182,11 @@
       "cases": 15
     },
     {
+      "file": "apps/api/subscription-cancel.integration.spec.ts",
+      "layer": "integration",
+      "cases": 18
+    },
+    {
       "file": "apps/api/subscription.integration.spec.ts",
       "layer": "integration",
       "cases": 24
@@ -1247,6 +1280,11 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/organizations/:organizationId/subscription/cancel",
+      "file": "modules/subscription/interfaces/subscription-cancel.controller.ts"
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/organizations/:organizationId/switch",
       "file": "modules/tenant/interfaces/organization-switch.controller.ts"
     },
@@ -1273,12 +1311,12 @@
   ],
   "counts": {
     "modules": 10,
-    "tables": 22,
-    "tablesWithRls": 9,
-    "capabilities": 13,
-    "routes": 14,
-    "testFiles": 56,
-    "testCases": 525,
+    "tables": 23,
+    "tablesWithRls": 10,
+    "capabilities": 14,
+    "routes": 15,
+    "testFiles": 58,
+    "testCases": 555,
     "adrs": 64,
     "adrsAccepted": 56
   }

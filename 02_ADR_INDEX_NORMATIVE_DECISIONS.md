@@ -1268,6 +1268,8 @@ CANCELED -> terminal
 
 Any other transition is a domain error. Transitions are recorded in an append-only transition log with actor and reason.
 
+> **Cross-reference, 2026-09-09 — the machine's entry states, added because item 2 above defines exits and nothing defined entries.** A subscription is created **`TRIALING`**, a trial having been granted (ADR-052 items 1–2), or **`ACTIVE`** from Phase 2 item 12's `billing.payment.verify`, inside the transaction that verifies a first payment. **There is no other entry.** ADR-052's 2026-09-09 amendment rules that **there is no unpaid subscription** — a first purchase with no trial creates a payment intent rather than a subscription row — so no state in this machine means "created, awaiting payment", and none is added. This changes no transition above; it records which states a row may *begin* in, which the transition list alone cannot say.
+
 > **Cross-reference, 2026-09-03:** the lifecycle below is now the **only** branch by ruling rather than by omission — **ADR-058** rules direct debit out of V1, with ADR-037's deferral as the blocking reason and four named reopening conditions.
 
 4. **Renewal lifecycle, designed for gateways without recurring charge** (ADR-023 item 6):
@@ -3654,6 +3656,49 @@ This is true of essentially every self-serve trial in the industry, and **the mi
 **الف-6. A trial receives a generated subdomain; a chosen name is granted only with the first paid subscription.** Ruled in **ADR-028's amendment of the same date** and cross-referenced here because it is a property of a trial: ADR-028's 2026-09-03 amendment makes a platform subdomain permanently unreissuable, so **a free trial with a chosen name burns a good name permanently on every abandoned signup.**
 
 **This interacts with the abuse surface this ADR already ACCEPTED.** One-trial-per-organization does not stop a second organization; a generated subdomain does not stop it either, and is not offered as a fix for it. What it does stop is the **collateral** cost of that abuse — the namespace being consumed by signups that never convert — which is a different harm with a cheaper remedy.
+
+### Amendment, 2026-09-09 — there is no unpaid subscription; a first purchase with no trial creates a payment intent, not a subscription
+
+**Ruled by the maintainer on 2026-09-09**, on an escalation from Phase 2 item 4, which **declined to implement item 2's second outcome** and reported it rather than improvising. **Binds Phase 2 items 4 and 12.**
+
+**What item 2 says, and what item 4 found when it tried to build it.** Item 2 above gives `plan.subscribe` two outcomes: *"a trialling subscription when that version offers a trial and the organization is still eligible, an **`ACTIVE`** one when it does not."* The second outcome cannot be built as written:
+
+- **`ACTIVE` is a `SERVING` state** (ADR-024 item 2), and ADR-024 item 4's lifecycle reaches it only through **paid**.
+- **Payment is Phase 2 item 12.** At item 4 there is no invoice, no intent and no gateway, so an `ACTIVE` subscription created there is a served subscription nobody paid for.
+- **The path is reachable, not theoretical.** Item 3 of this ADR makes an organization ineligible after one trial, so **its next `plan.subscribe` lands on exactly that branch** and would be served for free.
+- **ADR-024 has no state meaning "created, awaiting first payment."** `PAST_DUE` means unpaid *past* `period_end` and is itself serving within grace.
+
+**The ruling:**
+
+> **There is no unpaid subscription. A subscription row exists only once it is either `TRIALING` — a trial having been granted — or paid.**
+>
+> **`plan.subscribe` against a version that offers no trial does not create a subscription. It creates a payment intent.** The subscription, its first period and its invoice are created inside the transaction that verifies that payment.
+
+**Three reasons, and the third is what makes this a repair rather than a new invention.**
+
+1. **It adds no state.** A `PENDING_PAYMENT` status would be a change to ADR-024 item 3's machine, which is not a slice's to make — and is not needed, because the pending thing is the intent, not the subscription.
+2. **It cannot give the product away.** Nothing is serving until money has been verified, which is the property item 4's refusal was protecting.
+3. **The pattern already exists in this repository.** **ADR-025 item 4** rules that a pending upgrade *"holds a `SCHEDULED` change record"* and *"must never apply optimistically. On payment failure the change record expires and the subscription is untouched."* That is state held **outside** the subscription until payment verifies. This amendment applies the same shape to a first purchase, where the "record held outside" is the payment intent.
+
+**What this changes about item 2 above.** Its first outcome is unchanged. Its second outcome — the `ACTIVE` branch — is **superseded**: `plan.subscribe` on a version offering no trial creates a payment intent and returns it, and the subscription appears only at `billing.payment.verify`. **`plan.subscribe` remains one capability with one audit event; what differs by branch is what it creates.**
+
+**One consequence, owed to item 12 and recorded here because it follows from this ruling rather than from item 12's own scope.** The payment intent must carry **the `plan_version_id` and `price_version_id` it was priced from**. It is now the only thing standing between a customer's decision and their subscription, and ADR-025 item 6's pinning rule — *"a later edit to that plan must not retroactively alter the change"* — has nothing else to attach to across that gap. **Item 12 creates that table; this amendment states the obligation and creates nothing.**
+
+**A second obligation, surfaced by item 4 and also owed to item 12.** **No capability exposes a price today** — `plan.list` deliberately carries no money (ADR-044, and `PHASE_2_BRIEF.md` §2's exclusion) and Phase 2 item 2 surfaces no capability at all — so a customer cannot see what they are about to pay. **ADR-055 part 1 makes this item 12's, not a later nicety:** it requires that *"the checkout step must show the **breakdown — subtotal, rate, tax, total — before the redirect**, not on the invoice afterwards."* A checkout that cannot show a price cannot satisfy that.
+
+### What this amendment does not do
+
+- **It does not change ADR-024 item 3's machine**, and adds no status. See the dated cross-reference in ADR-024.
+- **It does not create the payment-intent table**, choose its columns, or schedule item 12.
+- **It does not touch the trial itself** — eligibility, the 14-day duration, the one-trial-per-organization constraint and the no-payment-method rule are all unchanged.
+- **It does not decide what `plan.subscribe` returns on the intent branch.** That is a contract question for item 12, which owns the intent's shape.
+
+### Verification, added by this amendment
+
+- [ ] `plan.subscribe` against a version offering no trial creates **no** `subscriptions` row, proven by a test that asserts the table is empty afterwards
+- [ ] a subscription exists only in `TRIALING` or in a state reached from a verified payment — no code path writes one otherwise
+- [ ] the payment intent records the `plan_version_id` and `price_version_id` it was priced from
+- [ ] checkout displays the ADR-055 breakdown before the redirect, from a capability that can read a price
 
 ### Verification, superseding and adding
 

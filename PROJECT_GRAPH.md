@@ -1,24 +1,24 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `9db7415` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `7e88982` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 10 modules · 22 tables (9 with RLS) · 13 capabilities · 14 routes · 525 test cases in 56 files · 64 ADRs (56 accepted)
+**At a glance:** 10 modules · 23 tables (10 with RLS) · 14 capabilities · 15 routes · 555 test cases in 58 files · 64 ADRs (56 accepted)
 
 ## Modules
 
 | module | layers | files | depends on | platform |
 |---|---|---|---|---|
 | `audit` | contracts, domain, infrastructure, migrations | 10 | — | yes |
-| `authorization` | application, contracts, domain, infrastructure, migrations | 18 | `capability` | yes |
+| `authorization` | application, contracts, domain, infrastructure, migrations | 19 | `capability` | yes |
 | `billing` | application, contracts, domain, infrastructure, interfaces, migrations | 18 | `audit`, `capability`, `identity`, `money` | yes |
 | `calendar` | contracts, domain | 4 | — | — |
 | `capability` | contracts, domain, interfaces | 8 | `audit` | yes |
 | `idempotency` | application, contracts, domain, infrastructure, migrations | 9 | — | yes |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 42 | `audit`, `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
-| `subscription` | application, contracts, domain, infrastructure, interfaces, migrations | 20 | `audit`, `authorization`, `billing`, `capability`, `idempotency`, `identity`, `tenant` | yes |
+| `subscription` | application, contracts, domain, infrastructure, interfaces, migrations | 31 | `audit`, `authorization`, `billing`, `capability`, `idempotency`, `identity`, `tenant` | yes |
 | `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 67 | `audit`, `authorization`, `capability`, `identity` | yes |
 
 ## Tables
@@ -47,6 +47,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `store_memberships` | tenant | yes | yes | yes | `store_memberships_self_or_tenant_access` | `20260822090500_tenant__create_store_memberships.sql` |
 | `stores` | tenant | yes | yes | yes | `stores_tenant_isolation` | `20260822090400_tenant__create_stores.sql` |
 | `subscription_periods` | subscription | yes | yes | yes | `subscription_periods_tenant_isolation` | `20260910090000_subscription__create_subscriptions.sql` |
+| `subscription_state_transitions` | subscription | yes | yes | yes | `subscription_state_transitions_tenant_isolation` | `20260910100000_subscription__create_state_transitions.sql` |
 | `subscriptions` | subscription | yes | yes | yes | `subscriptions_tenant_isolation` | `20260910090000_subscription__create_subscriptions.sql` |
 | `users` | identity | — | — | — | — | `20260822090000_identity__create_users.sql` |
 
@@ -66,6 +67,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `plan.subscribe` | `POST /api/v1/organizations/:organizationId/subscription` | `plan.subscribe` | HIGH_WRITE | yes | — |
 | `store.create` | `POST /api/v1/stores` | `store.create` | MEDIUM_WRITE | yes | — |
 | `store.read` | `GET /api/v1/stores/:storeId` | `store.read` | READ | yes | yes |
+| `subscription.cancel` | `POST /api/v1/organizations/:organizationId/subscription/cancel` | `subscription.cancel` | HIGH_WRITE | yes | — |
 | `subscription.read` | `GET /api/v1/organizations/:organizationId/subscription` | `subscription.read` | READ | yes | — |
 
 ## Platform singletons
@@ -81,11 +83,11 @@ Roles ADR-030 requires exactly one implementation of.
 
 | layer | files | cases |
 |---|---|---|
-| application | 16 | 98 |
+| application | 17 | 110 |
 | conformance | 2 | 30 |
 | domain | 5 | 65 |
 | infrastructure | 6 | 43 |
-| integration | 17 | 231 |
+| integration | 18 | 249 |
 | interfaces | 1 | 4 |
 | other | 5 | 32 |
 | platform | 4 | 22 |
@@ -110,6 +112,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/identity/domain/session.entity.spec.ts` | domain | 4 |
 | `modules/money/domain/money.vo.spec.ts` | domain | 17 |
 | `modules/money/infrastructure/currency-registry.spec.ts` | infrastructure | 7 |
+| `modules/subscription/application/cancel-subscription.service.spec.ts` | application | 12 |
 | `modules/subscription/application/subscribe-to-plan.service.spec.ts` | application | 11 |
 | `modules/subscription/domain/serving-state.spec.ts` | domain | 12 |
 | `modules/subscription/domain/subscription-status.spec.ts` | domain | 5 |
@@ -141,6 +144,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `apps/api/plan-list.integration.spec.ts` | integration | 13 |
 | `apps/api/store-create.integration.spec.ts` | integration | 24 |
 | `apps/api/store-read.integration.spec.ts` | integration | 15 |
+| `apps/api/subscription-cancel.integration.spec.ts` | integration | 18 |
 | `apps/api/subscription.integration.spec.ts` | integration | 24 |
 | `apps/api/tenant-isolation-rls.spec.ts` | integration | 3 |
 | `tools/conformance/harness.selftest.live-db.spec.ts` | conformance | 6 |

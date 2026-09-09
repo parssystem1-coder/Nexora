@@ -17,3 +17,12 @@ export type { SubscriptionStatus } from "../domain/subscription-status.js";
 export type { SubscriptionDto } from "../application/subscribe-to-plan.input.js";
 export { planSubscribeCapability } from "../interfaces/plan-subscribe.capability.js";
 export { subscriptionReadCapability } from "../interfaces/subscription-read.capability.js";
+export { subscriptionCancelCapability } from "../interfaces/subscription-cancel.capability.js";
+/**
+ * ADR-024 item 3's reason vocabulary. Exported because **item 14's jobs and
+ * item 16's reactivation both write transitions**, and they must use these
+ * words rather than inventing their own — a log two writers spell differently
+ * cannot be queried and nothing would catch the divergence.
+ */
+export { TRANSITION_REASONS } from "../domain/transition-reason.js";
+export type { TransitionReason, TransitionActorType } from "../domain/transition-reason.js";

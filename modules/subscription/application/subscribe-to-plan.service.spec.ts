@@ -45,6 +45,12 @@ class FakeSubscriptions implements SubscriptionRepository {
   async findPeriodById(): Promise<SubscriptionPeriod | null> {
     return null;
   }
+  async transitionStatus(): Promise<boolean> {
+    // Item 5's method. `plan.subscribe` never transitions — it creates — so a
+    // call here would be a defect, and this fake says so rather than returning
+    // a plausible `true`.
+    throw new Error("SubscribeToPlanService must not transition a subscription's status.");
+  }
 }
 
 const COMMAND = {
@@ -149,13 +155,12 @@ describe("SubscribeToPlanService", () => {
   });
 
   /**
-   * The one place this service does not follow ADR-052 item 2 literally, tested
-   * so the deviation is visible rather than implicit. See the service's doc
-   * comment and `decisions/2026-09.md` for the reasoning: an `ACTIVE`
-   * subscription is a SERVING one, and creating one here would give a paid plan
-   * away for free, because payment is item 12.
+   * ADR-052's 2026-09-09 amendment: there is no unpaid subscription, and a
+   * first purchase with no trial creates a **payment intent** rather than a
+   * subscription. Item 12 owns the intent, so until then this branch creates
+   * nothing at all — which is the property this test pins.
    */
-  it("refuses a plan version that offers no trial, rather than granting a free ACTIVE subscription", async () => {
+  it("creates nothing at all on a version that offers no trial, per ADR-052's 2026-09-09 amendment", async () => {
     const noTrial = new FakeOfferings({ ...TRIAL_OFFERING, trialPeriodDays: 0 });
     const subs = new FakeSubscriptions();
 
@@ -166,7 +171,7 @@ describe("SubscribeToPlanService", () => {
 
     expect(error).toBeInstanceOf(CapabilityError);
     expect(error?.code).toBe("CONFLICT");
-    expect(error?.details).toMatchObject({ reason: "PAYMENT_NOT_AVAILABLE" });
+    expect(error?.details).toMatchObject({ reason: "PAYMENT_INTENT_REQUIRED" });
     // Nothing was written.
     expect(subs.created).toBeUndefined();
   });

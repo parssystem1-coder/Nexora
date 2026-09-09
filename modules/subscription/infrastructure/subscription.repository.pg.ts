@@ -5,7 +5,11 @@ import { isUniqueViolation } from "../../../platform/db/constraint-violation.js"
 import { Subscription, SubscriptionPeriod } from "../domain/subscription.entity.js";
 import type { PeriodStatus } from "../domain/subscription.entity.js";
 import { TrialAlreadyUsedError } from "../domain/subscription.repository.js";
-import type { CreateSubscriptionCommand, SubscriptionRepository } from "../domain/subscription.repository.js";
+import type {
+  CreateSubscriptionCommand,
+  SubscriptionRepository,
+  TransitionStatusCommand,
+} from "../domain/subscription.repository.js";
 import type { SubscriptionStatus } from "../domain/subscription-status.js";
 import "./subscription.tables.js";
 
@@ -118,6 +122,31 @@ export class SubscriptionRepositoryPg implements SubscriptionRepository {
       .where("tenant_id", "=", tenantId)
       .executeTakeFirst();
     return row !== undefined;
+  }
+
+  /**
+   * ADR-045's compare-and-set, and its first real writer.
+   *
+   * `WHERE id = ? AND version = ?` plus `version = version + 1`: if another
+   * writer moved first the predicate matches nothing, `numUpdatedRows` is 0,
+   * and the caller turns that into `CONCURRENCY_CONFLICT`. The read that
+   * produced `expectedVersion` happened in this same transaction, so the window
+   * this closes is a genuinely concurrent writer rather than a stale read.
+   */
+  async transitionStatus(command: TransitionStatusCommand): Promise<boolean> {
+    const result = await this.conn
+      .updateTable("subscriptions")
+      .set({
+        status: command.toStatus,
+        canceled_at: command.canceledAt?.toISOString() ?? null,
+        version: command.expectedVersion + 1,
+        updated_at: new Date().toISOString(),
+      })
+      .where("id", "=", command.subscriptionId)
+      .where("version", "=", command.expectedVersion)
+      .executeTakeFirst();
+
+    return (result.numUpdatedRows ?? 0n) > 0n;
   }
 
   async findPeriodById(periodId: string): Promise<SubscriptionPeriod | null> {

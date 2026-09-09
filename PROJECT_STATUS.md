@@ -180,3 +180,15 @@ Update this section when that changes.
 
 Update this section when that changes.
 
+**Item 5 done — the transition log and `subscription.cancel`.** It opens by recording the escalation item 4 raised rather than by writing code: **ADR-052 gained a dated amendment ruling that there is no unpaid subscription.** A first purchase against a version offering no trial creates a **payment intent**, not a subscription; the subscription, its first period and its invoice appear inside the transaction that verifies that payment. ADR-024 item 3 gained a dated cross-reference naming the machine's only entry states, and **no status was added** — the pending thing is the intent, not the subscription. ADR-025 item 4's `SCHEDULED` change record is the precedent, which is what makes it a repair rather than a redesign.
+
+**`subscription_state_transitions` is the first ADR-041 partitioning candidate Phase 2 has created**, so that ruling's three obligations bind for the first time. The one worth reading twice is obligation 2: it forbids a foreign key **referencing** a candidate, not one declared **by** it — the log's own foreign key to `subscriptions` is permitted, and a virgin-schema check confirmed nothing references the log.
+
+**A transition is not an audit event.** It carries `from_status`, `to_status` and `reason_code`, which no audit event has, and it exists only when the change happened, whereas ADR-034 writes an audit row on both paths. The proof they are not redundant is a writer with no capability at all: item 14's jobs move subscriptions with no request to audit.
+
+**The `reason` vocabulary is closed and decided here**, because item 12, 14, 15 and 16 will all write into it and a log two writers spell differently cannot be queried.
+
+**`subscription.cancel`'s semantics were genuinely ambiguous and are reported rather than resolved quietly.** `05` §4.2 names no status and ADR-024 item 3 permits both `CANCELED` and `CANCEL_AT_PERIOD_END` from `ACTIVE`. A trial cancels outright — the machine has no `TRIALING → CANCEL_AT_PERIOD_END`, so that half is forced. A paid term goes to `CANCEL_AT_PERIOD_END`, on ADR-020 rule 1's *cancellation is never destructive*, and the recommendation to leave it that way is in `decisions/2026-09.md`.
+
+Update this section when that changes.
+

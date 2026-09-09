@@ -20,33 +20,33 @@ export interface SubscribeToPlanCommand {
  * capability, and no payment required.**" A trial *is* a subscription, in
  * `TRIALING`, and ADR-024's state machine already models its whole life.
  *
- * ## The one place this service does not follow ADR-052 item 2 literally
+ * ## The no-trial branch creates nothing, and that is now ruled rather than escalated
  *
- * That item says `plan.subscribe` "has two outcomes depending on the plan
- * version it is given: a trialling subscription when that version offers a
- * trial and the organization is still eligible, an **`ACTIVE`** one when it does
- * not."
+ * Item 4 declined to implement ADR-052 item 2's second outcome — an `ACTIVE`
+ * subscription when the plan version offers no trial — because `ACTIVE` is a
+ * SERVING state (ADR-024 item 2) that ADR-024 reaches only through payment, and
+ * the branch is reachable by any organization that has already used its trial.
  *
- * **This service implements the first outcome and refuses the second**, and the
- * refusal is deliberate rather than an omission:
+ * **The maintainer ruled it on 2026-09-09** (ADR-052's amendment of that date):
  *
- *   * `ACTIVE` is a **SERVING** state (ADR-024 item 2), and ADR-024 item 4's
- *     lifecycle reaches it only through *paid*. Creating one here would hand out
- *     a serving subscription to a paid plan with **no payment taken**.
- *   * **Payment is item 12.** `PHASE_2_BRIEF.md` §2 puts money outside this
- *     slice, and there is no invoice, no intent and no gateway to take one with.
- *   * The path is **reachable, not theoretical**: an organization that has
- *     already used its trial is "no longer eligible", so a second
- *     `plan.subscribe` would land on exactly that branch and get the product
- *     free.
+ * > There is no unpaid subscription. A subscription row exists only once it is
+ * > either `TRIALING` — a trial having been granted — or paid.
+ * >
+ * > `plan.subscribe` against a version that offers no trial does not create a
+ * > subscription. **It creates a payment intent.** The subscription, its first
+ * > period and its invoice are created inside the transaction that verifies that
+ * > payment.
  *
- * ADR-024 has no state for "created, awaiting first payment" — `PAST_DUE` means
- * unpaid *past* `period_end` and is itself serving within grace — so there is no
- * correct status to put such a subscription in either. **Refusing is the only
- * option that neither invents a state nor gives the product away.** Recorded in
- * `decisions/2026-09.md` under this item, and flagged for the review stop that
- * ends it: if the maintainer rules otherwise, the change is one branch here plus
- * whatever ADR-024 gains to describe the state.
+ * **So the permanent behaviour of this branch is to create an intent, and that
+ * belongs to Phase 2 item 12**, which owns `billing_payment_intents` and
+ * `billing.payment.initiate`. Until item 12 exists there is nothing to create,
+ * so the branch refuses — the same refusal item 4 shipped, now with a ruling
+ * behind it instead of an open question. The refusal is the interim; the intent
+ * is the design.
+ *
+ * ADR-024's machine is unchanged and gains no status: the pending thing is the
+ * intent, not the subscription. A dated cross-reference in ADR-024 item 3
+ * records that the machine's only entry states are `TRIALING` and `ACTIVE`.
  */
 export class SubscribeToPlanService {
   constructor(
@@ -78,11 +78,11 @@ export class SubscribeToPlanService {
       // See this class's doc comment. Not `RESOURCE_NOT_FOUND`: the plan exists
       // and the caller named it correctly. `CONFLICT` is `05` §7's code for a
       // request that permanently conflicts with current state until something
-      // changes — and what must change is that payment exists.
+      // changes — and what must change is that item 12 exists to take a payment.
       throw new CapabilityError(
         "CONFLICT",
-        "Subscribing to a plan version that offers no trial requires payment, which is not available yet.",
-        { planVersionId: command.planVersionId, reason: "PAYMENT_NOT_AVAILABLE" },
+        "Subscribing to a plan version that offers no trial requires a verified payment, which Phase 2 item 12 delivers.",
+        { planVersionId: command.planVersionId, reason: "PAYMENT_INTENT_REQUIRED" },
       );
     }
 

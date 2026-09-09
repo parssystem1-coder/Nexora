@@ -1,0 +1,20 @@
+-- `PHASE_2_BRIEF.md` §5 names `subscription_state_transitions` among the
+-- ledger-shaped tables that owe `REVOKE UPDATE, DELETE` "in its own creating
+-- migration". Split into a second file for the reason items 2 and 4 both split
+-- theirs: the reviewable unit is "what the application role may no longer do",
+-- apart from the schema change. `audit_events` established the shape in Phase 1.
+--
+-- ADR-024 item 3 is why this is the right posture rather than a habit: it calls
+-- the log **append-only** in the same sentence that requires it. A history the
+-- application role can rewrite answers no question about what happened.
+--
+-- It also protects ADR-041 obligation 1. `occurred_at` is the column a future
+-- partition key would use, and an UPDATE that moved a row's `occurred_at` would
+-- move it between partitions after the fact. Revoking UPDATE makes the
+-- immutability that obligation assumes a privilege rather than a convention.
+--
+-- **No table on §5's list is exempt and this one is not the exception.**
+-- Scoped per table, exactly as every prior REVOKE here is: this does not touch
+-- `platform/db/init/001_roles.sql`'s blanket ALTER DEFAULT PRIVILEGES, which
+-- affects only objects created after it runs.
+REVOKE UPDATE, DELETE ON subscription_state_transitions FROM nexora_app;

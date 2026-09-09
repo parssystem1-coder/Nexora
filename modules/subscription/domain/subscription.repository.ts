@@ -1,4 +1,5 @@
 import type { Subscription, SubscriptionPeriod } from "./subscription.entity.js";
+import type { SubscriptionStatus } from "./subscription-status.js";
 
 /**
  * Raised when the organization already has a subscription that began as a
@@ -47,4 +48,27 @@ export interface SubscriptionRepository {
   existsForTenant(tenantId: string): Promise<boolean>;
 
   findPeriodById(periodId: string): Promise<SubscriptionPeriod | null>;
+
+  /**
+   * Moves the subscription to `toStatus`, guarded by ADR-045's optimistic
+   * token: the UPDATE carries `WHERE ... AND version = $n` and bumps it.
+   *
+   * Returns `false` when zero rows matched, which means another writer moved
+   * first. That is deliberately not an exception — the caller maps it to
+   * `CONCURRENCY_CONFLICT` (retryable, `05` §7), and a repository throwing an
+   * HTTP-shaped meaning would put the contract in the wrong layer.
+   *
+   * ADR-045 names this table because "the renewal job, `subscription.cancel`,
+   * `plan.change` and `subscription.reactivate` all write it". This is the
+   * first of those four to exist.
+   */
+  transitionStatus(command: TransitionStatusCommand): Promise<boolean>;
+}
+
+export interface TransitionStatusCommand {
+  subscriptionId: string;
+  expectedVersion: number;
+  toStatus: SubscriptionStatus;
+  /** Set only when moving to `CANCELED`; the table's CHECK ties the two together. */
+  canceledAt: Date | null;
 }

@@ -1691,6 +1691,190 @@
           }
         }
       }
+    },
+    "/api/v1/organizations/{organizationId}/subscription/cancel": {
+      "post": {
+        "operationId": "subscription.cancel",
+        "summary": "subscription.cancel (v1)",
+        "description": "Risk: HIGH_WRITE. Store-scoped: false. Idempotent: true. Audited: true. Required permissions: subscription.cancel.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "subscription.cancel succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "TRIALING",
+                        "ACTIVE",
+                        "PAST_DUE",
+                        "PAUSED",
+                        "CANCEL_AT_PERIOD_END",
+                        "EXPIRED",
+                        "CANCELED",
+                        "SUSPENDED"
+                      ]
+                    },
+                    "planVersionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "priceVersionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "termLength": {
+                      "type": "string"
+                    },
+                    "autoRenew": {
+                      "type": "boolean"
+                    },
+                    "trialEndsAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "currentPeriod": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "startsAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "endsAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "SCHEDULED",
+                            "CURRENT",
+                            "ENDED",
+                            "UNPAID"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "startsAt",
+                        "endsAt",
+                        "status"
+                      ]
+                    },
+                    "servingNow": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "status",
+                    "planVersionId",
+                    "priceVersionId",
+                    "termLength",
+                    "autoRenew",
+                    "trialEndsAt",
+                    "currentPeriod",
+                    "servingNow"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR | TENANT_CONTEXT_REQUIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT | IDEMPOTENCY_CONFLICT | CONCURRENCY_CONFLICT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "webhooks": {}

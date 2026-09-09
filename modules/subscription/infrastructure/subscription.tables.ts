@@ -48,9 +48,28 @@ export interface SubscriptionPeriodsTable {
   created_at: ColumnType<Date, string | undefined, never>;
 }
 
+/**
+ * ADR-024 item 3's append-only transition log, and ADR-041's first real
+ * partitioning candidate in this codebase. Every column is `never` on update:
+ * `REVOKE UPDATE, DELETE ... FROM nexora_app` makes that a privilege, and
+ * `occurred_at`'s immutability is what ADR-041 obligation 1 assumes.
+ */
+export interface SubscriptionStateTransitionsTable {
+  id: string;
+  tenant_id: string;
+  subscription_id: string;
+  from_status: ColumnType<string, string, never>;
+  to_status: ColumnType<string, string, never>;
+  reason_code: ColumnType<string, string, never>;
+  actor_type: ColumnType<string, string, never>;
+  actor_id: ColumnType<string | null, string | null | undefined, never>;
+  occurred_at: ColumnType<Date, string | undefined, never>;
+}
+
 declare module "../../../platform/db/kysely.js" {
   interface Database {
     subscriptions: SubscriptionsTable;
     subscription_periods: SubscriptionPeriodsTable;
+    subscription_state_transitions: SubscriptionStateTransitionsTable;
   }
 }
