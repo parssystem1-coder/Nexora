@@ -37,7 +37,11 @@ import "./billing.tables.js";
 const db = createDb(loadDbConfig());
 
 const STANDARD_PLAN_VERSION = "1a2b3c4d-0000-4000-8000-000000000002";
-const TRIAL_PLAN_VERSION = "1a2b3c4d-0000-4000-8000-000000000001";
+// The `trial` plan was removed on 2026-09-10 when item 4 ruled that a trial is
+// a state of a subscription rather than a plan. This id now names no row, which
+// is exactly what the "no price for it" assertion below needs — and what the
+// privilege probes want anyway, per `AGENTS.md` §8.
+const REMOVED_TRIAL_PLAN_VERSION = "1a2b3c4d-0000-4000-8000-000000000001";
 const ANNUAL_PRICE = "2b3c4d5e-0000-4000-8000-000000000001";
 const BIENNIAL_PRICE = "2b3c4d5e-0000-4000-8000-000000000002";
 
@@ -206,8 +210,12 @@ describe("the seed", () => {
     expect(rows.map((r) => r.term)).toEqual(["1 year", "2 years"]);
   });
 
-  it("leaves the trial plan with no price at all, which is what free means here", async () => {
-    const rows = await db.selectFrom("prices").select("id").where("plan_version_id", "=", TRIAL_PLAN_VERSION).execute();
+  it("has no price for the removed trial plan version", async () => {
+    const rows = await db
+      .selectFrom("prices")
+      .select("id")
+      .where("plan_version_id", "=", REMOVED_TRIAL_PLAN_VERSION)
+      .execute();
 
     expect(rows).toHaveLength(0);
   });

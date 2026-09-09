@@ -1,0 +1,22 @@
+-- `PHASE_2_BRIEF.md` §5 lists `subscription_periods` among the ledger-shaped
+-- tables that owe `REVOKE UPDATE, DELETE` "in its own creating migration".
+-- Split into a second file for the same reason item 2 split its own: the
+-- reviewable unit is "what the application role may no longer do", by itself,
+-- apart from the schema change. `audit_events` established the shape in Phase 1
+-- (`20260822100100_audit__enforce_append_only.sql`).
+--
+-- ADR-024 item 1 is what makes this the right posture rather than a habit:
+-- "Renewal appends a period. It never mutates a previous one. This is what
+-- makes billing history reconstructible." A period whose dates the application
+-- role can rewrite is not a history.
+--
+-- **`subscriptions` is deliberately NOT here.** Its `status`,
+-- `current_period_id`, `canceled_at` and `version` change by design — ADR-024's
+-- whole state machine is updates to that row — and §5's list does not name it.
+-- Revoking there would make the state machine unimplementable.
+--
+-- Scoped per table, exactly as the audit precedent is: this does not change
+-- `platform/db/init/001_roles.sql`'s blanket ALTER DEFAULT PRIVILEGES, which
+-- affects only objects created after it runs and never retroactively re-grants
+-- on an existing table.
+REVOKE UPDATE, DELETE ON subscription_periods FROM nexora_app;

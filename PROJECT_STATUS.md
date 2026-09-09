@@ -167,3 +167,16 @@ Update this section when that changes.
 **One rule was added to `AGENTS.md` §8, and that is authority #1.** From item 2's incident: *a destructive statement written to prove it is denied must still be harmless if it is ever allowed — target a row that does not exist, or a throwaway schema, never live data.* §8 already ends with a one-line absolute test rule (*"Mocked PostgreSQL never satisfies a tenant isolation requirement"*), so its real shape is a layering table plus universal rules, and this is a second one. The edit is exactly two lines.
 
 Update this section when that changes.
+
+**Item 3 done — the shared idempotency store.** The second infrastructure item, and the first tenant-owned table Phase 2 created: `tenant_id`, `ENABLE`/`FORCE ROW LEVEL SECURITY` and a policy in the creating migration. It also produced `npm run check:fk`, which fails the build on a foreign key crossing a module boundary — a rule `04` §1 and `PHASE_2_BRIEF.md` §5 had both stated with nothing enforcing it.
+
+**Item 4 done — subscriptions, the term and the state machine. It carries `PHASE_2_BRIEF.md` §2's second review stop.** `subscriptions` and `subscription_periods`, `plan.subscribe` and `subscription.read`, ADR-024 item 2's single derived serving-state function, and **ADR-038's `withIdempotentCapability`** — the first capability here that both declares `idempotent: true` and enforces it, composed inside `runCapabilityAttempt` in the order ADR-038 item 2 draws, with nothing added to that shared tail.
+
+**A trial became a state of a subscription rather than a plan** (ruled 2026-09-05, the question items 1 and 2 both left open). Item 1's `trial` plan is gone, `standard` carries the 14 days, and ruling ب-8 is amended where it was recorded: the attribution mark follows serving state, and the `plan_features` grant was deleted rather than left unread.
+
+**One deviation is on the record for the review, because ADRs override every other document and this is a slice declining to implement one.** ADR-052 item 2 says `plan.subscribe` creates an `ACTIVE` subscription when the plan version offers no trial. It refuses instead: `ACTIVE` is a SERVING state, ADR-024 reaches it only through *paid*, payment is item 12, and the path is reachable by any organization that has already used its trial — so implementing it literally would give a paid plan away for free. ADR-024 has no state for "created, awaiting first payment" either.
+
+**Two things worth carrying forward.** The state machine is proved by its **complement** — a test walks all 64 ordered pairs and asserts each is accepted or rejected, with the legal set transcribed from the ADR independently of the implementation's own map. And a real bug was caught by exactly the test ADR-038's verification list asks for: the first idempotency claim inserted, caught the unique violation, then selected — which **cannot** work, because a raising statement aborts a PostgreSQL transaction and the claim shares one with the write. Every replay returned 500 until it became `ON CONFLICT DO NOTHING ... RETURNING`.
+
+Update this section when that changes.
+

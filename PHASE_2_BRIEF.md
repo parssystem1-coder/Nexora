@@ -157,6 +157,8 @@ Both additions were **owed** rather than discovered. ADR-048 and ADR-050 were ru
 **Neither table's columns are specified here, deliberately.** The counter's shape is item 13's design work and the delivery table's is item 14's; ADR-050 says so in its own ruling. This amendment adds them to the scope list and states what each is for. The names below follow this section's existing convention, stated for the entitlement/quota split and applying equally here: **table names are indicative; membership of this list is binding.**
 
 
+> **Note, 2026-09-10 (added by Phase 2 item 4): the `Holds` column below is a scope entry, not a column specification.** Read the ADR that governs a table for its shape, and this list for whether the table is in scope at all. Item 3 established the cost the expensive way — the row for `idempotency_records` names four things while **ADR-009 also requires `created_at`, `expires_at` and `actor_type`**, including the very column retention depends on — and item 4 met the same trap larger, where **ADR-024 item 1 and `04` §2.3 give `subscriptions` and `subscription_periods` a fuller shape than two summary rows can.** Six items are still to come and all of them read this list.
+
 **Only these. Creating anything else is out of scope.** Derived from `04_DATABASE_BLUEPRINT.md` §§2.3–2.6 by one rule: a table is in scope if `04` names it **and** a `06` Phase 2 item creates it.
 
 | Table | Owning module | Tenancy | Holds | Item |
@@ -670,6 +672,18 @@ Competitors sell its removal on lower paid tiers as well. **This platform does n
 **Also a `plan_features` seed rather than a mechanism.** ADR-023's *Adding a new provider* section rules that a gateway must cost *"one adapter, one capability declaration, one credential schema, one fixture-based test suite, and one configuration entry"* with zero changes elsewhere — **charging for something the architecture already made nearly free is rent on the platform's own work.** No plan gates a gateway.
 
 **Item 1's seed therefore carries these two feature keys**, and neither is a schema change.
+
+> **Amendment, 2026-09-10 (Phase 2 item 4) — ب-8's mark is driven by serving state, and its `plan_features` grant is removed.**
+>
+> **The ruling above is unimplementable as a plan feature, and item 1 said so at the time.** It asks one flag to distinguish a trial from a paid plan; the maintainer ruled on 2026-09-05 that **a trial is a state of a subscription, not a plan** (ADR-024 item 3's `TRIALING → ACTIVE` is a transition on *one* subscription, and ADR-052 item 2 puts both outcomes on the same capability and the same plan version). With one plan, a trial and a paid subscription are **the same plan version in different states**, and a `plan_features` row cannot see subscription state.
+>
+> **So the mark follows serving state instead:** shown while a subscription has never been paid for, hidden once it is `ACTIVE`. The input is the subscription, read through ADR-024 item 2's single derived function (`modules/subscription/contracts`'s `isServing`), and the consumer is Phase 4's storefront.
+>
+> **`storefront.attribution_free` was deleted rather than left in place** (`20260910091000_billing__correct_trial_seed.sql`). A grant nothing reads is worse than no grant: the next reader has to work out whether it is load-bearing.
+>
+> **What is unchanged:** پ-3's `billing.all_payment_gateways` seed, ب-8's commercial position — *if you have paid, the site is yours* — and ADR-044's rule that `plan_features` carries a machine key only.
+>
+> **Reopening trigger, named because it is the one case that would need a plan-shaped input again: a free-forever plan.** A plan that is permanently unpaid could not be distinguished by serving state, and the mark would have to become a plan feature once more.
 
 #### What this amendment does not do
 

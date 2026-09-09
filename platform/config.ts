@@ -88,3 +88,29 @@ export function loadTrustProxyConfig(env: NodeJS.ProcessEnv = process.env): bool
   const asNumber = Number(raw);
   return Number.isInteger(asNumber) ? asNumber : raw;
 }
+
+/**
+ * ADR-009: "retention is bounded and **configurable**". Its 2026-09-05
+ * amendment supplies the default — 30 days — and item 1 of that amendment
+ * records it as a choice rather than a derivation, in the same posture ADR-053
+ * takes for `sessions`.
+ *
+ * Read here and resolved into `idempotency_records.expires_at` **at claim
+ * time**, which is amendment item 2's requirement and not a stylistic one: a
+ * purge job that computed the boundary from the current setting would silently
+ * change the lifetime of every row already written each time the setting
+ * changed, including rows whose callers are still entitled to a replay.
+ *
+ * An unparseable or non-positive value falls back to the default rather than
+ * throwing. A malformed retention setting must not stop the platform accepting
+ * writes; it must produce the documented window.
+ */
+export const DEFAULT_IDEMPOTENCY_RETENTION_DAYS = 30;
+
+export function loadIdempotencyRetentionDays(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.IDEMPOTENCY_RETENTION_DAYS;
+  if (raw === undefined) return DEFAULT_IDEMPOTENCY_RETENTION_DAYS;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) return DEFAULT_IDEMPOTENCY_RETENTION_DAYS;
+  return parsed;
+}

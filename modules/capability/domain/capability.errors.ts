@@ -14,6 +14,7 @@ export type CapabilityErrorCode =
   | "RESOURCE_NOT_FOUND"
   | "CONFLICT"
   | "CONCURRENCY_CONFLICT"
+  | "IDEMPOTENCY_CONFLICT"
   | "DOMAIN_RESERVED"
   | "INTERNAL_ERROR";
 
@@ -40,6 +41,15 @@ const STATUS_BY_CODE: Record<CapabilityErrorCode, number> = {
   // a client to give up on a transient failure, or to blindly retry a real
   // conflict — the exact ambiguity this second code exists to remove.
   CONCURRENCY_CONFLICT: 409,
+  // 409, a third code sharing that status and distinct from both above.
+  // ADR-009: "identical key + different request_hash returns
+  // IDEMPOTENCY_CONFLICT." Unlike CONCURRENCY_CONFLICT it is NOT retryable —
+  // the identical request will conflict forever until the client changes the
+  // key or the payload — and unlike CONFLICT it names the specific defect, so a
+  // client can tell "you reused a key" from "this state disagrees with your
+  // request". Phase 2 item 4's `plan.subscribe` is its first user; documented
+  // in 05_API_CAPABILITY_CONTRACTS.md §7 since 2.0.
+  IDEMPOTENCY_CONFLICT: 409,
   // 409, the same class as CONFLICT but a distinct code: the slug conflicts
   // with a platform-reserved word, not with another row's unique index.
   // store.create (05_API_CAPABILITY_CONTRACTS.md §7) is its first user.

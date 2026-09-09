@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "3791fde",
+    "commit": "9db7415",
     "dirty": true
   },
   "modules": [
@@ -25,7 +25,7 @@
         "infrastructure",
         "migrations"
       ],
-      "files": 17,
+      "files": 18,
       "dependsOn": [
         "capability"
       ],
@@ -41,7 +41,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 15,
+      "files": 18,
       "dependsOn": [
         "audit",
         "capability",
@@ -76,10 +76,13 @@
     {
       "name": "idempotency",
       "layers": [
+        "application",
+        "contracts",
+        "domain",
         "infrastructure",
         "migrations"
       ],
-      "files": 3,
+      "files": 9,
       "dependsOn": [],
       "dependsOnPlatform": true
     },
@@ -110,6 +113,28 @@
       ],
       "files": 11,
       "dependsOn": [],
+      "dependsOnPlatform": true
+    },
+    {
+      "name": "subscription",
+      "layers": [
+        "application",
+        "contracts",
+        "domain",
+        "infrastructure",
+        "interfaces",
+        "migrations"
+      ],
+      "files": 20,
+      "dependsOn": [
+        "audit",
+        "authorization",
+        "billing",
+        "capability",
+        "idempotency",
+        "identity",
+        "tenant"
+      ],
       "dependsOnPlatform": true
     },
     {
@@ -319,6 +344,28 @@
       ]
     },
     {
+      "name": "subscription_periods",
+      "module": "subscription",
+      "migration": "20260910090000_subscription__create_subscriptions.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "subscription_periods_tenant_isolation"
+      ]
+    },
+    {
+      "name": "subscriptions",
+      "module": "subscription",
+      "migration": "20260910090000_subscription__create_subscriptions.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "subscriptions_tenant_isolation"
+      ]
+    },
+    {
       "name": "users",
       "module": "identity",
       "migration": "20260822090000_identity__create_users.sql",
@@ -426,6 +473,18 @@
       "route": "GET /api/v1/plans"
     },
     {
+      "id": "plan.subscribe",
+      "module": "subscription",
+      "file": "modules/subscription/interfaces/plan-subscribe.capability.ts",
+      "permissions": [
+        "plan.subscribe"
+      ],
+      "risk": "HIGH_WRITE",
+      "audit": true,
+      "storeScoped": false,
+      "route": "POST /api/v1/organizations/:organizationId/subscription"
+    },
+    {
       "id": "store.create",
       "module": "tenant",
       "file": "modules/tenant/interfaces/store-create.capability.ts",
@@ -448,6 +507,18 @@
       "audit": true,
       "storeScoped": true,
       "route": "GET /api/v1/stores/:storeId"
+    },
+    {
+      "id": "subscription.read",
+      "module": "subscription",
+      "file": "modules/subscription/interfaces/subscription-read.capability.ts",
+      "permissions": [
+        "subscription.read"
+      ],
+      "risk": "READ",
+      "audit": true,
+      "storeScoped": false,
+      "route": "GET /api/v1/organizations/:organizationId/subscription"
     }
   ],
   "singletons": [
@@ -928,6 +999,21 @@
       "cases": 7
     },
     {
+      "file": "modules/subscription/application/subscribe-to-plan.service.spec.ts",
+      "layer": "application",
+      "cases": 11
+    },
+    {
+      "file": "modules/subscription/domain/serving-state.spec.ts",
+      "layer": "domain",
+      "cases": 12
+    },
+    {
+      "file": "modules/subscription/domain/subscription-status.spec.ts",
+      "layer": "domain",
+      "cases": 5
+    },
+    {
       "file": "modules/tenant/application/assign-membership-role.service.spec.ts",
       "layer": "application",
       "cases": 9
@@ -1068,6 +1154,11 @@
       "cases": 15
     },
     {
+      "file": "apps/api/subscription.integration.spec.ts",
+      "layer": "integration",
+      "cases": 24
+    },
+    {
       "file": "apps/api/tenant-isolation-rls.spec.ts",
       "layer": "integration",
       "cases": 3
@@ -1146,6 +1237,16 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/organizations/:organizationId/subscription",
+      "file": "modules/subscription/interfaces/plan-subscribe.controller.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/:organizationId/subscription",
+      "file": "modules/subscription/interfaces/subscription-read.controller.ts"
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/organizations/:organizationId/switch",
       "file": "modules/tenant/interfaces/organization-switch.controller.ts"
     },
@@ -1171,13 +1272,13 @@
     }
   ],
   "counts": {
-    "modules": 9,
-    "tables": 20,
-    "tablesWithRls": 7,
-    "capabilities": 11,
-    "routes": 12,
-    "testFiles": 52,
-    "testCases": 473,
+    "modules": 10,
+    "tables": 22,
+    "tablesWithRls": 9,
+    "capabilities": 13,
+    "routes": 14,
+    "testFiles": 56,
+    "testCases": 525,
     "adrs": 64,
     "adrsAccepted": 56
   }

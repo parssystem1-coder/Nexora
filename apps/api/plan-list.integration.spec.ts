@@ -67,8 +67,11 @@ describe("GET /api/v1/plans", () => {
     const res = await request(app.getHttpServer()).get("/api/v1/plans").set("Cookie", `sid=${token}`);
 
     const keys = (res.body.items as { key: string }[]).map((i) => i.key);
-    expect(keys).toContain("trial");
+    // One plan since 2026-09-10: item 4's ruling made a trial a *state of a
+    // subscription* rather than a plan, so the `trial` plan's seed rows were
+    // removed and `standard` carries the 14-day trial itself.
     expect(keys).toContain("standard");
+    expect(keys).not.toContain("trial");
     for (const item of res.body.items as Record<string, unknown>[]) {
       // ADR-044 item 1: no name, label, title, description or locale map.
       expect(item).not.toHaveProperty("name");
@@ -95,23 +98,26 @@ describe("GET /api/v1/plans", () => {
     const res = await request(app.getHttpServer()).get("/api/v1/plans").set("Cookie", `sid=${token}`);
 
     const items = res.body.items as { key: string; trialPeriodDays: number }[];
-    expect(items.find((i) => i.key === "trial")?.trialPeriodDays).toBe(14);
-    expect(items.find((i) => i.key === "standard")?.trialPeriodDays).toBe(0);
+    // `standard` is now the plan that offers the trial. ADR-052 as amended by
+    // ruling ب-7: fourteen days.
+    expect(items.find((i) => i.key === "standard")?.trialPeriodDays).toBe(14);
   });
 
-  it("seeds ruling ب-8's mark as a grant on the paid plan and not on the trial", async () => {
+  it("no longer carries ruling ب-8's attribution grant, which one plan cannot express", async () => {
     const token = await authenticated();
 
     const res = await request(app.getHttpServer()).get("/api/v1/plans").set("Cookie", `sid=${token}`);
 
     const items = res.body.items as { key: string; featureKeys: string[] }[];
     const standard = items.find((i) => i.key === "standard");
-    const trial = items.find((i) => i.key === "trial");
-    expect(standard?.featureKeys).toContain("storefront.attribution_free");
-    expect(trial?.featureKeys).not.toContain("storefront.attribution_free");
-    // پ-3: every gateway is free on every plan, so both grant this one.
+
+    // ب-8 was amended on 2026-09-10 (`decisions/2026-09.md`). With one plan, a
+    // `plan_features` row cannot distinguish a trial from a paid subscription —
+    // they are the same plan version in different states — so the mark is driven
+    // by serving state and the grant was removed rather than left unread.
+    expect(standard?.featureKeys).not.toContain("storefront.attribution_free");
+    // پ-3 is untouched: every gateway is free on every plan.
     expect(standard?.featureKeys).toContain("billing.all_payment_gateways");
-    expect(trial?.featureKeys).toContain("billing.all_payment_gateways");
   });
 
   it("embeds no brand name anywhere in the catalogue it serves", async () => {
@@ -141,7 +147,6 @@ describe("GET /api/v1/plans", () => {
     }
 
     expect(new Set(seen).size).toBe(seen.length);
-    expect(seen).toContain("trial");
     expect(seen).toContain("standard");
     // A total order: the same sequence, ascending, every time.
     expect([...seen].sort()).toEqual(seen);

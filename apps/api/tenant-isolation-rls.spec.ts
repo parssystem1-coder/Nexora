@@ -179,6 +179,64 @@ const SEED_ROW: Record<string, SeedRow> = {
     );
     return row.id;
   },
+  subscriptions: async (f) => {
+    // Phase 2 item 4. Inserted directly rather than through `plan.subscribe`:
+    // that capability is idempotent, tenant-scoped and permission-checked, and
+    // driving it here would make this suite depend on the plan catalogue's seed
+    // as well as on RLS. The version ids are arbitrary — no foreign key points
+    // at `billing` (`04` §1), which is exactly what lets this probe stand alone.
+    const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
+      trx
+        .insertInto("subscriptions")
+        .values({
+          id: randomUUID(),
+          tenant_id: f.orgId,
+          plan_version_id: randomUUID(),
+          price_version_id: randomUUID(),
+          status: "ACTIVE",
+          term_length: "1 year",
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow(),
+    );
+    return row.id;
+  },
+  subscription_periods: async (f) => {
+    // Needs a parent subscription: the foreign key is intra-module and real.
+    // `status: 'ACTIVE'` above rather than `TRIALING` keeps this probe clear of
+    // the one-trial-per-organization partial unique index, which would collide
+    // on the second run of the suite.
+    const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, async (trx) => {
+      const subscription = await trx
+        .insertInto("subscriptions")
+        .values({
+          id: randomUUID(),
+          tenant_id: f.orgId,
+          plan_version_id: randomUUID(),
+          price_version_id: randomUUID(),
+          status: "ACTIVE",
+          term_length: "1 year",
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow();
+
+      return trx
+        .insertInto("subscription_periods")
+        .values({
+          id: randomUUID(),
+          tenant_id: f.orgId,
+          subscription_id: subscription.id,
+          plan_version_id: randomUUID(),
+          price_version_id: randomUUID(),
+          period_start: new Date().toISOString(),
+          period_end: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
+          status: "CURRENT",
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow();
+    });
+    return row.id;
+  },
   audit_events: async (f) => {
     const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
       trx
@@ -309,7 +367,7 @@ try {
 }
 
 describe("tenant isolation: every RLS-protected table, enumerated live, denies cross-tenant read/write/delete", () => {
-  it("the live enumeration finds exactly today's seven tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
+  it("the live enumeration finds exactly today's nine tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
     expect(tenantOwnedTables.map((t) => t.table)).toEqual([
       "audit_events",
       // Phase 2 item 3, and the first Phase 2 table to appear here: items 1 and
@@ -321,6 +379,11 @@ describe("tenant isolation: every RLS-protected table, enumerated live, denies c
       "organizations",
       "store_memberships",
       "stores",
+      // Phase 2 item 4. Both arrived together, and both failed this assertion
+      // and the seed-factory one before their factories were written — which is
+      // the loud failure the registry exists to produce.
+      "subscription_periods",
+      "subscriptions",
     ]);
     expect(tenantOwnedTables.every((t) => t.pkColumn === "id")).toBe(true);
   });
