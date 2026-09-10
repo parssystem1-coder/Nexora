@@ -45,10 +45,37 @@ export interface EntitlementSourcesTable {
   evaluated_at: ColumnType<Date, string | undefined, never>;
 }
 
+/**
+ * Phase 2 item 7. Platform-global reference data, the direct analogue of
+ * `plan_entitlements` — seeded by migration and read, never appended to per
+ * event, so it is **not** on §5's append-only list.
+ */
+export interface PlanQuotaPoliciesTable {
+  id: string;
+  /** A plain column: `plan_versions` is `modules/billing`'s. */
+  plan_version_id: string;
+  resource: ColumnType<string, string, never>;
+  limit_value: ColumnType<number, number, never>;
+  created_at: ColumnType<Date, string | undefined, never>;
+}
+
+/** Mutable, tenant-owned, and with no `version` column: ADR-045's Tier 2 trigger has not fired. */
+export interface TenantQuotaOverridesTable {
+  id: string;
+  tenant_id: string;
+  resource: ColumnType<string, string, string>;
+  override_type: ColumnType<string, string, string>;
+  limit_value: ColumnType<number, number, number>;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
 declare module "../../../platform/db/kysely.js" {
   interface Database {
     plan_entitlements: PlanEntitlementsTable;
     tenant_entitlement_overrides: TenantEntitlementOverridesTable;
     entitlement_sources: EntitlementSourcesTable;
+    plan_quota_policies: PlanQuotaPoliciesTable;
+    tenant_quota_overrides: TenantQuotaOverridesTable;
   }
 }

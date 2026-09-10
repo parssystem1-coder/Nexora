@@ -79,6 +79,25 @@ async function seedOverride(
   });
 }
 
+/** Writes a quota override directly: `05` §4.2 still has no capability that sets one. */
+async function seedQuotaOverride(
+  tenantId: string,
+  resource: string,
+  overrideType: "ABSOLUTE" | "DELTA",
+  limit: number,
+): Promise<void> {
+  await withTenantContext(db, { tenantId, userId: null, storeId: null }, async (trx) => {
+    const result = await trx
+      .insertInto("tenant_quota_overrides")
+      .values({ id: randomUUID(), tenant_id: tenantId, resource, override_type: overrideType, limit_value: limit })
+      .executeTakeFirst();
+    // `AGENTS.md` §8: a statement that must change rows asserts how many.
+    if ((result.numInsertedOrUpdatedRows ?? 0n) !== 1n) {
+      throw new Error(`seedQuotaOverride inserted ${result.numInsertedOrUpdatedRows} rows`);
+    }
+  });
+}
+
 beforeAll(async () => {
   try {
     await sql`select 1`.execute(db);
@@ -107,7 +126,9 @@ describe("GET /api/v1/organizations/:organizationId/entitlements", () => {
     const keys = (res.body.entitlements as { featureKey: string }[]).map((e) => e.featureKey);
     // Ruling ب-4's closed V1 list, seeded onto the standard plan version.
     expect(keys).toEqual(["domains", "members", "stores"]);
-    expect(res.body.entitlements.every((e: { state: string }) => e.state === "ALLOW")).toBe(true);
+    // Since item 7 they carry limits: a plan entitlement plus a quota policy is
+    // one LIMIT grant, not an ALLOW and a competing number.
+    expect(res.body.entitlements.every((e: { state: string }) => e.state === "LIMIT")).toBe(true);
   });
 
   it("explains every resolution, which is what makes a denial actionable (ADR-008)", async () => {
@@ -218,7 +239,10 @@ describe("entitlement_sources — ADR-008's explainability log", () => {
     );
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.state).toBe("ALLOW");
+    // LIMIT rather than ALLOW since item 7: the plan's entitlement and its quota
+    // policy compose into one grant carrying the number.
+    expect(rows[0]?.state).toBe("LIMIT");
+    expect(rows[0]?.limit_value).toBe(5);
     expect(rows[0]?.resolved_from).toEqual(["PLAN_VERSION"]);
     expect(rows[0]?.evaluated_at).toBeInstanceOf(Date);
   });
@@ -332,6 +356,172 @@ describe("PHASE_2_BRIEF §6 criterion 25 — the entitlement/quota tenancy split
           override_type: "ABSOLUTE",
           state: "ALLOW",
           limit_value: null,
+        })
+        .execute(),
+    );
+
+    await expect(attempt).rejects.toThrow(/row-level security/i);
+  });
+});
+
+describe("item 7 — quota policies composed into ADR-008's chain", () => {
+  it("turns the plan's ALLOW plus its quota policy into one LIMIT with a number", async () => {
+    const tenant = await tenantFixture("quota-plan");
+    await subscribe(tenant.orgId, tenant.token);
+
+    const res = await resolve(tenant.orgId, tenant.token, "members");
+
+    expect(res.body.entitlements[0].state).toBe("LIMIT");
+    expect(res.body.entitlements[0].limit).toBe(5);
+    // One grant, one rung — not two competing PLAN_VERSION grants, which rule 3
+    // would refuse as a conflict.
+    expect(res.body.entitlements[0].resolvedFrom).toEqual(["PLAN_VERSION"]);
+  });
+
+  it("seeds all three of ب-4's resources with a limit, and nothing else", async () => {
+    const tenant = await tenantFixture("quota-all");
+    await subscribe(tenant.orgId, tenant.token);
+
+    const res = await resolve(tenant.orgId, tenant.token);
+    const byKey = Object.fromEntries(
+      (res.body.entitlements as { featureKey: string; limit: number | null }[]).map((e) => [e.featureKey, e.limit]),
+    );
+
+    expect(byKey).toEqual({ members: 5, stores: 3, domains: 5 });
+  });
+
+  it("lets an ABSOLUTE quota override replace the plan's number", async () => {
+    const tenant = await tenantFixture("quota-absolute");
+    await subscribe(tenant.orgId, tenant.token);
+    await seedQuotaOverride(tenant.orgId, "members", "ABSOLUTE", 25);
+
+    const res = await resolve(tenant.orgId, tenant.token, "members");
+
+    expect(res.body.entitlements[0].limit).toBe(25);
+    expect(res.body.entitlements[0].resolvedFrom).toEqual(["TENANT_OVERRIDE_ABSOLUTE"]);
+  });
+
+  it("lets a DELTA quota override adjust it, as a modifier rather than a base", async () => {
+    const tenant = await tenantFixture("quota-delta");
+    await subscribe(tenant.orgId, tenant.token);
+    await seedQuotaOverride(tenant.orgId, "stores", "DELTA", 4);
+
+    const res = await resolve(tenant.orgId, tenant.token, "stores");
+
+    // 3 from the plan, +4 from the override. Item 6's finding carries over:
+    // a DELTA adjusts the resolved value rather than standing alone.
+    expect(res.body.entitlements[0].limit).toBe(7);
+    expect(res.body.entitlements[0].resolvedFrom).toEqual(["PLAN_VERSION", "TENANT_OVERRIDE_DELTA"]);
+  });
+
+  it("lets an entitlement DENY dominate a quota that permits five (ADR-008 rule 1)", async () => {
+    const tenant = await tenantFixture("quota-deny");
+    await subscribe(tenant.orgId, tenant.token);
+    await seedOverride(tenant.orgId, "domains", "ABSOLUTE", "DENY", null);
+
+    const res = await resolve(tenant.orgId, tenant.token, "domains");
+
+    // The entitlement axis wins; the number is never consulted.
+    expect(res.body.entitlements[0].state).toBe("DENY");
+    expect(res.body.entitlements[0].limit).toBeNull();
+  });
+
+  it("rejects a resource outside ب-4's closed list at the database", async () => {
+    const tenant = await tenantFixture("quota-badresource");
+
+    const attempt = withTenantContext(db, { tenantId: tenant.orgId, userId: null, storeId: null }, async (trx) =>
+      trx
+        .insertInto("tenant_quota_overrides")
+        .values({
+          id: randomUUID(),
+          tenant_id: tenant.orgId,
+          resource: "storage",
+          override_type: "ABSOLUTE",
+          limit_value: 10,
+        })
+        .execute(),
+    );
+
+    await expect(attempt).rejects.toThrow(/tenant_quota_overrides_resource_check/);
+  });
+
+  it("rejects a negative ABSOLUTE override while permitting a negative DELTA", async () => {
+    const tenant = await tenantFixture("quota-negative");
+
+    const absolute = withTenantContext(db, { tenantId: tenant.orgId, userId: null, storeId: null }, async (trx) =>
+      trx
+        .insertInto("tenant_quota_overrides")
+        .values({
+          id: randomUUID(),
+          tenant_id: tenant.orgId,
+          resource: "members",
+          override_type: "ABSOLUTE",
+          limit_value: -1,
+        })
+        .execute(),
+    );
+    await expect(absolute).rejects.toThrow(/tenant_quota_overrides_absolute_is_non_negative/);
+
+    // A negative DELTA is legitimate — an operator reducing an allowance.
+    await seedQuotaOverride(tenant.orgId, "stores", "DELTA", -1);
+  });
+});
+
+describe("§6 criterion 25, the quota half", () => {
+  it("makes a plan_quota_policies row readable with NO tenant context", async () => {
+    const rows = await db
+      .selectFrom("plan_quota_policies")
+      .select("resource")
+      .where("plan_version_id", "=", STANDARD_PLAN_VERSION)
+      .execute();
+
+    expect(rows).toHaveLength(3);
+  });
+
+  it("hides a tenant_quota_overrides row without tenant context, with a positive control", async () => {
+    const tenant = await tenantFixture("crit25q-nocontext");
+    await seedQuotaOverride(tenant.orgId, "members", "ABSOLUTE", 9);
+
+    const withContext = await withTenantContext(
+      db,
+      { tenantId: tenant.orgId, userId: null, storeId: null },
+      async (trx) => trx.selectFrom("tenant_quota_overrides").select("id").execute(),
+    );
+    expect(withContext.length).toBeGreaterThan(0);
+
+    const withoutContext = await db.selectFrom("tenant_quota_overrides").select("id").execute();
+    expect(withoutContext).toHaveLength(0);
+  });
+
+  it("hides another tenant's quota override, with a positive control in the same test", async () => {
+    const a = await tenantFixture("crit25q-a");
+    const b = await tenantFixture("crit25q-b");
+    await seedQuotaOverride(a.orgId, "domains", "ABSOLUTE", 2);
+
+    const asOwner = await withTenantContext(db, { tenantId: a.orgId, userId: null, storeId: null }, async (trx) =>
+      trx.selectFrom("tenant_quota_overrides").select("id").where("tenant_id", "=", a.orgId).execute(),
+    );
+    const asStranger = await withTenantContext(db, { tenantId: b.orgId, userId: null, storeId: null }, async (trx) =>
+      trx.selectFrom("tenant_quota_overrides").select("id").where("tenant_id", "=", a.orgId).execute(),
+    );
+
+    expect(asOwner).toHaveLength(1);
+    expect(asStranger).toHaveLength(0);
+  });
+
+  it("refuses a quota override INSERT attributed to another tenant", async () => {
+    const a = await tenantFixture("crit25q-insert-a");
+    const b = await tenantFixture("crit25q-insert-b");
+
+    const attempt = withTenantContext(db, { tenantId: a.orgId, userId: null, storeId: null }, async (trx) =>
+      trx
+        .insertInto("tenant_quota_overrides")
+        .values({
+          id: randomUUID(),
+          tenant_id: b.orgId,
+          resource: "members",
+          override_type: "ABSOLUTE",
+          limit_value: 1,
         })
         .execute(),
     );

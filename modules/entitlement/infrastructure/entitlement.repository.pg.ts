@@ -4,8 +4,11 @@ import type {
   EntitlementRepository,
   EntitlementSourceRepository,
   PlanEntitlement,
+  PlanQuotaPolicy,
   TenantEntitlementOverride,
+  TenantQuotaOverride,
 } from "../domain/entitlement.repository.js";
+import type { QuotaResource } from "../domain/quota-resource.js";
 import type { EntitlementState, OverrideType } from "../domain/resolve-entitlement.js";
 import "./entitlement.tables.js";
 
@@ -23,6 +26,32 @@ export class EntitlementRepositoryPg implements EntitlementRepository {
     return rows.map((r) => ({
       featureKey: r.feature_key,
       state: r.state as EntitlementState,
+      limit: r.limit_value,
+    }));
+  }
+
+  async listPlanQuotaPolicies(planVersionId: string): Promise<readonly PlanQuotaPolicy[]> {
+    const rows = await this.conn
+      .selectFrom("plan_quota_policies")
+      .select(["resource", "limit_value"])
+      .where("plan_version_id", "=", planVersionId)
+      .orderBy("resource", "asc")
+      .execute();
+
+    return rows.map((r) => ({ resource: r.resource as QuotaResource, limit: r.limit_value }));
+  }
+
+  async listTenantQuotaOverrides(tenantId: string): Promise<readonly TenantQuotaOverride[]> {
+    const rows = await this.conn
+      .selectFrom("tenant_quota_overrides")
+      .select(["resource", "override_type", "limit_value"])
+      .where("tenant_id", "=", tenantId)
+      .orderBy("resource", "asc")
+      .execute();
+
+    return rows.map((r) => ({
+      resource: r.resource as QuotaResource,
+      overrideType: r.override_type as OverrideType,
       limit: r.limit_value,
     }));
   }

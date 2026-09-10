@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { CapabilityError } from "../../capability/contracts/index.js";
 import type { Clock } from "../../../platform/clock.js";
-import { EntitlementConflictError, resolveEntitlement } from "../domain/resolve-entitlement.js";
+import { applyQuotaToGrant, EntitlementConflictError, resolveEntitlement } from "../domain/resolve-entitlement.js";
 import type { EntitlementGrant } from "../domain/resolve-entitlement.js";
 import type { EntitlementRepository, EntitlementSourceRepository } from "../domain/entitlement.repository.js";
 import type { ResolveEntitlementOutputDto } from "./resolve-entitlement.input.js";
@@ -62,6 +62,17 @@ export class ResolveEntitlementService {
     const planGrants = command.planVersionId ? await this.entitlements.listPlanEntitlements(command.planVersionId) : [];
     const overrides = await this.entitlements.listTenantOverrides(command.tenantId);
 
+    // Item 7's two axes. A quota does not compete with an entitlement — it
+    // refines one. See `applyQuotaToGrant` for why feeding both in as separate
+    // grants would make every quota'd resource fail closed under rule 3, and for
+    // which axis dominates when they disagree.
+    const planQuotas = command.planVersionId
+      ? await this.entitlements.listPlanQuotaPolicies(command.planVersionId)
+      : [];
+    const quotaOverrides = await this.entitlements.listTenantQuotaOverrides(command.tenantId);
+    const planQuotaByResource = new Map(planQuotas.map((q) => [q.resource as string, q.limit]));
+    const quotaOverrideByResource = new Map(quotaOverrides.map((q) => [q.resource as string, q]));
+
     const byFeature = new Map<string, EntitlementGrant[]>();
     const add = (featureKey: string, grant: EntitlementGrant) => {
       const existing = byFeature.get(featureKey);
@@ -70,13 +81,34 @@ export class ResolveEntitlementService {
     };
 
     for (const plan of planGrants) {
-      add(plan.featureKey, { source: "PLAN_VERSION", state: plan.state, limit: plan.limit });
+      add(
+        plan.featureKey,
+        applyQuotaToGrant(
+          { source: "PLAN_VERSION", state: plan.state, limit: plan.limit },
+          planQuotaByResource.get(plan.featureKey) ?? null,
+        ),
+      );
     }
     for (const override of overrides) {
       add(override.featureKey, {
         source: override.overrideType === "ABSOLUTE" ? "TENANT_OVERRIDE_ABSOLUTE" : "TENANT_OVERRIDE_DELTA",
         state: override.state,
         limit: override.limit,
+      });
+    }
+
+    // A quota override with no entitlement override beside it still belongs on
+    // its own rung: it adjusts the number without touching whether the resource
+    // is permitted at all. Skipped where an entitlement override already
+    // occupies that rung, because that row's own limit is the caller's stated
+    // intent and two grants at one rung is what rule 3 refuses.
+    const rungTaken = new Set(overrides.map((o) => `${o.featureKey}:${o.overrideType}`));
+    for (const [resource, quota] of quotaOverrideByResource) {
+      if (rungTaken.has(`${resource}:${quota.overrideType}`)) continue;
+      add(resource, {
+        source: quota.overrideType === "ABSOLUTE" ? "TENANT_OVERRIDE_ABSOLUTE" : "TENANT_OVERRIDE_DELTA",
+        state: "LIMIT",
+        limit: quota.limit,
       });
     }
 

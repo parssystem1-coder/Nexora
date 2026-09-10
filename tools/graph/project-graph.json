@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "a9c2a90",
+    "commit": "4a458ae",
     "dirty": true
   },
   "modules": [
@@ -83,7 +83,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 12,
+      "files": 15,
       "dependsOn": [
         "audit",
         "authorization",
@@ -291,6 +291,15 @@
       "policies": []
     },
     {
+      "name": "plan_quota_policies",
+      "module": "entitlement",
+      "migration": "20260910120000_entitlement__create_quota_policies.sql",
+      "tenantId": false,
+      "rlsEnabled": false,
+      "rlsForced": false,
+      "policies": []
+    },
+    {
       "name": "plan_versions",
       "module": "billing",
       "migration": "20260905090000_billing__create_plans.sql",
@@ -426,6 +435,17 @@
       "rlsForced": true,
       "policies": [
         "tenant_entitlement_overrides_tenant_isolation"
+      ]
+    },
+    {
+      "name": "tenant_quota_overrides",
+      "module": "entitlement",
+      "migration": "20260910120000_entitlement__create_quota_policies.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "tenant_quota_overrides_tenant_isolation"
       ]
     },
     {
@@ -1041,6 +1061,11 @@
       "cases": 4
     },
     {
+      "file": "modules/entitlement/domain/quota-resource.spec.ts",
+      "layer": "domain",
+      "cases": 7
+    },
+    {
       "file": "modules/entitlement/domain/resolve-entitlement.spec.ts",
       "layer": "domain",
       "cases": 18
@@ -1203,7 +1228,7 @@
     {
       "file": "apps/api/entitlement.integration.spec.ts",
       "layer": "integration",
-      "cases": 19
+      "cases": 30
     },
     {
       "file": "apps/api/error-contract.integration.spec.ts",
@@ -1390,12 +1415,12 @@
   ],
   "counts": {
     "modules": 11,
-    "tables": 26,
-    "tablesWithRls": 12,
+    "tables": 28,
+    "tablesWithRls": 13,
     "capabilities": 15,
     "routes": 16,
-    "testFiles": 60,
-    "testCases": 592,
+    "testFiles": 61,
+    "testCases": 610,
     "adrs": 64,
     "adrsAccepted": 56
   }

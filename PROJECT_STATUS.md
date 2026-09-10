@@ -202,3 +202,13 @@ Update this section when that changes.
 
 Update this section when that changes.
 
+**Item 7 done — quota policies.** An infrastructure item: two tables, a closed resource vocabulary, and no capability, so `openapi.json` is unchanged at fifteen. Ruling ب-4's list — `members`, `stores`, `domains` — is closed in a database `CHECK` and a TypeScript union together, the discipline item 5 used for `reason_code`.
+
+**`domains` is the first resource that sits on both axes**, because ADR-027 item 9 rules that "domain count is a quota; custom domains are an entitlement." The two compose into **one** grant, and that is a correctness matter rather than a style one: fed in as two `PLAN_VERSION` grants, an `ALLOW` and a `LIMIT` at the same rank would collide under ADR-008 rule 3 and fail every quota'd resource closed. **Which axis wins when they disagree is ADR-008 rule 1's — an explicit `DENY` beats a quota of three, and the number is never consulted.** §5's "two axes and the crosswalk" does not govern this and was checked rather than assumed: that subsection is ADR-024 statuses against ADR-020 tenant-data states.
+
+**ADR-008 governs quota overrides too** — its states are `ALLOW | DENY | LIMIT`, and a `LIMIT` is a quota-shaped answer — so item 6's finding carries over unchanged: a `DELTA` is a modifier, not a base. One asymmetry is new: a `DELTA` may be negative and an `ABSOLUTE` may not, and the CHECK ties the sign to the type.
+
+**Counting is item 8's, and the shape handed over is not uniform.** §5 permits a cross-module read through contracts and forbids the foreign key, so each owning module exposes a counter. `members` and `stores` are both `modules/tenant`; **`domains` has no table until Phase 4**, so a quota on it is unenforceable and item 8 must say so rather than counting zero and reporting success.
+
+Update this section when that changes.
+

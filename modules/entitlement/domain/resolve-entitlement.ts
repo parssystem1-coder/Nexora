@@ -164,3 +164,44 @@ export function resolveEntitlement(featureKey: string, grants: readonly Entitlem
 
   return { featureKey, state: base.state, limit: base.state === "LIMIT" ? limit : null, resolvedFrom };
 }
+
+/**
+ * **How the entitlement axis and the quota axis compose, which ADR-027 item 9
+ * makes unavoidable for `domains` and which applies to all three resources.**
+ *
+ * That item rules *"Domain count is a quota; custom domains are an entitlement.
+ * **Both are enforced through the standard capability policy chain.**"* So one
+ * resource has an answer on each axis, and they must combine into the single
+ * grant this chain resolves rather than competing as two.
+ *
+ * **They are not two grants of the same thing, and treating them as two is a
+ * real defect rather than a style choice.** A plan that grants `ALLOW` for
+ * `members` and sets a limit of 5 would, fed in as two `PLAN_VERSION` grants,
+ * collide under rule 3 — an `ALLOW` and a `LIMIT` at the same rank, not both
+ * declared additive — and every resolution would fail closed with
+ * `ENTITLEMENT_CONFLICT`. The entitlement says *may you*; the quota says *how
+ * many*; together they are one answer.
+ *
+ * **Which dominates when they disagree, settled by ADR-008 rule 1 rather than
+ * chosen here:** *"Explicit DENY always wins, regardless of source or precedence
+ * order."* So an entitlement of `DENY` with a quota of three is a `DENY` — the
+ * number is never consulted, because there is nothing to count toward. That is
+ * also the reading ADR-026 item 2 assumes when it says the gate on a plan-gated
+ * public capability, *"for example white-label branding or custom domains, is an
+ * entitlement check at request time"* — a gate that a quota could override would
+ * not be a gate.
+ *
+ * **`PHASE_2_BRIEF.md` §5's "Lifecycle: two axes and the crosswalk" does not
+ * govern this**, and was checked rather than assumed: that subsection is about
+ * ADR-024's eight subscription statuses against ADR-020's four tenant-data
+ * states (D2-5), a different pair. §5's entitlement/quota rule is D2-14, and it
+ * is about **table structure** — separate tables, never one with a nullable
+ * `tenant_id` — not about composition.
+ */
+export function applyQuotaToGrant(grant: EntitlementGrant, quotaLimit: number | null): EntitlementGrant {
+  // ADR-008 rule 1. A denial is not a limit of zero: zero means "none of this
+  // resource, under a grant that exists", and a caller can tell them apart.
+  if (grant.state === "DENY" || quotaLimit === null) return grant;
+
+  return { ...grant, state: "LIMIT", limit: quotaLimit };
+}

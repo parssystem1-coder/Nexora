@@ -42,6 +42,9 @@ const TENANT_EXEMPT = new Set([
   // Phase 2 item 6. Platform-authored reference data, exempt by the same
   // §5 clause that already names it alongside the plan and price tables.
   "plan_entitlements",
+  // Phase 2 item 7. Platform-authored reference data, exempt by the same §5
+  // clause that already names it alongside `plan_entitlements`.
+  "plan_quota_policies",
 ]);
 
 const CREATE_TABLE_RE = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([a-zA-Z_][\w]*)"?\s*\(([\s\S]*?)\n\)\s*;/gi;

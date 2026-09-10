@@ -319,6 +319,25 @@ const SEED_ROW: Record<string, SeedRow> = {
     );
     return row.id;
   },
+  tenant_quota_overrides: async (f) => {
+    // Phase 2 item 7. Inserted directly, like its entitlement sibling: `05` §4.2
+    // still has no capability that sets an override, which is ADR-045's own
+    // named trigger for the `version` column neither table carries.
+    const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
+      trx
+        .insertInto("tenant_quota_overrides")
+        .values({
+          id: randomUUID(),
+          tenant_id: f.orgId,
+          resource: "members",
+          override_type: "ABSOLUTE",
+          limit_value: 7,
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow(),
+    );
+    return row.id;
+  },
   audit_events: async (f) => {
     const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
       trx
@@ -449,7 +468,7 @@ try {
 }
 
 describe("tenant isolation: every RLS-protected table, enumerated live, denies cross-tenant read/write/delete", () => {
-  it("the live enumeration finds exactly today's twelve tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
+  it("the live enumeration finds exactly today's thirteen tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
     expect(tenantOwnedTables.map((t) => t.table)).toEqual([
       "audit_events",
       // Phase 2 item 6. Both failed this assertion and the seed-factory one
@@ -473,6 +492,9 @@ describe("tenant isolation: every RLS-protected table, enumerated live, denies c
       "subscription_state_transitions",
       "subscriptions",
       "tenant_entitlement_overrides",
+      // Phase 2 item 7, and the last tenant-owned table the entitlement module
+      // adds in this phase.
+      "tenant_quota_overrides",
     ]);
     expect(tenantOwnedTables.every((t) => t.pkColumn === "id")).toBe(true);
   });

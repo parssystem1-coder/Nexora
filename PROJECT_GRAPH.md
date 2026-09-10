@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `a9c2a90` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `4a458ae` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 11 modules · 26 tables (12 with RLS) · 15 capabilities · 16 routes · 592 test cases in 60 files · 64 ADRs (56 accepted)
+**At a glance:** 11 modules · 28 tables (13 with RLS) · 15 capabilities · 16 routes · 610 test cases in 61 files · 64 ADRs (56 accepted)
 
 ## Modules
 
@@ -15,7 +15,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `billing` | application, contracts, domain, infrastructure, interfaces, migrations | 18 | `audit`, `capability`, `identity`, `money` | yes |
 | `calendar` | contracts, domain | 4 | — | — |
 | `capability` | contracts, domain, interfaces | 8 | `audit` | yes |
-| `entitlement` | application, contracts, domain, infrastructure, interfaces, migrations | 12 | `audit`, `authorization`, `capability`, `identity`, `subscription`, `tenant` | yes |
+| `entitlement` | application, contracts, domain, infrastructure, interfaces, migrations | 15 | `audit`, `authorization`, `capability`, `identity`, `subscription`, `tenant` | yes |
 | `idempotency` | application, contracts, domain, infrastructure, migrations | 9 | — | yes |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 42 | `audit`, `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
@@ -39,6 +39,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `permissions` | authorization | — | — | — | — | `20260822090600_authorization__create_permission_catalog.sql` |
 | `plan_entitlements` | entitlement | — | — | — | — | `20260910110000_entitlement__create_entitlements.sql` |
 | `plan_features` | billing | — | — | — | — | `20260905090000_billing__create_plans.sql` |
+| `plan_quota_policies` | entitlement | — | — | — | — | `20260910120000_entitlement__create_quota_policies.sql` |
 | `plan_versions` | billing | — | — | — | — | `20260905090000_billing__create_plans.sql` |
 | `plans` | billing | — | — | — | — | `20260905090000_billing__create_plans.sql` |
 | `price_versions` | billing | — | — | — | — | `20260905120000_billing__create_prices.sql` |
@@ -53,6 +54,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `subscription_state_transitions` | subscription | yes | yes | yes | `subscription_state_transitions_tenant_isolation` | `20260910100000_subscription__create_state_transitions.sql` |
 | `subscriptions` | subscription | yes | yes | yes | `subscriptions_tenant_isolation` | `20260910090000_subscription__create_subscriptions.sql` |
 | `tenant_entitlement_overrides` | entitlement | yes | yes | yes | `tenant_entitlement_overrides_tenant_isolation` | `20260910110000_entitlement__create_entitlements.sql` |
+| `tenant_quota_overrides` | entitlement | yes | yes | yes | `tenant_quota_overrides_tenant_isolation` | `20260910120000_entitlement__create_quota_policies.sql` |
 | `users` | identity | — | — | — | — | `20260822090000_identity__create_users.sql` |
 
 ## Capabilities
@@ -90,9 +92,9 @@ Roles ADR-030 requires exactly one implementation of.
 |---|---|---|
 | application | 17 | 110 |
 | conformance | 2 | 30 |
-| domain | 6 | 83 |
+| domain | 7 | 90 |
 | infrastructure | 6 | 43 |
-| integration | 19 | 268 |
+| integration | 19 | 279 |
 | interfaces | 1 | 4 |
 | other | 5 | 32 |
 | platform | 4 | 22 |
@@ -108,6 +110,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/billing/infrastructure/prices-schema.spec.ts` | infrastructure | 15 |
 | `modules/calendar/domain/business-calendar.spec.ts` | domain | 27 |
 | `modules/capability/interfaces/capability-attempt.spec.ts` | interfaces | 4 |
+| `modules/entitlement/domain/quota-resource.spec.ts` | domain | 7 |
 | `modules/entitlement/domain/resolve-entitlement.spec.ts` | domain | 18 |
 | `modules/idempotency/infrastructure/idempotency-records-schema.spec.ts` | infrastructure | 13 |
 | `modules/identity/application/check-session-revoked.service.spec.ts` | application | 4 |
@@ -140,7 +143,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `apps/api/auth-login.integration.spec.ts` | integration | 19 |
 | `apps/api/auth-logout.integration.spec.ts` | integration | 13 |
 | `apps/api/concurrency-conflict.integration.spec.ts` | integration | 1 |
-| `apps/api/entitlement.integration.spec.ts` | integration | 19 |
+| `apps/api/entitlement.integration.spec.ts` | integration | 30 |
 | `apps/api/error-contract.integration.spec.ts` | integration | 3 |
 | `apps/api/health.integration.spec.ts` | integration | 3 |
 | `apps/api/membership-invite.integration.spec.ts` | integration | 24 |
