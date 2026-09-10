@@ -70,6 +70,25 @@ export interface TenantQuotaOverridesTable {
   updated_at: ColumnType<Date, string | undefined, string>;
 }
 
+/**
+ * Phase 2 item 8. Mutable — ADR-026's verification says upgrading "clears" the
+ * state, and a log cannot be cleared — and the first Phase 2 table to carry
+ * ADR-045's `version`, because that ruling names it in Tier 1 with an explicit
+ * yes rather than leaving it to a Tier 2 trigger.
+ */
+export interface TenantOverLimitStatesTable {
+  id: string;
+  tenant_id: string;
+  resource: ColumnType<string, string, string>;
+  current_count: ColumnType<number, number, number>;
+  limit_value: ColumnType<number, number, number>;
+  /** The one fact no read can recompute. Immutable once written. */
+  entered_at: ColumnType<Date, string | undefined, never>;
+  version: ColumnType<number, number | undefined, number>;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, string>;
+}
+
 declare module "../../../platform/db/kysely.js" {
   interface Database {
     plan_entitlements: PlanEntitlementsTable;
@@ -77,5 +96,6 @@ declare module "../../../platform/db/kysely.js" {
     entitlement_sources: EntitlementSourcesTable;
     plan_quota_policies: PlanQuotaPoliciesTable;
     tenant_quota_overrides: TenantQuotaOverridesTable;
+    tenant_over_limit_states: TenantOverLimitStatesTable;
   }
 }

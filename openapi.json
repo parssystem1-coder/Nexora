@@ -1074,6 +1074,189 @@
         }
       }
     },
+    "/api/v1/organizations/{organizationId}/over-limit": {
+      "get": {
+        "operationId": "overlimit.read",
+        "summary": "overlimit.read (v1)",
+        "description": "Risk: READ. Store-scoped: false. Idempotent: false. Audited: true. Required permissions: overlimit.read.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "overlimit.read succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "organizationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "evaluatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "anyOverLimit": {
+                      "type": "boolean"
+                    },
+                    "resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "resource": {
+                            "type": "string",
+                            "enum": [
+                              "members",
+                              "stores",
+                              "domains"
+                            ]
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "WITHIN_LIMIT",
+                              "OVER_LIMIT",
+                              "NOT_EVALUABLE"
+                            ]
+                          },
+                          "currentCount": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "limit": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "reason": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "NO_COUNTABLE_SOURCE",
+                              "NO_LIMIT_RESOLVED"
+                            ]
+                          },
+                          "blockedOperations": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "resolution": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "upgrade",
+                                "reduce"
+                              ]
+                            }
+                          },
+                          "enteredAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "resource",
+                          "state",
+                          "currentCount",
+                          "limit",
+                          "reason",
+                          "blockedOperations",
+                          "resolution",
+                          "enteredAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "organizationId",
+                    "evaluatedAt",
+                    "anyOverLimit",
+                    "resources"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR | TENANT_CONTEXT_REQUIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "AUTHENTICATION_REQUIRED | SESSION_INVALIDATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ENTITLEMENT_CONFLICT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/plans": {
       "get": {
         "operationId": "plan.list",

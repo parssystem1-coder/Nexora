@@ -12,6 +12,7 @@ import { PlanSubscribeController } from "../../modules/subscription/interfaces/p
 import { SubscriptionReadController } from "../../modules/subscription/interfaces/subscription-read.controller.js";
 import { SubscriptionCancelController } from "../../modules/subscription/interfaces/subscription-cancel.controller.js";
 import { EntitlementController } from "../../modules/entitlement/interfaces/entitlement.controller.js";
+import { OverLimitController } from "../../modules/entitlement/interfaces/overlimit.controller.js";
 import { AuthLoginController } from "../../modules/identity/interfaces/auth-login.controller.js";
 import { AuthLogoutController } from "../../modules/identity/interfaces/auth-logout.controller.js";
 import { AuthLogoutAllController } from "../../modules/identity/interfaces/auth-logout-all.controller.js";
@@ -47,6 +48,7 @@ import { HealthController } from "./health.controller.js";
     SubscriptionReadController,
     SubscriptionCancelController,
     EntitlementController,
+    OverLimitController,
     AuthLoginController,
     AuthLogoutController,
     AuthLogoutAllController,

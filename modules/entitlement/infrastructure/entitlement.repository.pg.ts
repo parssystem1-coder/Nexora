@@ -9,6 +9,7 @@ import type {
   TenantQuotaOverride,
 } from "../domain/entitlement.repository.js";
 import type { QuotaResource } from "../domain/quota-resource.js";
+import type { OverLimitStateRepository } from "../domain/entitlement.repository.js";
 import type { EntitlementState, OverrideType } from "../domain/resolve-entitlement.js";
 import "./entitlement.tables.js";
 
@@ -97,5 +98,19 @@ export class EntitlementSourceRepositoryPg implements EntitlementSourceRepositor
         evaluated_at: entry.evaluatedAt.toISOString(),
       })
       .execute();
+  }
+}
+
+export class OverLimitStateRepositoryPg implements OverLimitStateRepository {
+  constructor(private readonly conn: Kysely<Database> | Transaction<Database>) {}
+
+  async findEnteredAtByResource(tenantId: string): Promise<ReadonlyMap<string, Date>> {
+    const rows = await this.conn
+      .selectFrom("tenant_over_limit_states")
+      .select(["resource", "entered_at"])
+      .where("tenant_id", "=", tenantId)
+      .execute();
+
+    return new Map(rows.map((r) => [r.resource, r.entered_at]));
   }
 }

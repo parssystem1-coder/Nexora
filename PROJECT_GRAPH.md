@@ -1,26 +1,26 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `4a458ae` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `npm run graph` from commit `3923ebe` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 This file answers *what exists*, cheaply. It does not answer *whether it is correct* — that is the conformance harness (ADR-030) and human review. A fact here that looks wrong means the source is wrong, not this file.
 
-**At a glance:** 11 modules · 28 tables (13 with RLS) · 15 capabilities · 16 routes · 610 test cases in 61 files · 64 ADRs (56 accepted)
+**At a glance:** 11 modules · 29 tables (14 with RLS) · 16 capabilities · 17 routes · 635 test cases in 63 files · 64 ADRs (56 accepted)
 
 ## Modules
 
 | module | layers | files | depends on | platform |
 |---|---|---|---|---|
 | `audit` | contracts, domain, infrastructure, migrations | 10 | — | yes |
-| `authorization` | application, contracts, domain, infrastructure, migrations | 20 | `capability` | yes |
+| `authorization` | application, contracts, domain, infrastructure, migrations | 21 | `capability` | yes |
 | `billing` | application, contracts, domain, infrastructure, interfaces, migrations | 18 | `audit`, `capability`, `identity`, `money` | yes |
 | `calendar` | contracts, domain | 4 | — | — |
 | `capability` | contracts, domain, interfaces | 8 | `audit` | yes |
-| `entitlement` | application, contracts, domain, infrastructure, interfaces, migrations | 15 | `audit`, `authorization`, `capability`, `identity`, `subscription`, `tenant` | yes |
+| `entitlement` | application, contracts, domain, infrastructure, interfaces, migrations | 22 | `audit`, `authorization`, `capability`, `identity`, `subscription`, `tenant` | yes |
 | `idempotency` | application, contracts, domain, infrastructure, migrations | 9 | — | yes |
 | `identity` | application, contracts, domain, infrastructure, interfaces, migrations | 42 | `audit`, `capability` | yes |
 | `money` | contracts, domain, infrastructure, migrations | 11 | — | yes |
 | `subscription` | application, contracts, domain, infrastructure, interfaces, migrations | 32 | `audit`, `authorization`, `billing`, `capability`, `idempotency`, `identity`, `tenant` | yes |
-| `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 67 | `audit`, `authorization`, `capability`, `identity` | yes |
+| `tenant` | application, contracts, domain, infrastructure, interfaces, migrations | 68 | `audit`, `authorization`, `capability`, `identity` | yes |
 
 ## Tables
 
@@ -54,6 +54,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `subscription_state_transitions` | subscription | yes | yes | yes | `subscription_state_transitions_tenant_isolation` | `20260910100000_subscription__create_state_transitions.sql` |
 | `subscriptions` | subscription | yes | yes | yes | `subscriptions_tenant_isolation` | `20260910090000_subscription__create_subscriptions.sql` |
 | `tenant_entitlement_overrides` | entitlement | yes | yes | yes | `tenant_entitlement_overrides_tenant_isolation` | `20260910110000_entitlement__create_entitlements.sql` |
+| `tenant_over_limit_states` | entitlement | yes | yes | yes | `tenant_over_limit_states_tenant_isolation` | `20260910130000_entitlement__create_over_limit_states.sql` |
 | `tenant_quota_overrides` | entitlement | yes | yes | yes | `tenant_quota_overrides_tenant_isolation` | `20260910120000_entitlement__create_quota_policies.sql` |
 | `users` | identity | — | — | — | — | `20260822090000_identity__create_users.sql` |
 
@@ -70,6 +71,7 @@ This file answers *what exists*, cheaply. It does not answer *whether it is corr
 | `membership.role.assign` | `POST /api/v1/organizations/:organizationId/memberships/:membershipId/roles` | `membership.role.assign` | HIGH_WRITE | yes | — |
 | `organization.create` | `POST /api/v1/organizations` | — | MEDIUM_WRITE | yes | — |
 | `organization.switch` | `POST /api/v1/organizations/:organizationId/switch` | — | LOW_WRITE | yes | — |
+| `overlimit.read` | `GET /api/v1/organizations/:organizationId/over-limit` | `overlimit.read` | READ | yes | — |
 | `plan.list` | `GET /api/v1/plans` | — | READ | yes | — |
 | `plan.subscribe` | `POST /api/v1/organizations/:organizationId/subscription` | `plan.subscribe` | HIGH_WRITE | yes | — |
 | `store.create` | `POST /api/v1/stores` | `store.create` | MEDIUM_WRITE | yes | — |
@@ -92,9 +94,9 @@ Roles ADR-030 requires exactly one implementation of.
 |---|---|---|
 | application | 17 | 110 |
 | conformance | 2 | 30 |
-| domain | 7 | 90 |
+| domain | 8 | 97 |
 | infrastructure | 6 | 43 |
-| integration | 19 | 279 |
+| integration | 20 | 297 |
 | interfaces | 1 | 4 |
 | other | 5 | 32 |
 | platform | 4 | 22 |
@@ -110,6 +112,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `modules/billing/infrastructure/prices-schema.spec.ts` | infrastructure | 15 |
 | `modules/calendar/domain/business-calendar.spec.ts` | domain | 27 |
 | `modules/capability/interfaces/capability-attempt.spec.ts` | interfaces | 4 |
+| `modules/entitlement/domain/over-limit.spec.ts` | domain | 7 |
 | `modules/entitlement/domain/quota-resource.spec.ts` | domain | 7 |
 | `modules/entitlement/domain/resolve-entitlement.spec.ts` | domain | 18 |
 | `modules/idempotency/infrastructure/idempotency-records-schema.spec.ts` | infrastructure | 13 |
@@ -151,6 +154,7 @@ Roles ADR-030 requires exactly one implementation of.
 | `apps/api/membership-role-assign.integration.spec.ts` | integration | 30 |
 | `apps/api/organization-create.integration.spec.ts` | integration | 13 |
 | `apps/api/organization-switch.integration.spec.ts` | integration | 12 |
+| `apps/api/over-limit.integration.spec.ts` | integration | 18 |
 | `apps/api/plan-list.integration.spec.ts` | integration | 13 |
 | `apps/api/store-create.integration.spec.ts` | integration | 24 |
 | `apps/api/store-read.integration.spec.ts` | integration | 15 |

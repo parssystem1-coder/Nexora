@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "4a458ae",
+    "commit": "3923ebe",
     "dirty": true
   },
   "modules": [
@@ -25,7 +25,7 @@
         "infrastructure",
         "migrations"
       ],
-      "files": 20,
+      "files": 21,
       "dependsOn": [
         "capability"
       ],
@@ -83,7 +83,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 15,
+      "files": 22,
       "dependsOn": [
         "audit",
         "authorization",
@@ -168,7 +168,7 @@
         "interfaces",
         "migrations"
       ],
-      "files": 67,
+      "files": 68,
       "dependsOn": [
         "audit",
         "authorization",
@@ -438,6 +438,17 @@
       ]
     },
     {
+      "name": "tenant_over_limit_states",
+      "module": "entitlement",
+      "migration": "20260910130000_entitlement__create_over_limit_states.sql",
+      "tenantId": true,
+      "rlsEnabled": true,
+      "rlsForced": true,
+      "policies": [
+        "tenant_over_limit_states_tenant_isolation"
+      ]
+    },
+    {
       "name": "tenant_quota_overrides",
       "module": "entitlement",
       "migration": "20260910120000_entitlement__create_quota_policies.sql",
@@ -556,6 +567,18 @@
       "audit": true,
       "storeScoped": false,
       "route": "POST /api/v1/organizations/:organizationId/switch"
+    },
+    {
+      "id": "overlimit.read",
+      "module": "entitlement",
+      "file": "modules/entitlement/interfaces/overlimit-read.capability.ts",
+      "permissions": [
+        "overlimit.read"
+      ],
+      "risk": "READ",
+      "audit": true,
+      "storeScoped": false,
+      "route": "GET /api/v1/organizations/:organizationId/over-limit"
     },
     {
       "id": "plan.list",
@@ -1061,6 +1084,11 @@
       "cases": 4
     },
     {
+      "file": "modules/entitlement/domain/over-limit.spec.ts",
+      "layer": "domain",
+      "cases": 7
+    },
+    {
       "file": "modules/entitlement/domain/quota-resource.spec.ts",
       "layer": "domain",
       "cases": 7
@@ -1266,6 +1294,11 @@
       "cases": 12
     },
     {
+      "file": "apps/api/over-limit.integration.spec.ts",
+      "layer": "integration",
+      "cases": 18
+    },
+    {
       "file": "apps/api/plan-list.integration.spec.ts",
       "layer": "integration",
       "cases": 13
@@ -1373,6 +1406,11 @@
       "file": "modules/tenant/interfaces/membership-role.controller.ts"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/organizations/:organizationId/over-limit",
+      "file": "modules/entitlement/interfaces/overlimit.controller.ts"
+    },
+    {
       "method": "POST",
       "path": "/api/v1/organizations/:organizationId/subscription",
       "file": "modules/subscription/interfaces/plan-subscribe.controller.ts"
@@ -1415,12 +1453,12 @@
   ],
   "counts": {
     "modules": 11,
-    "tables": 28,
-    "tablesWithRls": 13,
-    "capabilities": 15,
-    "routes": 16,
-    "testFiles": 61,
-    "testCases": 610,
+    "tables": 29,
+    "tablesWithRls": 14,
+    "capabilities": 16,
+    "routes": 17,
+    "testFiles": 63,
+    "testCases": 635,
     "adrs": 64,
     "adrsAccepted": 56
   }

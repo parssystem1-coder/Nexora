@@ -17,3 +17,9 @@ export type {
 } from "../domain/resolve-entitlement.js";
 export type { ResolveEntitlementOutputDto } from "../application/resolve-entitlement.input.js";
 export { entitlementResolveCapability } from "../interfaces/entitlement-resolve.capability.js";
+export { evaluateResource } from "../domain/over-limit.js";
+export type { OverLimitState, ResourceEvaluation, NotEvaluableReason } from "../domain/over-limit.js";
+export { QUOTA_RESOURCES, RESOURCE_OWNING_MODULE, isQuotaResource } from "../domain/quota-resource.js";
+export type { QuotaResource } from "../domain/quota-resource.js";
+export type { ReadOverLimitOutputDto } from "../application/read-over-limit.input.js";
+export { overlimitReadCapability } from "../interfaces/overlimit-read.capability.js";

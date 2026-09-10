@@ -338,6 +338,29 @@ const SEED_ROW: Record<string, SeedRow> = {
     );
     return row.id;
   },
+  tenant_over_limit_states: async (f) => {
+    // Phase 2 item 8. Inserted directly, because **nothing in Phase 2 writes
+    // this table**: ADR-045 names its two writers as "the usage recorder and the
+    // over-limit evaluator", and the usage recorder is item 9 while ADR-026's
+    // entry cause is item 15's plan change.
+    //
+    // The counts satisfy `tenant_over_limit_states_is_actually_over`, which
+    // refuses a row that is not in fact over its limit.
+    const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
+      trx
+        .insertInto("tenant_over_limit_states")
+        .values({
+          id: randomUUID(),
+          tenant_id: f.orgId,
+          resource: "members",
+          current_count: 9,
+          limit_value: 5,
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow(),
+    );
+    return row.id;
+  },
   audit_events: async (f) => {
     const row = await withTenantContext(db, { tenantId: f.orgId, userId: null, storeId: null }, (trx) =>
       trx
@@ -468,7 +491,7 @@ try {
 }
 
 describe("tenant isolation: every RLS-protected table, enumerated live, denies cross-tenant read/write/delete", () => {
-  it("the live enumeration finds exactly today's thirteen tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
+  it("the live enumeration finds exactly today's fourteen tenant-owned tables - not a hand-maintained list, but not silently missing one either", () => {
     expect(tenantOwnedTables.map((t) => t.table)).toEqual([
       "audit_events",
       // Phase 2 item 6. Both failed this assertion and the seed-factory one
@@ -494,6 +517,9 @@ describe("tenant isolation: every RLS-protected table, enumerated live, denies c
       "tenant_entitlement_overrides",
       // Phase 2 item 7, and the last tenant-owned table the entitlement module
       // adds in this phase.
+      // Phase 2 item 8, and the first Phase 2 table to carry ADR-045's `version`
+      // — that ruling names it in Tier 1 with an explicit yes.
+      "tenant_over_limit_states",
       "tenant_quota_overrides",
     ]);
     expect(tenantOwnedTables.every((t) => t.pkColumn === "id")).toBe(true);

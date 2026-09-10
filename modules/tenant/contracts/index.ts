@@ -14,3 +14,5 @@ export { membershipRoleAssignCapability } from "../interfaces/membership-role-as
 export { storeCreateCapability } from "../interfaces/store-create.capability.js";
 export { organizationSwitchCapability } from "../interfaces/organization-switch.capability.js";
 export { membershipRevokeCapability } from "../interfaces/membership-revoke.capability.js";
+export type { TenantResourceCounter } from "./resource-count.contract.js";
+export { createTenantResourceCounter } from "./resource-count.contract.js";

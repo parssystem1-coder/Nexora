@@ -59,3 +59,18 @@ export interface EntitlementSourceRepository {
     evaluatedAt: Date;
   }): Promise<void>;
 }
+
+/**
+ * The stored over-limit state (ADR-026 item 6: "queryable per tenant").
+ *
+ * **Read-only in Phase 2, and that is the honest shape rather than a stub.**
+ * ADR-045 names this table's two writers — "the usage recorder and the
+ * over-limit evaluator" — and neither exists: the usage recorder is item 9, and
+ * ADR-026's own entry cause is a downgrade, which is item 15's `plan.change`. A
+ * `record` method here would be a signature with no caller and no test, which is
+ * the "documentation, not architecture" failure ADR-030 names.
+ */
+export interface OverLimitStateRepository {
+  /** `entered_at` per resource for one tenant — the one fact a live evaluation cannot recompute. */
+  findEnteredAtByResource(tenantId: string): Promise<ReadonlyMap<string, Date>>;
+}

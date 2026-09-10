@@ -212,3 +212,15 @@ Update this section when that changes.
 
 Update this section when that changes.
 
+**Item 8 done — over-limit state and `overlimit.read`.** ADR-026 turned out to close nothing this session's brief had claimed was open; it sharpened one ruling instead. Its item 4 requires the tenant be told "which resource, the current count, the new limit, exactly which operations are now blocked, and how to resolve it", and calls a generic message insufficient — **a count of zero for an uncounted resource is worse than generic, because it is precise and wrong.**
+
+**Nothing in Phase 2 writes the table**, and the writers are named rather than guessed: ADR-045's Tier 1 row says "the usage recorder and the over-limit evaluator both write it", which are item 9 and — via ADR-026's downgrade entry cause — item 15. **So the read path was built not to trust its own table:** it counts live through each owning module's contract, resolves limits through ADR-008's chain, and reads the table only for `entered_at`, the single fact it cannot recompute. A read that trusted it would report "not over limit" for every tenant forever and look correct, which is the silent-success failure `AGENTS.md` §8's second rule exists to catch, in its third distinct shape.
+
+**The third state is item 7's obligation discharged.** `domains` has no table until Phase 4, so it reports `NOT_EVALUABLE` with a **null** count and a reason — never zero. Nothing here changes when `store_domains` exists; the resource becomes evaluable the moment its module exposes a counter.
+
+**Mutable, not append-only**, decided by one word in ADR-026's verification list: upgrading "**clears**" the state, and a log cannot be cleared. **It is also the first Phase 2 table to carry ADR-045's `version`** — not because a Tier 2 trigger fired, but because that ruling names it in **Tier 1 with an explicit yes**, which items 6 and 7's tables never were.
+
+**The harness caught a false claim in this session's own work.** The capability first declared no `ENTITLEMENT_CONFLICT`, arguing it consumed an already-resolved limit — but the controller calls the resolver, so the code is genuinely reachable. `ERROR-CODE-UNDECLARED` traced what the controller can reach and refuted the comment.
+
+Update this section when that changes.
+
